@@ -49,6 +49,7 @@ public static class IndexWriter
             });
 
             using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
             cmd.CommandText =
                 "INSERT INTO Chunks (ChunkId, DocumentId, SectionTitle, ContentText, Embedding, Metadata) " +
                 "VALUES ($id, $doc, $title, $text, $emb, $meta)";
