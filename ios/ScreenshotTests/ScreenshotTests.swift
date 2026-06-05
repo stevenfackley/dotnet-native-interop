@@ -5,13 +5,16 @@ import XCTest
 ///
 /// Best-effort: navigation is guarded by existence checks and `continueAfterFailure = true`, so a single
 /// element that can't be found doesn't abort the whole capture run — you still get every other screen.
+@MainActor
 final class ScreenshotTests: XCTestCase {
     private let app = XCUIApplication()
 
     override func setUpWithError() throws {
         continueAfterFailure = true
         app.launch()
-        // Let the first launch + initial catalog load settle.
+        // Capture in landscape — the iPad layout (wide transport pickers + charts) reads better than portrait.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        // Let the first launch + rotation + initial catalog load settle.
         sleep(3)
     }
 
@@ -61,8 +64,16 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Navigation (best-effort)
 
     private func tapTab(_ label: String) {
-        let button = app.tabBars.buttons[label]
-        if button.waitForExistence(timeout: 10) {
+        // iPhone renders a bottom tab bar; iPad (iPadOS 18+) renders a top bar whose items are plain
+        // buttons not under `tabBars`. Try the tab-bar path first, then fall back to any button.
+        let tabBarButton = app.tabBars.buttons[label]
+        if tabBarButton.waitForExistence(timeout: 3) {
+            tabBarButton.tap()
+            sleep(1)
+            return
+        }
+        let button = app.buttons[label].firstMatch
+        if button.waitForExistence(timeout: 6) {
             button.tap()
             sleep(1)
         }
