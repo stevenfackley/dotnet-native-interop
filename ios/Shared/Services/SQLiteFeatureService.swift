@@ -8,8 +8,8 @@ struct SQLiteFeatureService: FeatureService {
 
     func descriptors() async throws -> [FeatureDescriptor] {
         let json = try await Task.detached(priority: .userInitiated) { () throws -> String in
-            guard let ptr = ondevicellm_sqlite_features() else { throw FeatureServiceError.nullResult }
-            defer { ondevicellm_string_free(ptr) }
+            guard let ptr = dni_sqlite_features() else { throw FeatureServiceError.nullResult }
+            defer { dni_string_free(ptr) }
             return String(cString: ptr)
         }.value
         return try JSONDecode.decode([FeatureDescriptor].self, from: json)
@@ -17,9 +17,9 @@ struct SQLiteFeatureService: FeatureService {
 
     func run(_ id: String) async throws -> FeatureResult {
         let json = try await Task.detached(priority: .userInitiated) { () throws -> String in
-            let ptr: UnsafePointer<CChar>? = id.withCString { ondevicellm_sqlite_run($0) }
+            let ptr: UnsafePointer<CChar>? = id.withCString { dni_sqlite_run($0) }
             guard let ptr else { throw FeatureServiceError.nullResult }
-            defer { ondevicellm_string_free(ptr) }
+            defer { dni_string_free(ptr) }
             return String(cString: ptr)
         }.value
         return try JSONDecode.decode(FeatureResult.self, from: json)

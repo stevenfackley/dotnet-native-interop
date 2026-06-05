@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OnDeviceLlm"
+rootProject.name = "DotnetNativeInterop"
 include(":app")

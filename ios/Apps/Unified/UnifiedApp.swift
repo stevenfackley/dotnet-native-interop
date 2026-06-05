@@ -3,7 +3,7 @@ import SwiftUI
 /// Unified app entry: one app, all three transports. Builds the services once and shares them between
 /// the Features explorer (selected transport) and the Compare tab (all transports).
 @main
-struct OnDeviceLlmUnifiedApp: App {
+struct DotnetNativeInteropUnifiedApp: App {
     @StateObject private var features: FeaturesViewModel
     @StateObject private var comparison: ComparisonViewModel
 

@@ -1,20 +1,20 @@
-# OnDeviceLLM ProGuard rules
+# DotnetNativeInterop ProGuard rules
 
 # Keep JNI entry points — the C shim calls back into these by name
--keep class io.ondevicellm.transport.FfiTokenListener { *; }
--keepclassmembers class io.ondevicellm.transport.FfiTokenListener {
+-keep class io.dotnetnativeinterop.transport.FfiTokenListener { *; }
+-keepclassmembers class io.dotnetnativeinterop.transport.FfiTokenListener {
     public void onToken(int, java.lang.String, boolean);
 }
 
 # Keep NativeBridge external functions (referenced by JNI)
--keep class io.ondevicellm.transport.NativeBridge { *; }
+-keep class io.dotnetnativeinterop.transport.NativeBridge { *; }
 
 # Room — keep entity classes and DAOs
--keep class io.ondevicellm.data.** { *; }
+-keep class io.dotnetnativeinterop.data.** { *; }
 
 # gRPC generated code
 -keep class io.grpc.** { *; }
--keep class ondevicellm.v1.** { *; }
+-keep class dni.v1.** { *; }
 -dontwarn io.grpc.**
 
 # OkHttp SSE

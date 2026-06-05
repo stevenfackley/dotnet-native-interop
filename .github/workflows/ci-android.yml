@@ -6,7 +6,7 @@ on:
       - main
       - develop
     paths:
-      - 'core/OnDeviceLlm.NativeBridge/**'
+      - 'core/DotnetNativeInterop.NativeBridge/**'
       - 'android/**'
       - 'build/build-android-so.sh'
       - '.github/workflows/ci-android.yml'
@@ -15,7 +15,7 @@ on:
       - main
       - develop
     paths:
-      - 'core/OnDeviceLlm.NativeBridge/**'
+      - 'core/DotnetNativeInterop.NativeBridge/**'
       - 'android/**'
       - 'build/build-android-so.sh'
       - '.github/workflows/ci-android.yml'

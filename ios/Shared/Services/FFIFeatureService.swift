@@ -6,8 +6,8 @@ struct FFIFeatureService: FeatureService {
 
     func descriptors() async throws -> [FeatureDescriptor] {
         let json = try await Task.detached(priority: .userInitiated) { () throws -> String in
-            guard let ptr = ondevicellm_features_json() else { throw FeatureServiceError.nullResult }
-            defer { ondevicellm_string_free(ptr) }
+            guard let ptr = dni_features_json() else { throw FeatureServiceError.nullResult }
+            defer { dni_string_free(ptr) }
             return String(cString: ptr)
         }.value
         return try JSONDecode.decode([FeatureDescriptor].self, from: json)
@@ -15,9 +15,9 @@ struct FFIFeatureService: FeatureService {
 
     func run(_ id: String) async throws -> FeatureResult {
         let json = try await Task.detached(priority: .userInitiated) { () throws -> String in
-            let ptr: UnsafePointer<CChar>? = id.withCString { ondevicellm_feature_run($0) }
+            let ptr: UnsafePointer<CChar>? = id.withCString { dni_feature_run($0) }
             guard let ptr else { throw FeatureServiceError.nullResult }
-            defer { ondevicellm_string_free(ptr) }
+            defer { dni_string_free(ptr) }
             return String(cString: ptr)
         }.value
         return try JSONDecode.decode(FeatureResult.self, from: json)

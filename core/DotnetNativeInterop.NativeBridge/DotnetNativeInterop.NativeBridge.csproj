@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DotnetNativeInterop.NativeBridge</RootNamespace>
+    <!-- Native artifact base name -> dni.dylib / dni.so. -->
+    <AssemblyName>dni</AssemblyName>
+
+    <!-- One NativeAOT shared library loaded into each native UI process. -->
+    <PublishAot>true</PublishAot>
+    <NativeLib>Shared</NativeLib>
+    <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
+
+    <!-- The C ABI exports use pointer types (byte*, delegate* unmanaged). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- SQLite via SQLCipher (Pattern 4). The stock e_sqlite3 bundle ships NO iOS native
+       static lib (only browser-wasm/win/linux/osx), so on NativeAOT iOS its P/Invokes have
+       no backing library and the provider's type initializer throws. e_sqlcipher is the ONLY
+       SQLitePCLRaw bundle that ships iOS device + simulator static libs, so we use
+       Microsoft.Data.Sqlite.Core + bundle_e_sqlcipher and hand-link the static lib below.
+       SQLCipher is full SQLite; Password= => PRAGMA key encrypts the database at rest.
+       On Windows (build/probe) the bundle resolves its win-x64 native automatically. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.0" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.11" />
+    <!-- Restored only to resolve the iOS static-lib path below; contributes no assets. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlcipher.ios" Version="2.1.11"
+                      GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Hand-link the e_sqlcipher static lib into the NativeAOT image for Apple RIDs.
+       DirectPInvoke binds the provider's P/Invokes (DLL name "e_sqlcipher") to the
+       statically linked symbols. The bundle's auto-link targets only fire for -ios TFMs. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'iossimulator-arm64'">
+    <DirectPInvoke Include="e_sqlcipher" />
+    <NativeLibrary Include="$(PkgSQLitePCLRaw_lib_e_sqlcipher_ios)/static/simulator/e_sqlcipher.a" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64'">
+    <DirectPInvoke Include="e_sqlcipher" />
+    <NativeLibrary Include="$(PkgSQLitePCLRaw_lib_e_sqlcipher_ios)/static/device/e_sqlcipher.a" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
+  </ItemGroup>
+
+  <!-- The retired Kestrel HTTP host and gRPC server are excluded from compilation. -->
+  <ItemGroup>
+    <Compile Remove="Http\**\*.cs" />
+    <Compile Remove="Grpc\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="abi\dni.h" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Android NativeAOT is experimental in .NET 10: acknowledge preview + allow the bionic RID. -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('linux-bionic'))">
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <DisableUnsupportedError>true</DisableUnsupportedError>
+  </PropertyGroup>
+
+</Project>

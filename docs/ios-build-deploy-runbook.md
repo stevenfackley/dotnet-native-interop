@@ -14,7 +14,7 @@ ssh steve@steve-mac-mini "zsh -lc '
   cd /Users/steve/dotnet-ios-android-poc-native-frontend
   bash build/build-ios-framework-device.sh        # device-only XCFramework (~half the full build)
   cd ios && xcodegen generate
-  xcodebuild -project OnDeviceLlmApp.xcodeproj -scheme OnDeviceLlmUnified -configuration Debug \
+  xcodebuild -project DotnetNativeInteropApp.xcodeproj -scheme DotnetNativeInteropUnified -configuration Debug \
     -destination \"generic/platform=iOS\" -derivedDataPath build/dd \
     -allowProvisioningUpdates DEVELOPMENT_TEAM=QJW4S8BDFX build
   xcrun devicectl device install app --device 00008101-0019092E1EFA601E \
@@ -91,8 +91,8 @@ holds only that keychain's password, not your login password.
 - Remote commands need a **login shell** (`zsh -lc`) or `dotnet`/`xcodegen`/`brew` aren't on PATH.
 - A **single-slice** (device-only) `.xcframework` is valid for device builds; don't recreate the
   simulator slice unless you need the Simulator.
-- `xcodegen`'s project is `ios/OnDeviceLlmApp.xcodeproj`, scheme **`OnDeviceLlmUnified`**, bundle id
-  `com.ondevicellm.unified` (from `ios/project.yml`).
+- `xcodegen`'s project is `ios/DotnetNativeInteropApp.xcodeproj`, scheme **`DotnetNativeInteropUnified`**, bundle id
+  `com.dotnetnativeinterop.unified` (from `ios/project.yml`).
 - `ios-deploy` is **not installed**; use `xcrun devicectl device install app` (Xcode 15+).
 - Adding a feature to the engine catalog needs **no ABI/Swift change** — but the **dylib changes**, so the
   XCFramework MUST be rebuilt for new demos to appear on device.
@@ -100,6 +100,6 @@ holds only that keychain's password, not your login password.
 ## Verifying without a device (Windows)
 
 Engine demos are deterministic and self-checking. Build + a throwaway probe referencing
-`OnDeviceLlm.Engine` (assert `LanguageFeatureCatalog.Run(id).Ok`), then delete the probe. The native
+`DotnetNativeInterop.Engine` (assert `LanguageFeatureCatalog.Run(id).Ok`), then delete the probe. The native
 build/deploy above is the only way to verify the **visual** demos and AOT-only behaviour (e.g. AES-GCM via
 CryptoKit). See `nativeaot-mobile-caveats.md` for what can and can't be proven off-device.

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # build-ios-framework.sh
-# Publishes OnDeviceLlm.NativeBridge for iOS (device + simulator), applies dylib name fixes,
+# Publishes DotnetNativeInterop.NativeBridge for iOS (device + simulator), applies dylib name fixes,
 # and assembles a universal XCFramework.
 #
 # This script runs on macOS and uses Apple toolchains (install_name_tool, lipo, xcodebuild).
@@ -13,8 +13,8 @@ set -euo pipefail
 # ============================================================================
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CSPROJ_PATH="${PROJECT_DIR}/core/OnDeviceLlm.NativeBridge/OnDeviceLlm.NativeBridge.csproj"
-HEADER_PATH="${PROJECT_DIR}/core/OnDeviceLlm.NativeBridge/abi/ondevicellm.h"
+CSPROJ_PATH="${PROJECT_DIR}/core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj"
+HEADER_PATH="${PROJECT_DIR}/core/DotnetNativeInterop.NativeBridge/abi/dni.h"
 
 # Build artifact locations
 BUILD_DIR="${PROJECT_DIR}/build/ios-artifacts"
@@ -23,14 +23,14 @@ SIMULATOR_PUBLISH="${BUILD_DIR}/iossimulator-arm64"
 
 # Framework output
 FRAMEWORK_DIR="${PROJECT_DIR}/ios/Frameworks"
-FRAMEWORK_NAME="ondevicellm"
+FRAMEWORK_NAME="dni"
 XCFRAMEWORK_PATH="${FRAMEWORK_DIR}/${FRAMEWORK_NAME}.xcframework"
 
 # Cleanup and create build directory
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}" "${FRAMEWORK_DIR}"
 
-echo "=== OnDeviceLlm iOS Framework Build ==="
+echo "=== DotnetNativeInterop iOS Framework Build ==="
 echo "Project: ${CSPROJ_PATH}"
 echo "Output: ${XCFRAMEWORK_PATH}"
 echo ""
@@ -47,8 +47,8 @@ dotnet publish \
   -o "${DEVICE_PUBLISH}" \
   -p:UseAppHost=false
 
-if [ ! -f "${DEVICE_PUBLISH}/ondevicellm.dylib" ]; then
-  echo "ERROR: ondevicellm.dylib not found in ${DEVICE_PUBLISH}"
+if [ ! -f "${DEVICE_PUBLISH}/dni.dylib" ]; then
+  echo "ERROR: dni.dylib not found in ${DEVICE_PUBLISH}"
   exit 1
 fi
 
@@ -64,8 +64,8 @@ dotnet publish \
   -o "${SIMULATOR_PUBLISH}" \
   -p:UseAppHost=false
 
-if [ ! -f "${SIMULATOR_PUBLISH}/ondevicellm.dylib" ]; then
-  echo "ERROR: ondevicellm.dylib not found in ${SIMULATOR_PUBLISH}"
+if [ ! -f "${SIMULATOR_PUBLISH}/dni.dylib" ]; then
+  echo "ERROR: dni.dylib not found in ${SIMULATOR_PUBLISH}"
   exit 1
 fi
 
@@ -77,14 +77,14 @@ fi
 echo "[3/4] Fixing dylib install names..."
 
 # Device dylib: set the framework-relative load name
-# install_name_tool -id @rpath/ondevicellm.framework/ondevicellm <dylib>
-# This tells the iOS runtime to find the dylib at @rpath/ondevicellm.framework/ondevicellm
+# install_name_tool -id @rpath/dni.framework/dni <dylib>
+# This tells the iOS runtime to find the dylib at @rpath/dni.framework/dni
 install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
-  "${DEVICE_PUBLISH}/ondevicellm.dylib"
+  "${DEVICE_PUBLISH}/dni.dylib"
 
 # Simulator dylib: same fix
 install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
-  "${SIMULATOR_PUBLISH}/ondevicellm.dylib"
+  "${SIMULATOR_PUBLISH}/dni.dylib"
 
 echo "   Device dylib: install_name set to @rpath/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
 echo "   Simulator dylib: install_name set to @rpath/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
@@ -99,10 +99,10 @@ echo "[4/4] Assembling frameworks..."
 # Create device framework bundle.
 # The bundle dir name must equal "<FRAMEWORK_NAME>.framework" and contain a binary named
 # "<FRAMEWORK_NAME>", or xcodebuild -create-xcframework can't find the executable. Device and
-# simulator therefore live in separate parent dirs so both can be "ondevicellm.framework".
+# simulator therefore live in separate parent dirs so both can be "dni.framework".
 DEVICE_FRAMEWORK="${BUILD_DIR}/device/${FRAMEWORK_NAME}.framework"
 mkdir -p "${DEVICE_FRAMEWORK}/Headers"
-cp "${DEVICE_PUBLISH}/ondevicellm.dylib" "${DEVICE_FRAMEWORK}/${FRAMEWORK_NAME}"
+cp "${DEVICE_PUBLISH}/dni.dylib" "${DEVICE_FRAMEWORK}/${FRAMEWORK_NAME}"
 cp "${HEADER_PATH}" "${DEVICE_FRAMEWORK}/Headers/"
 
 # Generate minimal Info.plist for device framework
@@ -114,13 +114,13 @@ cat > "${DEVICE_FRAMEWORK}/Info.plist" <<'EOF'
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>ondevicellm</string>
+  <string>dni</string>
   <key>CFBundleIdentifier</key>
-  <string>com.ondevicellm</string>
+  <string>com.dotnetnativeinterop</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>OnDeviceLlm</string>
+  <string>DotnetNativeInterop</string>
   <key>CFBundlePackageType</key>
   <string>FMWK</string>
   <key>CFBundleShortVersionString</key>
@@ -136,7 +136,7 @@ EOF
 # Create simulator framework bundle (same naming rule as device).
 SIMULATOR_FRAMEWORK="${BUILD_DIR}/simulator/${FRAMEWORK_NAME}.framework"
 mkdir -p "${SIMULATOR_FRAMEWORK}/Headers"
-cp "${SIMULATOR_PUBLISH}/ondevicellm.dylib" "${SIMULATOR_FRAMEWORK}/${FRAMEWORK_NAME}"
+cp "${SIMULATOR_PUBLISH}/dni.dylib" "${SIMULATOR_FRAMEWORK}/${FRAMEWORK_NAME}"
 cp "${HEADER_PATH}" "${SIMULATOR_FRAMEWORK}/Headers/"
 
 # Copy Info.plist to simulator framework
@@ -179,4 +179,4 @@ echo ""
 echo "To use in Xcode:"
 echo "  1. Drag ${XCFRAMEWORK_PATH} into Xcode project"
 echo "  2. Select target and add to 'Frameworks and Libraries'"
-echo "  3. Link with '#import <ondevicellm/ondevicellm.h>'"
+echo "  3. Link with '#import <dni/dni.h>'"

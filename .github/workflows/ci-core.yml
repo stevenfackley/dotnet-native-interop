@@ -29,11 +29,11 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore OnDeviceLlm.slnx
+        run: dotnet restore DotnetNativeInterop.slnx
 
       - name: Build
-        run: dotnet build OnDeviceLlm.slnx -c Release --no-restore
+        run: dotnet build DotnetNativeInterop.slnx -c Release --no-restore
 
       - name: Test
-        run: dotnet test OnDeviceLlm.slnx -c Release --no-build --verbosity normal
+        run: dotnet test DotnetNativeInterop.slnx -c Release --no-build --verbosity normal
         continue-on-error: true

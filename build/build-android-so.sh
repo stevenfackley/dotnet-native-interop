@@ -2,21 +2,21 @@
 set -euo pipefail
 
 # build-android-so.sh
-# Publishes OnDeviceLlm.NativeBridge for Android (linux-bionic-arm64),
+# Publishes DotnetNativeInterop.NativeBridge for Android (linux-bionic-arm64),
 # and copies the .so to the Gradle jniLibs directory with the 'lib' prefix.
 #
 # IMPORTANT: NativeAOT for Android is experimental in .NET 10 (warning XA1040).
 # The DisableUnsupportedError flag is required to suppress the preview warning.
 #
 # SHARP EDGE: Microsoft.Data.Sqlite links e_sqlite3, which must be located
-# alongside libondevicellm.so on the device. Comment below shows placement.
+# alongside libdni.so on the device. Comment below shows placement.
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CSPROJ_PATH="${PROJECT_DIR}/core/OnDeviceLlm.NativeBridge/OnDeviceLlm.NativeBridge.csproj"
+CSPROJ_PATH="${PROJECT_DIR}/core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj"
 
 # Build artifact location
 BUILD_DIR="${PROJECT_DIR}/build/android-artifacts"
@@ -29,10 +29,10 @@ JNILIB_DIR="${PROJECT_DIR}/android/app/src/main/jniLibs/arm64-v8a"
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}" "${JNILIB_DIR}"
 
-echo "=== OnDeviceLlm Android .so Build ==="
+echo "=== DotnetNativeInterop Android .so Build ==="
 echo "Project: ${CSPROJ_PATH}"
 echo "RID: linux-bionic-arm64"
-echo "Output: ${JNILIB_DIR}/libondevicellm.so"
+echo "Output: ${JNILIB_DIR}/libdni.so"
 echo ""
 
 # ============================================================================
@@ -50,12 +50,12 @@ dotnet publish \
   -p:DisableUnsupportedError=true \
   -p:UseAppHost=false
 
-if [ ! -f "${PUBLISH_DIR}/ondevicellm.so" ]; then
-  echo "ERROR: ondevicellm.so not found in ${PUBLISH_DIR}"
+if [ ! -f "${PUBLISH_DIR}/dni.so" ]; then
+  echo "ERROR: dni.so not found in ${PUBLISH_DIR}"
   exit 1
 fi
 
-echo "   Generated: ${PUBLISH_DIR}/ondevicellm.so"
+echo "   Generated: ${PUBLISH_DIR}/dni.so"
 
 # ============================================================================
 # Copy to Android jniLibs with 'lib' prefix
@@ -63,12 +63,12 @@ echo "   Generated: ${PUBLISH_DIR}/ondevicellm.so"
 
 echo "[2/2] Installing to Android jniLibs..."
 
-# Android JNI convention: System.loadLibrary("ondevicellm") -> libondevicellm.so
+# Android JNI convention: System.loadLibrary("dni") -> libdni.so
 # The 'lib' prefix and .so extension are added automatically by the loader.
-# Copy the raw .so to jniLibs/arm64-v8a/libondevicellm.so
-cp "${PUBLISH_DIR}/ondevicellm.so" "${JNILIB_DIR}/libondevicellm.so"
+# Copy the raw .so to jniLibs/arm64-v8a/libdni.so
+cp "${PUBLISH_DIR}/dni.so" "${JNILIB_DIR}/libdni.so"
 
-echo "   Installed: ${JNILIB_DIR}/libondevicellm.so"
+echo "   Installed: ${JNILIB_DIR}/libdni.so"
 echo ""
 
 # ============================================================================
@@ -103,5 +103,5 @@ echo ""
 
 echo ""
 echo "=== Build Complete ==="
-echo "Android .so: ${JNILIB_DIR}/libondevicellm.so"
+echo "Android .so: ${JNILIB_DIR}/libdni.so"
 echo ""

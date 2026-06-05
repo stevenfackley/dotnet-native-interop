@@ -1,6 +1,6 @@
-name: OnDeviceLlmApp
+name: DotnetNativeInteropApp
 options:
-  bundleIdPrefix: com.ondevicellm
+  bundleIdPrefix: com.dotnetnativeinterop
   deploymentTarget:
     iOS: "17.0"
   xcodeVersion: "16.0"
@@ -20,7 +20,7 @@ targets:
   # The one app: all three transports (FFI / HTTP / SQLCipher) with a picker + Compare tab.
   # SQLite data crosses as JSON from the native lib (which owns the SQLCipher key), so no
   # Swift SQLite dependency is needed.
-  OnDeviceLlmUnified:
+  DotnetNativeInteropUnified:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
@@ -28,12 +28,12 @@ targets:
       - path: Shared
       - path: Apps/Unified
     dependencies:
-      - framework: Frameworks/ondevicellm.xcframework
+      - framework: Frameworks/dni.xcframework
         embed: true
         codeSign: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ondevicellm.unified
+        PRODUCT_BUNDLE_IDENTIFIER: com.dotnetnativeinterop.unified
         INFOPLIST_KEY_CFBundleDisplayName: "C# Features"
         INFOPLIST_FILE: Apps/Unified/Info.plist
         CODE_SIGN_STYLE: Automatic

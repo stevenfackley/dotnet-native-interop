@@ -16,7 +16,7 @@ struct HTTPFeatureService: FeatureService {
     }
 
     private func get(_ path: String) async throws -> Data {
-        let port = Int(ondevicellm_http_start())
+        let port = Int(dni_http_start())
         guard port > 0 else { throw FeatureServiceError.nullResult }
         guard let url = URL(string: "http://127.0.0.1:\(port)\(path)") else {
             throw FeatureServiceError.nullResult

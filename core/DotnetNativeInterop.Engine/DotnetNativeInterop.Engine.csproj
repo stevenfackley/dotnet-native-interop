@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DotnetNativeInterop.Engine</RootNamespace>
+    <AssemblyName>DotnetNativeInterop.Engine</AssemblyName>
+    <!-- Pure, transport-agnostic domain. Kept AOT/trim clean so the NativeBridge
+         can compile it into the NativeAOT shared library without warnings. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- SIMD-accelerated, AOT-friendly tensor ops for the cosine-similarity demo. -->
+    <PackageReference Include="System.Numerics.Tensors" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

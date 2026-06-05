@@ -17,20 +17,23 @@ are Microsoft Learn + `dotnet/runtime` issues (key ones linked inline).
 Net: every shipped demo is AOT-safe; AES-GCM was the only real risk and is guarded. **On-device run is
 still the final proof** (the framework now AOT-compiles for `ios-arm64`).
 
-## Part B — Phase 2 rename (`OnDeviceLlm` → `DotnetNativeInterop`) checklist
+## Part B — `OnDeviceLlm` → `DotnetNativeInterop` rename checklist (completed 2026-06-05)
 
-The SDK does **not** auto-propagate renames (runtime #100747 is "Future"), so each of these is manual and
-must move **atomically**:
+The SDK does **not** auto-propagate renames (runtime #100747 is "Future"), so each of these was done manually
+and had to move **atomically** (C# namespace → `DotnetNativeInterop`; native lib/symbol/header token → `dni`;
+reverse-DNS → `com.`/`io.dotnetnativeinterop`):
 
-1. **`[UnmanagedCallersOnly]` EntryPoint symbols** (`ondevicellm_*` → e.g. `dni_*`): change the C# attribute
-   strings **and** `abi/ondevicellm.h` **and** the Swift bridging header **and** the xcodegen project in one
-   pass — a mismatch is a link-time `Undefined symbol`.
-2. **`.xcframework` rename**: `FRAMEWORK_SEARCH_PATHS` alone does **not** resolve `.xcframework` slices —
-   the renamed bundle must be re-referenced in the (generated) project. Our `build-ios-framework*.sh` sets
-   `install_name` + `CFBundleExecutable`; both carry the framework name and must change together.
-3. **iOS bundle ID** (`com.ondevicellm.*`): renaming **invalidates provisioning profiles + entitlements** —
-   regenerate in the Apple Developer Portal (or let `-allowProvisioningUpdates` re-issue).
-4. **Android `applicationId` + Kotlin package** (`io.ondevicellm`): a package rename normally breaks JNI
+1. **`[UnmanagedCallersOnly]` EntryPoint symbols** (`ondevicellm_*` → `dni_*`): change the C# attribute
+   strings **and** `abi/dni.h` (was `ondevicellm.h`) **and** the Swift bridging header **and** the xcodegen
+   project in one pass — a mismatch is a link-time `Undefined symbol`.
+2. **`.xcframework` rename** (`ondevicellm` → `dni`): `FRAMEWORK_SEARCH_PATHS` alone does **not** resolve
+   `.xcframework` slices — the renamed bundle must be re-referenced in the (generated) project. Our
+   `build-ios-framework*.sh` sets `install_name` + `CFBundleExecutable`; both carry the framework name and
+   must change together.
+3. **iOS bundle ID** (`com.ondevicellm.*` → `com.dotnetnativeinterop.*`): renaming **invalidates provisioning
+   profiles + entitlements** — regenerate in the Apple Developer Portal (or let `-allowProvisioningUpdates`
+   re-issue). Note: the renamed app installs **alongside** the old one on the device (different bundle id).
+4. **Android `applicationId` + Kotlin package** (`io.ondevicellm` → `io.dotnetnativeinterop`): a package rename normally breaks JNI
    **static** name resolution (`Java_<pkg>_<class>_<method>`). **This repo already uses `JNI_OnLoad` +
    `RegisterNatives`** (see README threading model), which decouples C symbol names from the package — so the
    Android rename is lower-risk here. Still update `applicationId`, the package dirs, and the proto package.

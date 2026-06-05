@@ -11,7 +11,7 @@ string literals, …), executed for real inside the NativeAOT library. The pipel
 interface (`ILanguageModel`) for a real backend — e.g. an on-device LLM via llama.cpp — and every
 transport and screen works unchanged.
 
-> The .NET code builds to `ondevicellm.dylib` (iOS) / `libondevicellm.so` (Android) and is loaded
+> The .NET code builds to `dni.dylib` (iOS) / `libdni.so` (Android) and is loaded
 > **directly into the UI process** — no separate backend process, no network, no cloud.
 
 ---
@@ -74,7 +74,7 @@ but is **excluded from the build** — see the note under the table.
 
 ## The app
 
-One unified SwiftUI app (`com.ondevicellm.unified`) with a transport **picker** — switch FFI / HTTP /
+One unified SwiftUI app (`com.dotnetnativeinterop.unified`) with a transport **picker** — switch FFI / HTTP /
 SQLCipher and the same catalog reloads through that transport. Four tabs:
 
 - **Dashboard** — the active transport, "Run all", and aggregate results.
@@ -98,13 +98,13 @@ Each feature is its own component: a row that navigates to a detail screen, not 
                  │      ffi · http · sqlcipher       │
                  ▼                                   ▼
       ┌────────────────────────────────────────────────────────┐
-      │  ondevicellm  —  NativeAOT shared library (.dylib/.so)  │
+      │  dni  —  NativeAOT shared library (.dylib/.so)  │
       │  C ABI + 3 built transport hosts:                      │
       │    Ffi (JSON) · HttpRaw (sockets/SSE) · SQLCipher (.db)│
       └───────────────────────────┬────────────────────────────┘
                                    ▼
       ┌────────────────────────────────────────────────────────┐
-      │  OnDeviceLlm.Engine  —  pure .NET, AOT-safe            │
+      │  DotnetNativeInterop.Engine  —  pure .NET, AOT-safe            │
       │  LanguageFeatureCatalog: each feature executes live    │
       │  ILanguageModel ← FeatureShowcaseModel (swap-in seam)  │
       └────────────────────────────────────────────────────────┘
@@ -117,18 +117,18 @@ Each feature is its own component: a row that navigates to a detail screen, not 
 ## Repository layout
 
 ```
-OnDeviceLlm.slnx · global.json · Directory.Build.props
+DotnetNativeInterop.slnx · global.json · Directory.Build.props
 core/
-  OnDeviceLlm.Engine/          pure domain: executable feature catalog, orchestrator, channel session
-  OnDeviceLlm.NativeBridge/    NativeAOT shared library
-    abi/ondevicellm.h          frozen C ABI (FFI + HTTP + SQLCipher exports)
+  DotnetNativeInterop.Engine/          pure domain: executable feature catalog, orchestrator, channel session
+  DotnetNativeInterop.NativeBridge/    NativeAOT shared library
+    abi/dni.h          frozen C ABI (FFI + HTTP + SQLCipher exports)
     Ffi/ HttpRaw/ Sqlite/      built transports (Sqlite uses SQLCipher)
     Http/ Grpc/                excluded from build (no mobile runtime pack) — kept for reference
-proto/ondevicellm.proto        gRPC contract (excluded build)
+proto/dni.proto        gRPC contract (excluded build)
 ios/
   Shared/                      models, FeatureService protocol, view models, the SwiftUI shell
   Apps/Unified/                the one app target (FFI + HTTP + SQLCipher, picker + Compare)
-android/ (io.ondevicellm)      Compose host + JNI shim (follow-on: not yet unified)
+android/ (io.dotnetnativeinterop)      Compose host + JNI shim (follow-on: not yet unified)
 build/                         build-ios-framework.sh · build-android-so.sh
 docs/                          INTEROP_CONTRACT.md · patterns.json · superpowers/specs/
 .github/workflows/             ci-core · ci-ios · ci-android
@@ -141,14 +141,14 @@ docs/                          INTEROP_CONTRACT.md · patterns.json · superpowe
 **Managed code** (Engine + the three built transports) builds anywhere with the .NET 10 SDK:
 
 ```bash
-dotnet build OnDeviceLlm.slnx -c Release
+dotnet build DotnetNativeInterop.slnx -c Release
 ```
 
 **Native artifacts require a macOS host** (Apple toolchain for iOS; Android NDK is smoothest there too):
 
 ```bash
-./build/build-ios-framework.sh     # → ios/Frameworks/ondevicellm.xcframework
-./build/build-android-so.sh        # → android/app/src/main/jniLibs/arm64-v8a/libondevicellm.so
+./build/build-ios-framework.sh     # → ios/Frameworks/dni.xcframework
+./build/build-android-so.sh        # → android/app/src/main/jniLibs/arm64-v8a/libdni.so
 ```
 
 Then generate and open the iOS project (`cd ios && xcodegen generate`, then Xcode), or build Android

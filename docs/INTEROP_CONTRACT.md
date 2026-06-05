@@ -1,4 +1,4 @@
-# OnDeviceLlm — Interop Contract
+# DotnetNativeInterop — Interop Contract
 
 Single source of truth for the native↔managed transports. **Three transports are built** (FFI,
 raw-socket HTTP, SQLite); **gRPC is excluded from the build** (no NativeAOT mobile runtime pack) and
@@ -6,10 +6,10 @@ documented below for reference only. Every built piece of code binds to the name
 
 ## Architecture
 
-- **`OnDeviceLlm.Engine`** — pure domain: `ILanguageModel`, `MockLanguageModel` (offline,
+- **`DotnetNativeInterop.Engine`** — pure domain: `ILanguageModel`, `MockLanguageModel` (offline,
   deterministic), `InferenceOrchestrator`, `InferenceSession` (bounded-channel backpressure),
   `InferenceRequest`, `InferenceToken`. No OS or transport dependencies.
-- **`OnDeviceLlm.NativeBridge`** — NativeAOT shared library `ondevicellm` (`.dylib`/`.so`). Hosts
+- **`DotnetNativeInterop.NativeBridge`** — NativeAOT shared library `dni` (`.dylib`/`.so`). Hosts
   the built transports (FFI, raw-HTTP, SQLite; gRPC excluded) and the C ABI. All drive one shared
   `EngineHost.Orchestrator`.
 - **`ios/`** Swift (SwiftUI) host, **`android/`** Kotlin (Compose) host. Each selects a transport
@@ -29,23 +29,23 @@ documented below for reference only. Every built piece of code binds to the name
 
 ## C ABI (Pattern 3 — FFI)
 
-Frozen in `core/OnDeviceLlm.NativeBridge/abi/ondevicellm.h`. Exports use
+Frozen in `core/DotnetNativeInterop.NativeBridge/abi/dni.h`. Exports use
 `[UnmanagedCallersOnly(EntryPoint = "...")]` with the exact C names:
 
 | C export | Meaning |
 |----------|---------|
-| `int32 ondevicellm_initialize()` | Calls `EngineHost.Initialize()`. 0 / negative status. |
-| `void ondevicellm_shutdown()` | Stops servers/broker, disposes sessions. |
-| `int64 ondevicellm_session_start(prompt, max_tokens, temperature, cb, user_data)` | Starts an `InferenceSession`; drains the channel on a background task and invokes `cb` per token. Returns session id (>0) or negative status. |
-| `int32 ondevicellm_session_cancel(id)` | `session.Cancel()`. |
-| `int32 ondevicellm_session_free(id)` | `SessionRegistry.RemoveAsync(id)`. |
+| `int32 dni_initialize()` | Calls `EngineHost.Initialize()`. 0 / negative status. |
+| `void dni_shutdown()` | Stops servers/broker, disposes sessions. |
+| `int64 dni_session_start(prompt, max_tokens, temperature, cb, user_data)` | Starts an `InferenceSession`; drains the channel on a background task and invokes `cb` per token. Returns session id (>0) or negative status. |
+| `int32 dni_session_cancel(id)` | `session.Cancel()`. |
+| `int32 dni_session_free(id)` | `SessionRegistry.RemoveAsync(id)`. |
 
 Callback: `void (*)(void* user_data, int32 index, const char* text_utf8, int32 is_final)`.
 Fired on a **.NET background thread**; `text` valid only during the call (copy it).
 
 ## Pattern 1 — HTTP loopback (raw sockets, `HttpRaw/`)
 
-- Exports: `ondevicellm_http_start() -> port`, `ondevicellm_http_stop()`.
+- Exports: `dni_http_start() -> port`, `dni_http_stop()`.
 - A minimal **`System.Net.Sockets`** HTTP/1.1 server (no ASP.NET — no mobile runtime pack) binds
   `127.0.0.1:0` and returns the OS-assigned port.
 - Any request streams the showcase as SSE; response `text/event-stream`, each event:
@@ -55,19 +55,19 @@ Fired on a **.NET background thread**; `text` valid only during the call (copy i
 
 ## Pattern 2 — gRPC over UDS — EXCLUDED FROM BUILD (reference only)
 
-> `Grpc/` and `proto/ondevicellm.proto` are `<Compile Remove>`'d: ASP.NET Core gRPC has no NativeAOT
-> mobile runtime pack, so `ondevicellm_grpc_start/stop` are **not exported** by the shipped library.
+> `Grpc/` and `proto/dni.proto` are `<Compile Remove>`'d: ASP.NET Core gRPC has no NativeAOT
+> mobile runtime pack, so `dni_grpc_start/stop` are **not exported** by the shipped library.
 > The design below is retained as documentation, not a contract the build honours.
 
-- Contract: `proto/ondevicellm.proto`, namespace `OnDeviceLlm.NativeBridge.Grpc`, service
+- Contract: `proto/dni.proto`, namespace `DotnetNativeInterop.NativeBridge.Grpc`, service
   `Inference.Infer` (server-streaming `InferToken`).
-- Intended exports: `ondevicellm_grpc_start(socket_path)`, `ondevicellm_grpc_stop()`.
+- Intended exports: `dni_grpc_start(socket_path)`, `dni_grpc_stop()`.
 - Kestrel `options.ListenUnixSocket(socket_path)` with HTTP/2; host owns the `.sock` path in its
   sandbox (iOS `NSTemporaryDirectory`/app group; Android `cacheDir`). Delete a stale socket on start.
 
 ## Pattern 4 — SQLite WAL broker
 
-- Exports: `ondevicellm_broker_start(db_path)`, `ondevicellm_broker_stop()`.
+- Exports: `dni_broker_start(db_path)`, `dni_broker_stop()`.
 - `Microsoft.Data.Sqlite`, `PRAGMA journal_mode=WAL`. Schema:
 
 ```sql
@@ -98,9 +98,9 @@ CREATE TABLE IF NOT EXISTS response_tokens (
 
 ## Native library naming
 
-Loadable name **`ondevicellm`**. Android `System.loadLibrary("ondevicellm")` ⇒ `libondevicellm.so`.
-iOS links/embeds `ondevicellm.framework`. csproj `AssemblyName=ondevicellm` ⇒ NativeAOT emits
-`ondevicellm.{dylib,so}`; build scripts add the `lib` prefix (Android) and wrap the framework (iOS).
+Loadable name **`dni`**. Android `System.loadLibrary("dni")` ⇒ `libdni.so`.
+iOS links/embeds `dni.framework`. csproj `AssemblyName=dni` ⇒ NativeAOT emits
+`dni.{dylib,so}`; build scripts add the `lib` prefix (Android) and wrap the framework (iOS).
 
 ## Build (macOS host)
 
@@ -109,7 +109,7 @@ iOS links/embeds `ondevicellm.framework`. csproj `AssemblyName=ondevicellm` ⇒ 
   `.xcframework` (`build/build-ios-framework.sh`).
 - Android: `dotnet publish -r linux-bionic-arm64 -p:DisableUnsupportedError=true`. NativeAOT for
   Android is **experimental** in .NET 10 (warning XA1040). Copy →
-  `android/app/src/main/jniLibs/arm64-v8a/libondevicellm.so` (`build/build-android-so.sh`).
+  `android/app/src/main/jniLibs/arm64-v8a/libdni.so` (`build/build-android-so.sh`).
 - Sharp edge: `Microsoft.Data.Sqlite` native (`e_sqlite3`) must link for the mobile RID — on iOS
   prefer system `libsqlite3`; on Android bundle/locate the `e_sqlite3` `.so`.
 
@@ -135,14 +135,14 @@ Transport selector ids used everywhere: `ffi`, `http`, `grpc`, `sqlite`.
 
 | Area | Directory |
 |------|-----------|
-| Pattern 1 HTTP (.NET) | `core/OnDeviceLlm.NativeBridge/Http/` |
-| Pattern 2 gRPC (.NET) | `core/OnDeviceLlm.NativeBridge/Grpc/` |
-| Pattern 3 FFI (.NET) | `core/OnDeviceLlm.NativeBridge/Ffi/` |
-| Pattern 4 SQLite (.NET) | `core/OnDeviceLlm.NativeBridge/Sqlite/` |
+| Pattern 1 HTTP (.NET) | `core/DotnetNativeInterop.NativeBridge/Http/` |
+| Pattern 2 gRPC (.NET) | `core/DotnetNativeInterop.NativeBridge/Grpc/` |
+| Pattern 3 FFI (.NET) | `core/DotnetNativeInterop.NativeBridge/Ffi/` |
+| Pattern 4 SQLite (.NET) | `core/DotnetNativeInterop.NativeBridge/Sqlite/` |
 | iOS host + 4 clients | `ios/` |
 | Android host + 4 clients | `android/` |
 | Build scripts + CI | `build/`, `.github/workflows/` |
 
-**Read-only / frozen:** everything in `OnDeviceLlm.Engine/`, plus
-`OnDeviceLlm.NativeBridge/{EngineHost,SessionRegistry,NativeInterop}.cs`, the `.csproj`,
-`proto/ondevicellm.proto`, and `abi/ondevicellm.h`.
+**Read-only / frozen:** everything in `DotnetNativeInterop.Engine/`, plus
+`DotnetNativeInterop.NativeBridge/{EngineHost,SessionRegistry,NativeInterop}.cs`, the `.csproj`,
+`proto/dni.proto`, and `abi/dni.h`.
