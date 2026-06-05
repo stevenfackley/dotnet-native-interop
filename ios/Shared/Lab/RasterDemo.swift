@@ -27,11 +27,12 @@ extension RasterDemo {
                 if let result = await render(command) {
                     payload = result.result
                     if let colon = result.result.firstIndex(of: ":") {
-                        dims = String(result.result[..<colon])
+                        let axes = result.result[..<colon].split(separator: "x")
+                        dims = axes.count >= 2 ? "\(axes[0])×\(axes[1])" : String(result.result[..<colon])
                     }
                     let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
                     frameMs = ms
-                    fps = ms > 0 ? min(120, 1000 / ms) : 0
+                    fps = ms > 0 ? min(120.0, 1000 / ms) : 0
                     last = command
                 }
                 if animating { advance() }

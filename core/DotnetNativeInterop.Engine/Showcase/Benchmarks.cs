@@ -155,6 +155,7 @@ public static class Benchmarks
             rows[py] = acc;
         });
 
+        // Summed and returned so the escape-time loop can't be elided as dead code — only timing matters.
         long total = 0;
         foreach (var r in rows)
         {
