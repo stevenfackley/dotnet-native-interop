@@ -39,3 +39,30 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SWIFT_OBJC_BRIDGING_HEADER: Apps/Unified/BridgingHeader.h
         DEVELOPMENT_TEAM: ""  # Pass DEVELOPMENT_TEAM=… on the xcodebuild command line.
+
+  # UI-test target that navigates every screen and captures a screenshot of each (run on a Simulator,
+  # no signing needed). Drives the populating actions so charts/benchmarks/telemetry aren't empty.
+  DotnetNativeInteropScreenshots:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: ScreenshotTests
+    dependencies:
+      - target: DotnetNativeInteropUnified
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dotnetnativeinterop.screenshots
+        TEST_TARGET_NAME: DotnetNativeInteropUnified
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  DotnetNativeInteropUnified:
+    build:
+      targets:
+        DotnetNativeInteropUnified: all
+        DotnetNativeInteropScreenshots: [test]
+    test:
+      targets:
+        - DotnetNativeInteropScreenshots
