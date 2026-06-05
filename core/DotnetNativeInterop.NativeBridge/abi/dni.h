@@ -81,6 +81,12 @@ const char* dni_sqlite_run(const char* id);     /* {id,result,elapsedMs,ok}     
  *   GET /features          -> [{id,title,version,code,expected}]
  *   GET /feature/run/{id}  -> {id,result,elapsedMs,ok}                       */
 
+/* ---- Engine introspection ----------------------------------------------- */
+/* Returns heap UTF-8 JSON of live runtime stats
+ * {gcGen0,gcGen1,gcGen2,heapBytes,committedBytes,allocatedBytes,gcPauseMs,
+ *  threadCount,processorCount,uptimeMs}; copy then release with dni_string_free. */
+const char* dni_engine_stats(void);
+
 #ifdef __cplusplus
 }
 #endif

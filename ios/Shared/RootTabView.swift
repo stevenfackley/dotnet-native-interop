@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// The app shell: Dashboard / Features / Lab / Compare / About tabs over the shared view models.
 struct RootTabView: View {
     @ObservedObject var features: FeaturesViewModel
     @ObservedObject var comparison: ComparisonViewModel
     @ObservedObject var lab: LabViewModel
+    @ObservedObject var latency: LatencyViewModel
+    let telemetry: TelemetryService
 
     var body: some View {
         TabView {
@@ -20,10 +21,10 @@ struct RootTabView: View {
             ComparisonView(model: comparison)
                 .tabItem { Label("Compare", systemImage: "chart.bar.xaxis") }
 
-            LatencyView(viewModel: features)
+            LatencyHubView(model: latency, telemetry: telemetry)
                 .tabItem { Label("Latency", systemImage: "stopwatch") }
 
-            AboutView(infos: features.orderedInfos)
+            AboutView(infos: features.orderedInfos, telemetry: telemetry)
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
     }

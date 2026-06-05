@@ -34,6 +34,7 @@ public static class ShowcaseCommand
                     GetD(p, "angle", 0.0), GetI(p, "w", 220, 32, 512), GetI(p, "h", 220, 32, 512)),
                 "bench-matmul" => ShowcaseJson.Serialize(Benchmarks.MatmulGflops(GetI(p, "max", 384, 64, 512))),
                 "bench-parallel" => ShowcaseJson.Serialize(Benchmarks.ParallelScaling(GetI(p, "size", 480, 64, 1024))),
+                "bench-echo" => Echo(GetI(p, "bytes", 1024, 1, 1_048_576)),
                 _ => $"Unknown showcase command: {name}",
             };
 
@@ -47,6 +48,10 @@ public static class ShowcaseCommand
             return new FeatureRun(id, ex.Message, stopwatch.Elapsed.TotalMilliseconds, false);
         }
     }
+
+    // Returns an N-byte ASCII payload; the latency lab times the round-trip to measure transport
+    // cost vs response size. N is clamped by the caller via GetI.
+    private static string Echo(int bytes) => new string('x', bytes);
 
     private static Dictionary<string, string> ParseParams(string[] parts)
     {
