@@ -30,6 +30,9 @@ struct RootTabView: View {
 
             AboutView(infos: features.orderedInfos, telemetry: telemetry)
                 .tabItem { Label("About", systemImage: "info.circle") }
+
+            EdgeSearchHubView()
+                .tabItem { Label("Manuals", systemImage: "wrench.and.screwdriver") }
         }
     }
 }

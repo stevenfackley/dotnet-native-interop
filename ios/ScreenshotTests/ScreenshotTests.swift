@@ -57,6 +57,11 @@ final class ScreenshotTests: XCTestCase {
         shot("16-ai-hub")
         captureSemanticSearch(as: "17-semantic-search")
         drill("Apple chat", settle: 3, as: "18-apple-chat")
+
+        // --- Manuals (EVS: Swift-side ONNX + Core ML, prebuilt SQLite index) ---
+        tapTab("Manuals")
+        sleep(2)
+        captureEdgeSearch(as: "19-edge-search")
     }
 
     // MARK: - Capture
@@ -173,6 +178,19 @@ final class ScreenshotTests: XCTestCase {
         sleep(15)
         shot(name)
         goBack()
+    }
+
+    /// Enter Manuals, type a maintenance query, submit (loads the ONNX model + index, embeds via Core ML,
+    /// ranks), wait for results, screenshot.
+    private func captureEdgeSearch(as name: String) {
+        let field = app.textFields.firstMatch
+        if field.waitForExistence(timeout: 6) {
+            field.tap()
+            field.typeText("compressor won't start\n")
+        }
+        // First query is cold: lazy-loads the ~90 MB model + SQLite index, then embeds via Core ML.
+        sleep(15)
+        shot(name)
     }
 
     /// Engine telemetry: enter, toggle the stress switch so GC/heap move, screenshot, stop, pop back.

@@ -32,6 +32,11 @@ targets:
       - path: ../core/DotnetNativeInterop.Engine/Ai/assets
         type: folder
         buildPhase: resources
+      # EVS: the prebuilt SQLite vector index + the cross-runtime agreement fixtures.
+      - path: ../core/DotnetNativeInterop.EdgeIndexPublisher/edge-index.db
+        buildPhase: resources
+      - path: ../core/DotnetNativeInterop.EdgeIndexPublisher/edge-fixtures.json
+        buildPhase: resources
     dependencies:
       - framework: Frameworks/dni.xcframework
         embed: true
