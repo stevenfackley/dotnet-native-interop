@@ -8,23 +8,27 @@ enum VisualFeature {
     /// True for features whose result should be rendered as an image.
     static func isVisual(_ id: String) -> Bool { id.hasPrefix("viz-") }
 
-    /// Parses `"128x128:<base64>"` into a grayscale SwiftUI `Image`, or nil if malformed.
+    /// Parses `"WxH:<base64>"` (8-bit grayscale) or `"WxHxC:<base64>"` (C = 1 gray or 3 RGB) into a
+    /// SwiftUI `Image`, or nil if malformed.
     static func image(from payload: String) -> Image? {
         guard let colon = payload.firstIndex(of: ":") else { return nil }
         let dimensions = payload[..<colon].split(separator: "x")
-        guard dimensions.count == 2,
-              let width = Int(dimensions[0]), let height = Int(dimensions[1]),
+        guard dimensions.count == 2 || dimensions.count == 3,
+              let width = Int(dimensions[0]), let height = Int(dimensions[1]) else { return nil }
+        let channels = dimensions.count == 3 ? (Int(dimensions[2]) ?? 1) : 1
+        guard channels == 1 || channels == 3,
               let data = Data(base64Encoded: String(payload[payload.index(after: colon)...])),
-              data.count == width * height else { return nil }
+              data.count == width * height * channels,
+              let provider = CGDataProvider(data: data as CFData) else { return nil }
 
-        guard let provider = CGDataProvider(data: data as CFData),
-              let cgImage = CGImage(
-                width: width, height: height,
-                bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: width,
-                space: CGColorSpaceCreateDeviceGray(),
-                bitmapInfo: CGBitmapInfo(rawValue: 0),
-                provider: provider, decode: nil,
-                shouldInterpolate: false, intent: .defaultIntent)
+        let colorSpace = channels == 1 ? CGColorSpaceCreateDeviceGray() : CGColorSpaceCreateDeviceRGB()
+        guard let cgImage = CGImage(
+            width: width, height: height,
+            bitsPerComponent: 8, bitsPerPixel: 8 * channels, bytesPerRow: width * channels,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: 0),
+            provider: provider, decode: nil,
+            shouldInterpolate: false, intent: .defaultIntent)
         else { return nil }
 
         return Image(decorative: cgImage, scale: 1)
