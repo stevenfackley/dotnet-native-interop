@@ -19,6 +19,9 @@ struct RootTabView: View {
             LabView(lab: lab)
                 .tabItem { Label("Lab", systemImage: "cpu") }
 
+            AiHubView(search: search)
+                .tabItem { Label("AI", systemImage: "sparkles") }
+
             ComparisonView(model: comparison)
                 .tabItem { Label("Compare", systemImage: "chart.bar.xaxis") }
 
@@ -27,9 +30,6 @@ struct RootTabView: View {
 
             AboutView(infos: features.orderedInfos, telemetry: telemetry)
                 .tabItem { Label("About", systemImage: "info.circle") }
-
-            AiHubView(search: search)
-                .tabItem { Label("AI", systemImage: "sparkles") }
         }
     }
 }
