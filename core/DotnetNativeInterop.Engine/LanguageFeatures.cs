@@ -38,6 +38,11 @@ public static partial class LanguageFeatureCatalog
     /// <summary>Executes one feature by id and times it; Ok = output matches the expected result.</summary>
     public static FeatureRun Run(string id)
     {
+        if (ShowcaseCommand.IsCommand(id))
+        {
+            return ShowcaseCommand.Run(id);
+        }
+
         var feature = Features.FirstOrDefault(f => f.Id == id);
         if (feature is null)
         {
