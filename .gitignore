@@ -46,3 +46,6 @@ android/**/src/main/jniLibs/
 build/ios-artifacts/
 build/frameworks/
 build/*.log
+
+## EVS: commit the prebuilt edge index
+!core/DotnetNativeInterop.EdgeIndexPublisher/edge-index.db
