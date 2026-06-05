@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        Theme.OnDeviceLlm — a minimal Material3 base theme.
+        Theme.DotnetNativeInterop — a minimal Material3 base theme.
         Compose handles actual theming; this XML theme only satisfies the
         android:theme attribute required by the Activity window before
         Compose renders.
     -->
-    <style name="Theme.OnDeviceLlm" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.DotnetNativeInterop" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

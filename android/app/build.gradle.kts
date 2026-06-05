@@ -11,12 +11,12 @@ plugins {
 }
 
 android {
-    namespace = "io.ondevicellm"
+    namespace = "io.dotnetnativeinterop"
     compileSdk = 35
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
-        applicationId = "io.ondevicellm"
+        applicationId = "io.dotnetnativeinterop"
         minSdk = 29          // Android 10 — UDS + OkHttp reliable floor
         targetSdk = 35
         versionCode = 1
@@ -33,7 +33,7 @@ android {
             cmake {
                 // Pass the ABI header location so jni_bridge.c can include it
                 arguments(
-                    "-DONDEVICELLM_INCLUDE_DIR=${rootDir.parentFile.absolutePath}/core/OnDeviceLlm.NativeBridge/abi"
+                    "-DDNI_INCLUDE_DIR=${rootDir.parentFile.absolutePath}/core/DotnetNativeInterop.NativeBridge/abi"
                 )
                 cFlags("-std=c11", "-Wall", "-Wextra")
             }
@@ -47,7 +47,7 @@ android {
         }
     }
 
-    // Pre-built libondevicellm.so goes in jniLibs — see build/build-android-so.sh
+    // Pre-built libdni.so goes in jniLibs — see build/build-android-so.sh
     sourceSets {
         getByName("main") {
             jniLibs.srcDirs("src/main/jniLibs")

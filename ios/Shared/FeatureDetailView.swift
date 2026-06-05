@@ -8,6 +8,7 @@ struct FeatureDetailView: View {
 
     private var result: FeatureResult? { viewModel.results[descriptor.id] }
     private var isRunning: Bool { viewModel.isRunning(descriptor.id) }
+    private var isVisual: Bool { VisualFeature.isVisual(descriptor.id) }
 
     var body: some View {
         List {
@@ -20,9 +21,17 @@ struct FeatureDetailView: View {
                     Text("Code").font(.caption).foregroundStyle(.secondary)
                     CodeBlock(code: descriptor.code)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Expected").font(.caption).foregroundStyle(.secondary)
-                    Text(descriptor.expected).font(.callout.monospaced()).textSelection(.enabled)
+                if isVisual {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Preview (every pixel computed in .NET)")
+                            .font(.caption).foregroundStyle(.secondary)
+                        FractalImageView(payload: descriptor.expected)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Expected").font(.caption).foregroundStyle(.secondary)
+                        Text(descriptor.expected).font(.callout.monospaced()).textSelection(.enabled)
+                    }
                 }
             }
 
@@ -50,14 +59,22 @@ struct FeatureDetailView: View {
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Output").font(.caption).foregroundStyle(.secondary)
-                        Text(result.result).font(.callout.monospaced()).textSelection(.enabled)
+                        if isVisual {
+                            FractalImageView(payload: result.result)
+                        } else {
+                            Text(result.result).font(.callout.monospaced()).textSelection(.enabled)
+                        }
                     }
                     if !result.ok {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Expected").font(.caption).foregroundStyle(.secondary)
-                            Text(descriptor.expected)
-                                .font(.callout.monospaced())
-                                .foregroundStyle(.secondary)
+                            if isVisual {
+                                FractalImageView(payload: descriptor.expected)
+                            } else {
+                                Text(descriptor.expected)
+                                    .font(.callout.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }

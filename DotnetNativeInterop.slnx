@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/core/">
+    <Project Path="core/DotnetNativeInterop.Engine/DotnetNativeInterop.Engine.csproj" />
+    <Project Path="core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj" />
+  </Folder>
+</Solution>

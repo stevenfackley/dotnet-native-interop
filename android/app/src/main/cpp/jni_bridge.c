@@ -2,11 +2,11 @@
  * jni_bridge.c — JNI shim between Kotlin and the NativeAOT C ABI.
  *
  * Load order required from Kotlin:
- *   System.loadLibrary("ondevicellm")       // NativeAOT .so — must be first
- *   System.loadLibrary("ondevicellm_jni")   // this shim
+ *   System.loadLibrary("dni")       // NativeAOT .so — must be first
+ *   System.loadLibrary("dni_jni")   // this shim
  *
  * Threading contract (FFI callback):
- *   The NativeAOT runtime invokes ondevicellm_token_cb on a .NET background thread.
+ *   The NativeAOT runtime invokes dni_token_cb on a .NET background thread.
  *   That thread is NOT a JVM thread; we must AttachCurrentThread once per worker
  *   thread before calling back into Java/Kotlin.  We use a pthread_once-per-thread
  *   TLS destructor to DetachCurrentThread when the thread exits, preventing leaks.
@@ -29,9 +29,9 @@
 #include <android/log.h>
 #include <pthread.h>
 
-#include "ondevicellm.h"
+#include "dni.h"
 
-#define TAG "OnDeviceLlmJni"
+#define TAG "DotnetNativeInteropJni"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
 
@@ -150,12 +150,12 @@ static void ffi_token_callback(void* user_data,
 }
 
 /* ==========================================================================
- * JNI_OnLoad — called when System.loadLibrary("ondevicellm_jni") executes.
+ * JNI_OnLoad — called when System.loadLibrary("dni_jni") executes.
  * ========================================================================== */
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     (void)reserved;
     g_jvm = vm;
-    LOGD("JNI_OnLoad — ondevicellm_jni loaded, JavaVM cached");
+    LOGD("JNI_OnLoad — dni_jni loaded, JavaVM cached");
     return JNI_VERSION_1_6;
 }
 
@@ -164,17 +164,17 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
  * ========================================================================== */
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeInitialize(
+Java_io_dni_transport_NativeBridge_nativeInitialize(
         JNIEnv* env, jclass clazz) {
     (void)env; (void)clazz;
-    return ondevicellm_initialize();
+    return dni_initialize();
 }
 
 JNIEXPORT void JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeShutdown(
+Java_io_dni_transport_NativeBridge_nativeShutdown(
         JNIEnv* env, jclass clazz) {
     (void)env; (void)clazz;
-    ondevicellm_shutdown();
+    dni_shutdown();
 }
 
 /* ==========================================================================
@@ -188,14 +188,14 @@ Java_io_ondevicellm_transport_NativeBridge_nativeShutdown(
  * ========================================================================== */
 
 JNIEXPORT jlong JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeSessionStart(
+Java_io_dni_transport_NativeBridge_nativeSessionStart(
         JNIEnv* env, jclass clazz,
         jstring prompt, jint max_tokens, jfloat temperature,
         jobject listener) {
     (void)clazz;
 
     if (prompt == NULL || listener == NULL) {
-        return (jlong)ONDEVICELLM_INVALID_ARGUMENT;
+        return (jlong)DNI_INVALID_ARGUMENT;
     }
 
     /* Cache the listener method ID (class invariant — same for every call). */
@@ -205,13 +205,13 @@ Java_io_ondevicellm_transport_NativeBridge_nativeSessionStart(
     (*env)->DeleteLocalRef(env, listener_class);
     if (on_token == NULL) {
         LOGE("nativeSessionStart: onToken method not found");
-        return (jlong)ONDEVICELLM_INVALID_ARGUMENT;
+        return (jlong)DNI_INVALID_ARGUMENT;
     }
 
     CallbackState* state = (CallbackState*)malloc(sizeof(CallbackState));
     if (state == NULL) {
         LOGE("nativeSessionStart: malloc failed");
-        return (jlong)ONDEVICELLM_INTERNAL;
+        return (jlong)DNI_INTERNAL;
     }
     state->listener_ref = (*env)->NewGlobalRef(env, listener);
     state->on_token     = on_token;
@@ -220,10 +220,10 @@ Java_io_ondevicellm_transport_NativeBridge_nativeSessionStart(
     if (c_prompt == NULL) {
         (*env)->DeleteGlobalRef(env, state->listener_ref);
         free(state);
-        return (jlong)ONDEVICELLM_INTERNAL;
+        return (jlong)DNI_INTERNAL;
     }
 
-    int64_t session_id = ondevicellm_session_start(
+    int64_t session_id = dni_session_start(
         c_prompt,
         (int32_t)max_tokens,
         (float)temperature,
@@ -242,17 +242,17 @@ Java_io_ondevicellm_transport_NativeBridge_nativeSessionStart(
 }
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeSessionCancel(
+Java_io_dni_transport_NativeBridge_nativeSessionCancel(
         JNIEnv* env, jclass clazz, jlong session_id) {
     (void)env; (void)clazz;
-    return ondevicellm_session_cancel((int64_t)session_id);
+    return dni_session_cancel((int64_t)session_id);
 }
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeSessionFree(
+Java_io_dni_transport_NativeBridge_nativeSessionFree(
         JNIEnv* env, jclass clazz, jlong session_id) {
     (void)env; (void)clazz;
-    return ondevicellm_session_free((int64_t)session_id);
+    return dni_session_free((int64_t)session_id);
 }
 
 /* ==========================================================================
@@ -260,17 +260,17 @@ Java_io_ondevicellm_transport_NativeBridge_nativeSessionFree(
  * ========================================================================== */
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeHttpStart(
+Java_io_dni_transport_NativeBridge_nativeHttpStart(
         JNIEnv* env, jclass clazz) {
     (void)env; (void)clazz;
-    return ondevicellm_http_start();
+    return dni_http_start();
 }
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeHttpStop(
+Java_io_dni_transport_NativeBridge_nativeHttpStop(
         JNIEnv* env, jclass clazz) {
     (void)env; (void)clazz;
-    return ondevicellm_http_stop();
+    return dni_http_stop();
 }
 
 /* ==========================================================================
@@ -278,22 +278,22 @@ Java_io_ondevicellm_transport_NativeBridge_nativeHttpStop(
  * ========================================================================== */
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeGrpcStart(
+Java_io_dni_transport_NativeBridge_nativeGrpcStart(
         JNIEnv* env, jclass clazz, jstring socket_path) {
     (void)clazz;
-    if (socket_path == NULL) return ONDEVICELLM_INVALID_ARGUMENT;
+    if (socket_path == NULL) return DNI_INVALID_ARGUMENT;
     const char* path = (*env)->GetStringUTFChars(env, socket_path, NULL);
-    if (path == NULL) return ONDEVICELLM_INTERNAL;
-    int32_t result = ondevicellm_grpc_start(path);
+    if (path == NULL) return DNI_INTERNAL;
+    int32_t result = dni_grpc_start(path);
     (*env)->ReleaseStringUTFChars(env, socket_path, path);
     return result;
 }
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeGrpcStop(
+Java_io_dni_transport_NativeBridge_nativeGrpcStop(
         JNIEnv* env, jclass clazz) {
     (void)env; (void)clazz;
-    return ondevicellm_grpc_stop();
+    return dni_grpc_stop();
 }
 
 /* ==========================================================================
@@ -301,20 +301,20 @@ Java_io_ondevicellm_transport_NativeBridge_nativeGrpcStop(
  * ========================================================================== */
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeBrokerStart(
+Java_io_dni_transport_NativeBridge_nativeBrokerStart(
         JNIEnv* env, jclass clazz, jstring db_path) {
     (void)clazz;
-    if (db_path == NULL) return ONDEVICELLM_INVALID_ARGUMENT;
+    if (db_path == NULL) return DNI_INVALID_ARGUMENT;
     const char* path = (*env)->GetStringUTFChars(env, db_path, NULL);
-    if (path == NULL) return ONDEVICELLM_INTERNAL;
-    int32_t result = ondevicellm_broker_start(path);
+    if (path == NULL) return DNI_INTERNAL;
+    int32_t result = dni_broker_start(path);
     (*env)->ReleaseStringUTFChars(env, db_path, path);
     return result;
 }
 
 JNIEXPORT jint JNICALL
-Java_io_ondevicellm_transport_NativeBridge_nativeBrokerStop(
+Java_io_dni_transport_NativeBridge_nativeBrokerStop(
         JNIEnv* env, jclass clazz) {
     (void)env; (void)clazz;
-    return ondevicellm_broker_stop();
+    return dni_broker_stop();
 }

@@ -77,6 +77,21 @@ final class FeaturesViewModel: ObservableObject {
         }
     }
 
+    /// Fires the no-op `ping` feature `count` times over the active transport and returns each call's
+    /// client-side round-trip in milliseconds — i.e. the pure transport overhead, since the engine work
+    /// is trivial. Used by the Latency histogram.
+    func pingLatencies(count: Int) async -> [Double] {
+        var samples: [Double] = []
+        samples.reserveCapacity(count)
+        for _ in 0..<count {
+            let start = DispatchTime.now().uptimeNanoseconds
+            _ = try? await service.run("ping")
+            let elapsed = DispatchTime.now().uptimeNanoseconds - start
+            samples.append(Double(elapsed) / 1_000_000)
+        }
+        return samples
+    }
+
     var ranCount: Int { results.count }
     var okCount: Int { results.values.filter(\.ok).count }
     var totalElapsedMs: Double { results.values.reduce(0) { $0 + $1.elapsedMs } }

@@ -10,9 +10,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:name=".OnDeviceLlmApp"
+        android:name=".DotnetNativeInteropApp"
         android:label="@string/app_name"
-        android:theme="@style/Theme.OnDeviceLlm"
+        android:theme="@style/Theme.DotnetNativeInterop"
         android:supportsRtl="true">
 
         <activity
