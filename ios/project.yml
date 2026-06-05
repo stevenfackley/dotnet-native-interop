@@ -36,6 +36,9 @@ targets:
       - framework: Frameworks/dni.xcframework
         embed: true
         codeSign: true
+      - framework: Frameworks/onnxruntime.xcframework
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dotnetnativeinterop.unified
@@ -44,6 +47,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SWIFT_OBJC_BRIDGING_HEADER: Apps/Unified/BridgingHeader.h
         DEVELOPMENT_TEAM: ""  # Pass DEVELOPMENT_TEAM=… on the xcodebuild command line.
+        # ONNX Runtime's iOS framework is a static C++ library; link libc++ so its std:: symbols resolve.
+        OTHER_LDFLAGS: "-lc++"
 
   # UI-test target that navigates every screen and captures a screenshot of each (run on a Simulator,
   # no signing needed). Drives the populating actions so charts/benchmarks/telemetry aren't empty.
@@ -62,12 +67,32 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
 
+  # Unit tests hosted in the app: the EVS Core ML linkage gate (EdgeSearchSpikeTests) and the
+  # Swift/.NET cross-runtime agreement tests (EdgeSearchAgreementTests). Runs on a Simulator.
+  DotnetNativeInteropTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: DotnetNativeInteropUnified
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dotnetnativeinterop.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_OBJC_BRIDGING_HEADER: Tests/TestsBridging.h
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/DotnetNativeInteropUnified.app/DotnetNativeInteropUnified"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
 schemes:
   DotnetNativeInteropUnified:
     build:
       targets:
         DotnetNativeInteropUnified: all
         DotnetNativeInteropScreenshots: [test]
+        DotnetNativeInteropTests: [test]
     test:
       targets:
         - DotnetNativeInteropScreenshots
+        - DotnetNativeInteropTests
