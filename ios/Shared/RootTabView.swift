@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// The app shell: Dashboard / Features / Compare / About tabs over the shared view models.
+/// The app shell: Dashboard / Features / Lab / Compare / About tabs over the shared view models.
 struct RootTabView: View {
     @ObservedObject var features: FeaturesViewModel
     @ObservedObject var comparison: ComparisonViewModel
+    @ObservedObject var lab: LabViewModel
 
     var body: some View {
         TabView {
@@ -12,6 +13,9 @@ struct RootTabView: View {
 
             FeaturesView(viewModel: features)
                 .tabItem { Label("Features", systemImage: "checkmark.seal") }
+
+            LabView(lab: lab)
+                .tabItem { Label("Lab", systemImage: "cpu") }
 
             ComparisonView(model: comparison)
                 .tabItem { Label("Compare", systemImage: "chart.bar.xaxis") }

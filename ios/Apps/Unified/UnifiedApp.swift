@@ -6,6 +6,7 @@ import SwiftUI
 struct DotnetNativeInteropUnifiedApp: App {
     @StateObject private var features: FeaturesViewModel
     @StateObject private var comparison: ComparisonViewModel
+    @StateObject private var lab: LabViewModel
 
     init() {
         let services: [TransportKind: FeatureService] = [
@@ -20,11 +21,12 @@ struct DotnetNativeInteropUnifiedApp: App {
         ]
         _features = StateObject(wrappedValue: FeaturesViewModel(services: services, infos: infos))
         _comparison = StateObject(wrappedValue: ComparisonViewModel(services: services))
+        _lab = StateObject(wrappedValue: LabViewModel(services: services))
     }
 
     var body: some Scene {
         WindowGroup {
-            RootTabView(features: features, comparison: comparison)
+            RootTabView(features: features, comparison: comparison, lab: lab)
         }
     }
 }
