@@ -1,78 +1,90 @@
-# OnDeviceLlm
+# dotnet-native-interop
 
-**Native↔managed interop, three ways** — one .NET 10 **NativeAOT** engine compiled to a single
-in-process shared library and reached over three transports (FFI, raw-socket HTTP, SQLite). A
-side-by-side, runnable comparison of how a Swift/Kotlin UI talks to embedded .NET.
+**One NativeAOT .NET 10 engine, embedded in native iOS & Android apps, reached three ways.** A single
+in-process shared library is driven from a Swift / Kotlin user interface over three interop
+transports — in-process **FFI**, loopback **HTTP**, and an encrypted **SQLCipher** store — and the app
+shows their cost **side by side**.
 
-> The .NET code compiles to `ondevicellm.dylib` (iOS) / `libondevicellm.so` (Android) and is loaded
-> **directly into the Swift/Kotlin UI process** — no separate backend process, no network, no cloud.
-> The demo payload streamed over every transport is a **live C# 14 / .NET 10 language-feature
-> showcase** (`FeatureShowcaseModel`) — zero weights, fully deterministic. The pipeline is generic:
-> swap the `ILanguageModel` seam (`MockLanguageModel` is the placeholder stub) for a real backend
-> such as llama.cpp and every transport and UI works unchanged.
+The payload streamed over every transport is a live **C# 14 / .NET 10 language-feature showcase**
+(collection expressions, the `field` keyword, extension blocks, generic math, list patterns, raw
+string literals, …), executed for real inside the NativeAOT library. The pipeline is generic: swap one
+interface (`ILanguageModel`) for a real backend — e.g. an on-device LLM via llama.cpp — and every
+transport and screen works unchanged.
+
+> The .NET code builds to `ondevicellm.dylib` (iOS) / `libondevicellm.so` (Android) and is loaded
+> **directly into the UI process** — no separate backend process, no network, no cloud.
 
 ---
 
-## The interop patterns
+## Acronyms & terms
 
-Three transports are compiled into the library and run on-device; a fourth (gRPC) is kept in the
-tree as a reference design but **excluded from the build** — see the note under the table.
+This project sits on the native↔managed boundary, so it leans on a lot of initialisms. In one place:
 
-| # | Pattern | Transport | Latency | Durable | Binary cost | Verdict |
-|---|---------|-----------|:------:|:------:|:----------:|---------|
-| 3 | **FFI + callback** | in-process C ABI (zero IPC) | ★★★★★ | — | low | **Production hot path** |
-| 1 | **HTTP loopback** | raw `System.Net.Sockets` `127.0.0.1` + SSE | ★★★ | — | low | Best for debugging |
-| 4 | **SQLite WAL broker** | shared `.db` table | ★★ | ✓ | low | Durable queue / history |
-| 2 | _gRPC over UDS_ | _Kestrel gRPC on a `.sock`_ | — | — | — | **Excluded — no mobile runtime pack** |
+| Term | Meaning |
+|------|---------|
+| **FFI** | Foreign Function Interface — calling C-ABI functions across the native↔managed boundary, in-process |
+| **ABI** | Application Binary Interface — the binary calling convention (symbol names, argument layout) |
+| **AOT** / **NativeAOT** | Ahead-Of-Time compilation — .NET compiled straight to a native binary, no JIT or runtime needed |
+| **JIT** | Just-In-Time compilation — the runtime alternative to AOT (not used here) |
+| **HTTP** | HyperText Transfer Protocol |
+| **SSE** | Server-Sent Events — one-directional streaming over HTTP |
+| **REST** | Representational State Transfer |
+| **TCP** | Transmission Control Protocol |
+| **JSON** | JavaScript Object Notation |
+| **SQL** | Structured Query Language (SQLite = an embedded "SQL" engine, "lite") |
+| **SQLCipher** | An encrypted build of SQLite — pages are AES-encrypted at rest via `PRAGMA key` |
+| **AES** | Advanced Encryption Standard |
+| **WAL** | Write-Ahead Logging — a SQLite journaling mode allowing concurrent reads while writing |
+| **IPC** | Inter-Process Communication |
+| **UI** | User Interface |
+| **gRPC** | gRPC Remote Procedure Calls (**RPC** = Remote Procedure Call) — present but excluded from the build |
+| **UDS** | Unix Domain Socket |
+| **JNI** | Java Native Interface — the Android C↔Java/Kotlin bridge |
+| **NDK** | Native Development Kit (Android's C/C++ toolchain) |
+| **RID** | Runtime Identifier — a .NET target triple, e.g. `ios-arm64` |
+| **GC** | Garbage Collection |
+| **TLS** | Thread-Local Storage (as used below — *not* Transport Layer Security) |
+| **SDK** | Software Development Kit |
+| **LTS** | Long-Term Support |
+| **CI** | Continuous Integration |
 
-> **Why HTTP is raw sockets, not Kestrel, and why gRPC is excluded:** ASP.NET Core (Kestrel + gRPC)
-> has no NativeAOT runtime pack for `ios-arm64` / `linux-bionic-arm64`, so it cannot publish into the
-> mobile shared library. The HTTP transport is therefore a minimal raw-socket HTTP/1.1 + SSE server
-> (`HttpRaw/`), and gRPC (`Grpc/`, `proto/`) is `<Compile Remove>`'d — present for reference only.
+---
 
-**Recommendation:** use **FFI + callback** for the streaming hot path, **SQLite (WAL)** for durable
-history, and treat **HTTP** as the debuggable comparison harness — not the production transport for
-two pieces of code that share one address space.
+## The three transports
 
-Both apps render the selected pattern's feature/limitation list **live** from
-[`docs/patterns.json`](docs/patterns.json) and show per-run metrics (time-to-first-token, tokens/sec,
-total). The authoritative interop spec is [`docs/INTEROP_CONTRACT.md`](docs/INTEROP_CONTRACT.md).
+All three are served by the **same** embedded library, which hosts every transport; they differ only
+in how the data crosses to Swift / Kotlin. A fourth (gRPC) is kept in the tree as a reference design
+but is **excluded from the build** — see the note under the table.
 
-### Pattern 3 — FFI + callback
-**Features:** zero IPC, direct in-memory calls · lowest latency / highest throughput · fewest moving
-parts (no server to bind) · bounded-channel backpressure maps onto the synchronous callback · no extra
-OS permissions.
-**Limitations:** most complex to build (UTF-8 marshalling, GC lifetimes, function-pointer ABI) ·
-callback fires on a .NET background thread (UI hop is the caller's job) · Android needs a C/JNI shim
-with `AttachCurrentThread` · a managed crash takes down the host · no process isolation.
+| Transport | Mechanism | How data crosses | Relative cost |
+|-----------|-----------|------------------|:------:|
+| **FFI** | in-process C ABI, zero IPC | JSON returned in-memory from a C export | ★ fastest |
+| **HTTP** | raw `System.Net.Sockets` server on `127.0.0.1` | JSON over a loopback HTTP/1.1 + SSE request | ★★ |
+| **SQLCipher** | encrypted on-disk SQLite (`PRAGMA key`) | written to & read back from a key-encrypted `.db`, returned as JSON | ★★★ slowest |
+| _gRPC over UDS_ | _Kestrel gRPC on a `.sock`_ | _(reference only — not compiled)_ | — |
 
-### Pattern 1 — HTTP loopback (raw sockets)
-**Features:** familiar REST/SSE, debuggable with curl · language-agnostic boundary (URLSession/OkHttp)
-· SSE maps naturally onto token streams · loopback avoids the iOS Local Network prompt · a tiny
-hand-rolled `System.Net.Sockets` server (no ASP.NET) keeps the AOT binary small.
-**Limitations:** TCP + HTTP + JSON overhead to talk to yourself · dynamic-port handshake · iOS
-**suspends the listener on backgrounding** (restart on foreground) · one-directional SSE · you own
-the HTTP/1.1 parsing a framework would otherwise give you.
+> **Why HTTP is raw sockets, why SQLite is SQLCipher, why gRPC is excluded.** ASP.NET Core (Kestrel +
+> gRPC) ships no NativeAOT runtime pack for mobile RIDs, so the HTTP transport is a hand-rolled
+> raw-socket HTTP/1.1 + SSE server and gRPC is `<Compile Remove>`'d. For SQLite, the default
+> `e_sqlite3` bundle ships **no iOS native library**; `e_sqlcipher` is the only SQLitePCLRaw bundle
+> with iOS device + simulator static libs, so it is statically linked into the NativeAOT image — and
+> since it is full SQLCipher, the database is encrypted at rest for free.
 
-### Pattern 4 — SQLite WAL broker
-**Features:** durable — requests/tokens survive an app kill · naturally reactive and decoupled · WAL
-allows concurrent UI reads while the broker writes · trivial to inspect (just a `.db`) · great as a
-job queue / offline outbox.
-**Limitations:** polling latency (tokens appear per poll interval) · per-token row INSERT is write
-amplification — wrong for hot streaming · no push (battery/wakeup cost) · you own ordering/retention
-/vacuum · highest end-to-end latency.
+---
 
-### Pattern 2 — gRPC over UDS _(excluded from the build — reference only)_
-> Kept in the tree (`core/.../Grpc/`, `proto/ondevicellm.proto`, generated Swift stubs) to document
-> the design, but **not compiled**: ASP.NET Core gRPC has no NativeAOT mobile runtime pack, so it
-> cannot ship in the on-device library. The notes below are what it *would* trade off.
+## The app
 
-**Features:** strongly-typed protobuf contract, server-streaming fits tokens · UDS stays in the
-sandbox (no TCP port, no Local Network prompt) · efficient HTTP/2 framing, mature clients · clean
-schema evolution.
-**Limitations:** serializes protobuf to talk to yourself · pulls the full Kestrel + ASP.NET + gRPC
-stack into the lib · UDS path lifecycle/cleanup · most ceremony of any option · **no NativeAOT mobile
-runtime pack — the blocker that excludes it here.**
+One unified SwiftUI app (`com.ondevicellm.unified`) with a transport **picker** — switch FFI / HTTP /
+SQLCipher and the same catalog reloads through that transport. Four tabs:
+
+- **Dashboard** — the active transport, "Run all", and aggregate results.
+- **Features** — the C# / .NET features grouped by language version; tap one to drill into its code
+  snippet, run it live, and see the result + timing (modelled on a capability-explorer UI).
+- **Compare** — runs every feature over **all three transports** and charts the client round-trip time
+  **side by side** (bars + totals). FFI ≪ HTTP < SQLCipher — the gap is the point.
+- **About** — each transport's tradeoffs.
+
+Each feature is its own component: a row that navigates to a detail screen, not one scrolling blob.
 
 ---
 
@@ -81,48 +93,44 @@ runtime pack — the blocker that excludes it here.**
 ```
       ┌─────────────────────┐            ┌─────────────────────┐
       │   iOS app (Swift)   │            │ Android app (Kotlin)│
-      │    SwiftUI · FFI    │            │   Compose · FFI     │
+      │  SwiftUI · 3 trans. │            │  Compose (follow-on)│
       └──────────┬──────────┘            └──────────┬──────────┘
-                 │        ffi · http · sqlite        │
+                 │      ffi · http · sqlcipher       │
                  ▼                                   ▼
       ┌────────────────────────────────────────────────────────┐
       │  ondevicellm  —  NativeAOT shared library (.dylib/.so)  │
-      │  OnDeviceLlm.NativeBridge:  C ABI + 3 built hosts      │
-      │   Ffi · Http(raw sockets/SSE) · Sqlite  (grpc: cut)    │
+      │  C ABI + 3 built transport hosts:                      │
+      │    Ffi (JSON) · HttpRaw (sockets/SSE) · SQLCipher (.db)│
       └───────────────────────────┬────────────────────────────┘
                                    ▼
       ┌────────────────────────────────────────────────────────┐
-      │  OnDeviceLlm.Engine  —  pure .NET, AOT-safe             │
-      │  InferenceOrchestrator · bounded-channel InferenceSession│
-      │  ILanguageModel ← FeatureShowcaseModel (active payload) │
+      │  OnDeviceLlm.Engine  —  pure .NET, AOT-safe            │
+      │  LanguageFeatureCatalog: each feature executes live    │
+      │  ILanguageModel ← FeatureShowcaseModel (swap-in seam)  │
       └────────────────────────────────────────────────────────┘
 
-  Http/ (Kestrel) and Grpc/ live in the tree but are excluded from the build.
-  MockLanguageModel is the swap-in stub for wiring a real LLM later.
+  Http/ (Kestrel) and Grpc/ remain in the tree but are excluded from the build.
 ```
-
-All built transports drive **one** shared `EngineHost.Orchestrator`. The bounded
-`System.Threading.Channels` channel gives true backpressure — the producer (the model, on a
-background thread) blocks when the UI lags rather than dropping tokens.
 
 ---
 
 ## Repository layout
 
 ```
-OnDeviceLlm.slnx
-global.json · Directory.Build.props
+OnDeviceLlm.slnx · global.json · Directory.Build.props
 core/
-  OnDeviceLlm.Engine/          pure domain (model, orchestrator, channel session)
+  OnDeviceLlm.Engine/          pure domain: executable feature catalog, orchestrator, channel session
   OnDeviceLlm.NativeBridge/    NativeAOT shared library
-    abi/ondevicellm.h          C ABI (FFI + HTTP exports; gRPC marked excluded)
-    Ffi/ HttpRaw/ Sqlite/      built transports
+    abi/ondevicellm.h          frozen C ABI (FFI + HTTP + SQLCipher exports)
+    Ffi/ HttpRaw/ Sqlite/      built transports (Sqlite uses SQLCipher)
     Http/ Grpc/                excluded from build (no mobile runtime pack) — kept for reference
 proto/ondevicellm.proto        gRPC contract (excluded build)
-ios/   OnDeviceLlmApp          SwiftUI host (FFI showcase) + client adapters
-android/ (io.ondevicellm)      Compose host + JNI shim + client adapters
+ios/
+  Shared/                      models, FeatureService protocol, view models, the SwiftUI shell
+  Apps/Unified/                the one app target (FFI + HTTP + SQLCipher, picker + Compare)
+android/ (io.ondevicellm)      Compose host + JNI shim (follow-on: not yet unified)
 build/                         build-ios-framework.sh · build-android-so.sh
-docs/                          INTEROP_CONTRACT.md · patterns.json
+docs/                          INTEROP_CONTRACT.md · patterns.json · superpowers/specs/
 .github/workflows/             ci-core · ci-ios · ci-android
 ```
 
@@ -130,8 +138,7 @@ docs/                          INTEROP_CONTRACT.md · patterns.json
 
 ## Build & run
 
-**Managed code** (Engine + the three built NativeBridge transports) builds anywhere with the .NET 10
-SDK:
+**Managed code** (Engine + the three built transports) builds anywhere with the .NET 10 SDK:
 
 ```bash
 dotnet build OnDeviceLlm.slnx -c Release
@@ -140,55 +147,44 @@ dotnet build OnDeviceLlm.slnx -c Release
 **Native artifacts require a macOS host** (Apple toolchain for iOS; Android NDK is smoothest there too):
 
 ```bash
-# iOS  → ios/Frameworks/ondevicellm.xcframework
-./build/build-ios-framework.sh
-
-# Android → android/app/src/main/jniLibs/arm64-v8a/libondevicellm.so
-./build/build-android-so.sh
+./build/build-ios-framework.sh     # → ios/Frameworks/ondevicellm.xcframework
+./build/build-android-so.sh        # → android/app/src/main/jniLibs/arm64-v8a/libondevicellm.so
 ```
 
-Then open the iOS project (`xcodegen generate` in `ios/`, then Xcode) or build Android
-(`cd android && ./gradlew :app:assembleDebug`). CI mirrors this: `ci-core` (managed, ubuntu+windows),
+Then generate and open the iOS project (`cd ios && xcodegen generate`, then Xcode), or build Android
+(`cd android && ./gradlew :app:assembleDebug`). CI mirrors this: `ci-core` (managed, ubuntu + windows),
 `ci-ios` / `ci-android` (macOS runners).
 
 ---
 
 ## Status
 
-- ✅ **Engine + the 3 built transports (FFI, raw-HTTP, SQLite) compile** — `dotnet build -c Release`,
-  0 warnings / 0 errors, verified on .NET 10.0.300.
-- 🚫 **gRPC + legacy Kestrel HTTP are excluded from the build** (`<Compile Remove>` in the csproj):
-  ASP.NET Core has no NativeAOT mobile runtime pack. Source kept in `Grpc/` and `Http/` for reference.
-- ⏳ **iOS / Android native builds** run on macOS via the `build/` scripts (NativeAOT mobile needs the
-  Apple/NDK toolchain — not buildable from Windows).
+- ✅ **Engine + the 3 built transports (FFI, raw-HTTP, SQLCipher) compile and run on device** (iOS).
+- ✅ **Unified iOS app** with transport picker + side-by-side Compare tab, deployed to a physical iPad.
+- 🚫 **gRPC + legacy Kestrel HTTP are excluded from the build** (no NativeAOT mobile runtime pack); the
+  source is kept under `Grpc/` and `Http/` for reference.
+- ⏳ **Android** trio is the open follow-on — same shared contract, Compose UI.
 
 ---
 
 ## Threading model
 
-- The model runs on a background `Task`; the bounded channel provides backpressure.
+- The engine runs work on a background `Task`; a bounded `System.Threading.Channels` channel provides
+  backpressure (the producer blocks when the UI lags rather than dropping output).
 - **iOS:** the FFI callback is a non-capturing `@convention(c)` function; the client hops to `@MainActor`.
-- **Android:** the JNI shim caches `JavaVM*` in `JNI_OnLoad`, `AttachCurrentThread` once per .NET
-  worker (TLS destructor detaches on exit), and calls back into Kotlin.
-
----
-
-## Known sharp edges
-
-- **.NET 10 LTS** (supported to Nov 2028). .NET 9 reached end-of-support May 2026.
-- **Android NativeAOT is experimental** in .NET 10 (warning XA1040) — enabled via
-  `EnablePreviewFeatures` + the `linux-bionic-arm64` RID (`android-arm64` cannot publish a library).
-- **iOS:** Apple forbids `dlopen` of a bare `.dylib`; the NativeAOT output is wrapped in a signed
-  `.framework`/`.xcframework` and linked at build (handled by the build script).
-- **SQLite:** the native `e_sqlite3` must link for each mobile RID (handled in the build scripts).
-- **No ASP.NET on mobile:** Kestrel/gRPC have no NativeAOT mobile runtime pack — which is why this
-  build excludes both. HTTP is a raw-socket server and the hot path is FFI.
+- **Android:** the JNI shim caches `JavaVM*` in `JNI_OnLoad`, calls `AttachCurrentThread` once per .NET
+  worker (a Thread-Local Storage / TLS destructor detaches on exit), then posts back to Kotlin.
 
 ---
 
 ## Swapping in a real model
 
 The shipped payload is the C# feature showcase (`FeatureShowcaseModel`). To run a real model instead,
-implement `ILanguageModel.GenerateAsync` (e.g. P/Invoke into llama.cpp) and wire it into
-`EngineHost.Initialize()` (swap the single `new FeatureShowcaseModel()` line). Every transport, both
-apps, and the streaming UI work unchanged.
+implement `ILanguageModel.GenerateAsync` (for example, P/Invoke into llama.cpp) and wire it into
+`EngineHost.Initialize()`. Every transport, the app, and the streaming UI work unchanged.
+
+---
+
+## License
+
+[MIT](LICENSE).
