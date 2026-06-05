@@ -7,6 +7,7 @@ final class FeaturesViewModel: ObservableObject {
     @Published var selected: TransportKind = .ffi
     @Published var descriptors: [FeatureDescriptor] = []
     @Published var results: [String: FeatureResult] = [:]
+    @Published var runCounts: [String: Int] = [:]
     @Published var running: Set<String> = []
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -65,6 +66,7 @@ final class FeaturesViewModel: ObservableObject {
         defer { running.remove(id) }
         do {
             results[id] = try await service.run(id)
+            runCounts[id, default: 0] += 1
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

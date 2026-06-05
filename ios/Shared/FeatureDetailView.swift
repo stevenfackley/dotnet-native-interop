@@ -55,7 +55,17 @@ struct FeatureDetailView: View {
                                     label: result.ok ? "Works" : "Mismatch")
                     }
                     LabeledContent("Elapsed") {
-                        Text(String(format: "%.3f ms", result.elapsedMs)).monospacedDigit()
+                        Text(String(format: "%.3f ms", result.elapsedMs))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: viewModel.runCounts[descriptor.id])
+                    }
+                    LabeledContent("Runs") {
+                        Text("\(viewModel.runCounts[descriptor.id] ?? 1)")
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .foregroundStyle(.secondary)
+                            .animation(.snappy, value: viewModel.runCounts[descriptor.id])
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Output").font(.caption).foregroundStyle(.secondary)
