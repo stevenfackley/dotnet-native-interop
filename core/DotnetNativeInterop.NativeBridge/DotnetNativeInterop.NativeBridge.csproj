@@ -49,10 +49,10 @@
        linked symbols, NativeLibrary pulls the static archive into the image, and -force_load keeps
        ORT's operator-kernel registrations (static initializers) from being dead-stripped. ORT is
        C++, so link libc++. On Windows (build/probe) the package resolves its win-x64 native. -->
-  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64'">
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('ios'))">
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" GeneratePathProperty="true" />
   </ItemGroup>
-  <Target Name="ExtractOnnxRuntimeIos" Condition="'$(RuntimeIdentifier)' == 'ios-arm64'"
+  <Target Name="ExtractOnnxRuntimeIos" Condition="$(RuntimeIdentifier.StartsWith('ios'))"
           BeforeTargets="IlcCompile">
     <Unzip SourceFiles="$(PkgMicrosoft_ML_OnnxRuntime)/runtimes/ios/native/onnxruntime.xcframework.zip"
            DestinationFolder="$(IntermediateOutputPath)ort-ios"
@@ -61,6 +61,11 @@
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64'">
     <DirectPInvoke Include="onnxruntime" />
     <NativeLibrary Include="$(IntermediateOutputPath)ort-ios/onnxruntime.xcframework/ios-arm64/onnxruntime.framework/onnxruntime" />
+    <LinkerArg Include="-lc++" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'iossimulator-arm64'">
+    <DirectPInvoke Include="onnxruntime" />
+    <NativeLibrary Include="$(IntermediateOutputPath)ort-ios/onnxruntime.xcframework/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime" />
     <LinkerArg Include="-lc++" />
   </ItemGroup>
 

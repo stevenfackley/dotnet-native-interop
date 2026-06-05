@@ -57,7 +57,7 @@ public sealed class SemanticSearch(ITextEncoder encoder)
                     return _default;
                 }
 
-                var dir = Path.Combine(AppContext.BaseDirectory, "Ai", "assets");
+                var dir = ResolveAssetsDir();
                 var tokenizer = new WordPieceTokenizer(File.ReadAllLines(Path.Combine(dir, "vocab.txt")));
                 var search = new SemanticSearch(new OnnxTextEncoder(Path.Combine(dir, "model.onnx"), tokenizer));
                 search.SetCorpus("features",
@@ -73,4 +73,18 @@ public sealed class SemanticSearch(ITextEncoder encoder)
     /// <summary>Searches the default instance; returns JSON top-K for the native export.</summary>
     public static string SearchJson(string query, string corpusId, int topK = 5) =>
         AiJson.Serialize(Default.Search(query, corpusId, topK));
+
+    // Assets land in different layouts: the .NET build output preserves "Ai/assets/", while the iOS app
+    // bundle copies the folder reference to "assets/" at the bundle root. Probe the known spots for vocab.
+    private static string ResolveAssetsDir()
+    {
+        var baseDir = AppContext.BaseDirectory;
+        string[] candidates =
+        [
+            Path.Combine(baseDir, "Ai", "assets"),
+            Path.Combine(baseDir, "assets"),
+            baseDir,
+        ];
+        return Array.Find(candidates, c => File.Exists(Path.Combine(c, "vocab.txt"))) ?? candidates[0];
+    }
 }
