@@ -11,19 +11,28 @@ final class EdgeSearchViewModel: ObservableObject {
     @Published var searching = false
     @Published var errorMessage: String?
     @Published private(set) var unavailable: String?
+    @Published private(set) var ready = false
     @Published private(set) var allErrorCodes: [String] = []
     @Published private(set) var allTools: [String] = []
 
     private var engine: EdgeSearchEngine?
+    private var loadTask: Task<EdgeSearchEngine, Error>?
 
-    /// Builds the engine once, off-main. Sets `unavailable` (→ graceful card) on failure.
+    /// Builds the engine once, off-main (loads the ~90 MB ONNX model + SQLite index). Idempotent and
+    /// cancellation-safe: every call awaits the same detached load, so a cancelled `.task` (the view
+    /// disappearing) neither loses progress nor triggers a second model load.
     func prepare() async {
         guard engine == nil, unavailable == nil else { return }
+        let task = loadTask ?? Task.detached(priority: .userInitiated) { try EdgeSearchEngine() }
+        loadTask = task
         do {
-            let e = try await Task.detached(priority: .userInitiated) { try EdgeSearchEngine() }.value
+            let e = try await task.value
             engine = e
             allErrorCodes = e.allErrorCodes.sorted()
             allTools = e.allTools.sorted()
+            ready = true
+        } catch is CancellationError {
+            // View disappeared mid-load; keep loadTask so a re-appear awaits the same load.
         } catch {
             unavailable = error.localizedDescription
         }

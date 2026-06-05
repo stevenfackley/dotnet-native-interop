@@ -191,6 +191,7 @@ final class ScreenshotTests: XCTestCase {
         // First query is cold: lazy-loads the ~90 MB model + SQLite index, then embeds via Core ML.
         sleep(15)
         shot(name)
+        // No goBack(): this is the final capture, so no navigation follows.
     }
 
     /// Engine telemetry: enter, toggle the stress switch so GC/heap move, screenshot, stop, pop back.

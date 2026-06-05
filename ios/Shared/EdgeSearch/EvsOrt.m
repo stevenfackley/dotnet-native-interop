@@ -52,7 +52,13 @@
                     ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, &maskVal) error:error]
         || [self fail:_ort->CreateTensorWithDataAsOrtValue(_mem, types, bytes, shape, 2,
                     ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, &typeVal) error:error];
-    if (bad) { free(types); return NO; }
+    if (bad) {
+        if (idsVal) _ort->ReleaseValue(idsVal);
+        if (maskVal) _ort->ReleaseValue(maskVal);
+        if (typeVal) _ort->ReleaseValue(typeVal);
+        free(types);
+        return NO;
+    }
 
     const char *inNames[3] = {"input_ids", "attention_mask", "token_type_ids"};
     const OrtValue *inVals[3] = {idsVal, maskVal, typeVal};
@@ -81,6 +87,12 @@
 
     _ort->ReleaseValue(outVal);
     return YES;
+}
+
+- (void)dealloc {
+    if (_mem) _ort->ReleaseMemoryInfo(_mem);
+    if (_session) _ort->ReleaseSession(_session);
+    if (_env) _ort->ReleaseEnv(_env);
 }
 
 // Returns YES (and fills *error) when `status` is a real error; releases it. NULL status -> NO.

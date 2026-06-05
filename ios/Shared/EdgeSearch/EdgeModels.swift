@@ -33,13 +33,11 @@ struct EdgeSearchHit: Identifiable, Sendable {
 enum EdgeSearchError: LocalizedError {
     case assetMissing(String)
     case dbOpenFailed
-    case inferenceFailed
 
     var errorDescription: String? {
         switch self {
         case .assetMissing(let f): return "Missing bundled asset: \(f)."
         case .dbOpenFailed: return "Couldn't open the compiled search index."
-        case .inferenceFailed: return "On-device embedding failed (Core ML)."
         }
     }
 }

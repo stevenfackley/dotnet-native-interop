@@ -56,6 +56,7 @@ final class EdgeSearchEngine: @unchecked Sendable {
     private static func loadIndex(dbPath: String) throws -> [(chunk: EdgeChunk, embedding: [Float])] {
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
+            if let db { sqlite3_close(db) }   // open_v2 sets db even on failure; release it.
             throw EdgeSearchError.dbOpenFailed
         }
         defer { sqlite3_close(db) }

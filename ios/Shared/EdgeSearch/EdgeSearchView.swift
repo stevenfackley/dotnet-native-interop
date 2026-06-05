@@ -13,6 +13,13 @@ struct EdgeSearchView: View {
                                            systemImage: "wrench.adjustable",
                                            description: Text(reason))
                 }
+            } else if !model.ready {
+                Section {
+                    HStack {
+                        ProgressView()
+                        Text("Loading the on-device search engine…").foregroundStyle(.secondary)
+                    }
+                }
             } else {
                 Section {
                     HStack {
