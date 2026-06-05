@@ -1,8 +1,8 @@
 # Running ONNX Runtime under NativeAOT on iOS — what worked
 
 **Date:** 2026-06-05
-**Status:** Windows AOT gate **PASSED**. iOS ARM64 link — validated by the framework build (see the
-[iOS link](#ios-arm64-link-the-real-target) section, completed during the Mac build).
+**Status:** Windows AOT gate **PASSED**, iOS ARM64 static link **PASSED**, and the signed app
+**installs on a physical iPad**. See [iOS link](#ios-arm64-link--confirmed) for how.
 **Why this doc exists:** the on-device AI feature embeds an [all-MiniLM-L6-v2][minilm] sentence model via
 `Microsoft.ML.OnnxRuntime` **inside** the NativeAOT engine (`dni.dylib`). "Does ONNX Runtime survive
 NativeAOT compilation + trimming, and link on iOS?" was an open question, so it was gated behind a
@@ -104,19 +104,47 @@ with "no constructor that takes 1 arguments" rather than an ambiguity error. Fix
 using OrtSession = Microsoft.ML.OnnxRuntime.InferenceSession;
 ```
 
-## iOS ARM64 link (the real target)
+## iOS ARM64 link — confirmed
 
-The `win-x64` spike de-risks codegen/trim; the **actual** question is whether `onnxruntime` (ios-arm64)
-links into `dni.dylib` during the NativeAOT iOS publish. That is validated by the framework build
-(`build/build-ios-framework-device.sh`) on the Mac mini.
+The `win-x64` spike de-risks codegen/trim; the **real** question was whether `onnxruntime` links into
+`dni.dylib` during the NativeAOT iOS publish. **It does — but not automatically.**
 
-> **Pending the Mac framework build (plan Task 13).** This section will record the real linker outcome:
-> whether the ONNX `ios-arm64` static lib resolved into `dni.dylib` out of the box, and any
-> `DirectPInvoke` / `NativeLibrary` / linker flags required. If the link fails, the exact linker error
-> goes here verbatim and the engine falls back to a pure-.NET encoder (a separate subsystem).
+**ORT's iOS lib is a *static* archive.** Inside `runtimes/ios/native/onnxruntime.xcframework.zip`, each
+slice's `onnxruntime.framework/onnxruntime` is an `ar` archive (a single `prelinked_objects.o`), not a
+dynamic framework. NativeAOT's first `ios-arm64` publish linked **zero** ONNX: the package's auto-link
+targets fire only for `-ios` TFMs, not NativeAOT RIDs. So `dni.dylib` came out 6.9 MB with no ONNX
+symbols, and the `.xcframework.zip` was left unembedded — the app would have crashed at the first
+`InferenceSession`.
 
-> **Asset note:** `model.onnx` (~90 MB) is stored via **Git LFS**. `git archive` ships only the LFS
-> pointer, so the Mac build needs the real file — `git lfs pull` after clone, or `scp` it across — before
-> the model can be bundled.
+**The fix mirrors this repo's existing SQLCipher hand-link** (`DotnetNativeInterop.NativeBridge.csproj`):
+extract the xcframework, `DirectPInvoke` the `onnxruntime` P/Invokes, point `NativeLibrary` at the static
+archive, and link `libc++` (ORT is C++):
+```xml
+<Target Name="ExtractOnnxRuntimeIos" Condition="$(RuntimeIdentifier.StartsWith('ios'))" BeforeTargets="IlcCompile">
+  <Unzip SourceFiles="$(PkgMicrosoft_ML_OnnxRuntime)/runtimes/ios/native/onnxruntime.xcframework.zip"
+         DestinationFolder="$(IntermediateOutputPath)ort-ios" SkipUnchangedFiles="true" />
+</Target>
+<ItemGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64'">
+  <DirectPInvoke Include="onnxruntime" />
+  <NativeLibrary Include="$(IntermediateOutputPath)ort-ios/onnxruntime.xcframework/ios-arm64/onnxruntime.framework/onnxruntime" />
+  <LinkerArg Include="-lc++" />
+</ItemGroup>
+```
+After this, `dni.dylib` grows **6.9 MB → 23 MB** (+17 MB of `__TEXT`) and the linker pulls ORT's
+`prelinked_objects.o`. **No `-force_load` is needed**: ORT ships as one prelinked object, so referencing
+the API entry point drags in the whole runtime — operator kernels included. The `ios-arm64` and
+`iossimulator-arm64` slices link identically. A benign `ld` warning notes ORT was built for iOS 13 while
+the dylib targets 12.2 — harmless, since the app's deployment target is iOS 17.
+
+**End-to-end on a physical device.** The full app — signed, with ORT in the dylib and the 90 MB model
+bundled — builds and **installs on a real iPad** (`xcrun devicectl device install`, exit 0). The model,
+vocab, and corpus ride along as an Xcode folder reference at `<App>.app/assets/`, and the engine's
+`ResolveAssetsDir` probes both the .NET-output (`Ai/assets/`) and bundle (`assets/`) layouts so it loads
+the model in either context.
+
+**Asset shipping note:** `model.onnx` (~90 MB) is stored via **Git LFS**. In practice `git archive`
+smudges the pointer to the real bytes when the LFS object is in the local cache, so a piped
+`git archive | tar` sync carries the real model to the build host; if it ever ships only the pointer,
+`git lfs pull` (or `scp`) the file before bundling.
 
 [minilm]: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
