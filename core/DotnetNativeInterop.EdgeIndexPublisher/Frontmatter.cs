@@ -15,14 +15,27 @@ public static class Frontmatter
             return (new DocFrontmatter("", "", [], []), markdown);
         }
 
-        var end = text.IndexOf("\n---", 4, StringComparison.Ordinal);
+        // The closing fence must be a full `---` line: `\n---\n`, or `\n---` at end of the doc. Matching a
+        // bare `\n---` substring would let a body thematic break (`---`/`----`) truncate the content.
+        var end = text.IndexOf("\n---\n", 4, StringComparison.Ordinal);
+        var bodyStart = end + "\n---\n".Length;
+        if (end < 0)
+        {
+            var eof = text.IndexOf("\n---", 4, StringComparison.Ordinal);
+            if (eof >= 0 && eof + 4 == text.Length)
+            {
+                end = eof;
+                bodyStart = text.Length;
+            }
+        }
+
         if (end < 0)
         {
             return (new DocFrontmatter("", "", [], []), markdown);
         }
 
         var header = text[4..end];
-        var body = text[(end + 4)..].TrimStart('\n');
+        var body = bodyStart >= text.Length ? "" : text[bodyStart..].TrimStart('\n');
 
         string id = "", title = "";
         string[] codes = [], tools = [];
