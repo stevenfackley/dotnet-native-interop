@@ -26,7 +26,7 @@ public static class EnumerableExtensions
 /// A catalog of C# / .NET language features, each executable on demand so the native UI can show the
 /// live output and timing per feature. Everything here is AOT-safe — no reflection.
 /// </summary>
-public static class LanguageFeatureCatalog
+public static partial class LanguageFeatureCatalog
 {
     /// <summary>The executable features.</summary>
     public static IReadOnlyList<LanguageFeature> Features { get; } = Build();
@@ -69,7 +69,9 @@ public static class LanguageFeatureCatalog
         catch (Exception ex) { return ex.Message; }
     }
 
-    private static List<LanguageFeature> Build() =>
+    private static List<LanguageFeature> Build() => [.. LanguageSyntaxDemos(), .. RuntimeDemos()];
+
+    private static List<LanguageFeature> LanguageSyntaxDemos() =>
     [
         new("collection-expressions", "Collection expressions + spread", "C# 12",
             "int[] a = [1, 2, 3];\nint[] b = [0, ..a, 4];",

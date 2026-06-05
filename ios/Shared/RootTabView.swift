@@ -16,6 +16,9 @@ struct RootTabView: View {
             ComparisonView(model: comparison)
                 .tabItem { Label("Compare", systemImage: "chart.bar.xaxis") }
 
+            LatencyView(viewModel: features)
+                .tabItem { Label("Latency", systemImage: "stopwatch") }
+
             AboutView(infos: features.orderedInfos)
                 .tabItem { Label("About", systemImage: "info.circle") }
         }

@@ -8,4 +8,9 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- SIMD-accelerated, AOT-friendly tensor ops for the cosine-similarity demo. -->
+    <PackageReference Include="System.Numerics.Tensors" Version="10.0.0" />
+  </ItemGroup>
+
 </Project>
