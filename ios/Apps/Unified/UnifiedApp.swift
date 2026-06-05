@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Unified app entry: one app, all three transports. Builds the services once and shares them between
-/// the Features explorer (selected transport) and the Compare tab (all transports).
 @main
 struct DotnetNativeInteropUnifiedApp: App {
     @StateObject private var features: FeaturesViewModel
     @StateObject private var comparison: ComparisonViewModel
     @StateObject private var lab: LabViewModel
+    @StateObject private var latency: LatencyViewModel
+    private let telemetry = TelemetryService()
 
     init() {
         let services: [TransportKind: FeatureService] = [
@@ -22,11 +22,13 @@ struct DotnetNativeInteropUnifiedApp: App {
         _features = StateObject(wrappedValue: FeaturesViewModel(services: services, infos: infos))
         _comparison = StateObject(wrappedValue: ComparisonViewModel(services: services))
         _lab = StateObject(wrappedValue: LabViewModel(services: services))
+        _latency = StateObject(wrappedValue: LatencyViewModel(services: services))
     }
 
     var body: some Scene {
         WindowGroup {
-            RootTabView(features: features, comparison: comparison, lab: lab)
+            RootTabView(features: features, comparison: comparison, lab: lab,
+                        latency: latency, telemetry: telemetry)
         }
     }
 }
