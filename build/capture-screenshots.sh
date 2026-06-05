@@ -40,6 +40,21 @@ mkdir -p "${OUT}"
 python3 - "${TMP}" "${OUT}" <<'PY'
 import json, os, shutil, subprocess, sys
 src, out = sys.argv[1], sys.argv[2]
+
+def strip_exif_chunk(path):
+    # `sips -r` rotates the pixels upright but writes a PNG eXIf orientation tag that EXIF-honoring
+    # viewers (Preview, GitHub) re-apply, double-rotating the image. Drop the eXIf chunk; IDAT is untouched.
+    data = open(path, "rb").read()
+    fixed = bytearray(data[:8])  # PNG signature
+    i = 8
+    while i < len(data):
+        length = int.from_bytes(data[i:i + 4], "big")
+        ctype = data[i + 4:i + 8]
+        if ctype != b"eXIf":
+            fixed += data[i:i + 12 + length]  # length(4) + type(4) + data + crc(4)
+        i += 12 + length
+    open(path, "wb").write(fixed)
+
 manifest = json.load(open(os.path.join(src, "manifest.json")))
 for entry in manifest:
     for a in entry.get("attachments", []):
@@ -49,6 +64,7 @@ for entry in manifest:
         # XCUITest stores landscape frames in the device's native (portrait) buffer; rotate to upright.
         subprocess.run(["sips", "-r", "270", dst],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        strip_exif_chunk(dst)
 PY
 
 echo "=== screenshots written to ${OUT} ==="
