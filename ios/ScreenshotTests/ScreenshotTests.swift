@@ -50,6 +50,13 @@ final class ScreenshotTests: XCTestCase {
         tapTab("About")
         sleep(2)
         shot("15-about")
+
+        // --- AI (on-device semantic search embedded by the .NET engine + Apple's model for contrast) ---
+        tapTab("AI")
+        sleep(2)
+        shot("16-ai-hub")
+        captureSemanticSearch(as: "17-semantic-search")
+        drill("Apple chat", settle: 3, as: "18-apple-chat")
     }
 
     // MARK: - Capture
@@ -64,19 +71,37 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Navigation (best-effort)
 
     private func tapTab(_ label: String) {
-        // iPhone renders a bottom tab bar; iPad (iPadOS 18+) renders a top bar whose items are plain
-        // buttons not under `tabBars`. Try the tab-bar path first, then fall back to any button.
+        if tapTabButton(label) { return }
+        // iPad's top tab bar fits ~6 items and collapses the rest behind an overflow control
+        // (a ">"/"More"). Open whichever affordance exists, then retry the now-revealed tab.
+        for overflow in ["More", "more", "ellipsis", "Show More"] {
+            let control = app.buttons[overflow]
+            if control.waitForExistence(timeout: 1), control.isHittable {
+                control.tap()
+                sleep(1)
+                break
+            }
+        }
+        _ = tapTabButton(label)
+    }
+
+    /// Taps a top-level tab by label via the tab bar or a plain button; returns whether it succeeded.
+    /// iPhone renders a bottom tab bar; iPad (iPadOS 18+) renders a top bar whose items are plain buttons.
+    @discardableResult
+    private func tapTabButton(_ label: String) -> Bool {
         let tabBarButton = app.tabBars.buttons[label]
-        if tabBarButton.waitForExistence(timeout: 3) {
+        if tabBarButton.waitForExistence(timeout: 2), tabBarButton.isHittable {
             tabBarButton.tap()
             sleep(1)
-            return
+            return true
         }
         let button = app.buttons[label].firstMatch
-        if button.waitForExistence(timeout: 6) {
+        if button.waitForExistence(timeout: 3), button.isHittable {
             button.tap()
             sleep(1)
+            return true
         }
+        return false
     }
 
     private func capture(tab: String, as name: String, settle: UInt32) {
@@ -130,6 +155,22 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         tapIfExists(button: run)
         sleep(settle)
+        shot(name)
+        goBack()
+    }
+
+    /// Enter semantic search, type a query, submit (onSubmit runs the .NET engine: loads the ONNX model,
+    /// embeds both corpora, ranks the query), wait for results, screenshot, then pop back.
+    private func captureSemanticSearch(as name: String) {
+        guard tapRow("Semantic search") else { return }
+        sleep(1)
+        let field = app.textFields.firstMatch
+        if field.waitForExistence(timeout: 5) {
+            field.tap()
+            field.typeText("encrypt my data\n")
+        }
+        // First query is cold: it loads the ~90 MB all-MiniLM model and embeds both corpora before ranking.
+        sleep(15)
         shot(name)
         goBack()
     }

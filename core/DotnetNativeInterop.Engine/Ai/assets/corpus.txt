@@ -1,0 +1,30 @@
+NativeAOT compiles .NET ahead-of-time to a native binary with no JIT or runtime.
+The garbage collector reclaims unused managed memory automatically.
+Span<T> enables zero-allocation slicing of arrays and strings.
+TensorPrimitives provides SIMD-accelerated vector math like cosine similarity.
+AES-GCM provides authenticated encryption with a 16-byte tag.
+SQLCipher encrypts an entire SQLite database at rest with a PRAGMA key.
+async and await express asynchronous code without blocking threads.
+Records are immutable reference types with value-based equality.
+The field keyword exposes a property's backing field in C# 14.
+Source-generated JSON avoids reflection so it works under NativeAOT.
+gRPC is a high-performance RPC framework using HTTP/2 and Protocol Buffers.
+P/Invoke calls native C functions from managed code across the ABI.
+Swift Charts renders native charts declaratively in SwiftUI.
+The iOS Simulator runs apps on a Mac without a physical device.
+Metal is Apple's low-level GPU graphics and compute API.
+A Mandelbrot set is a fractal defined by an escape-time iteration.
+Ray marching renders 3D scenes by stepping along signed distance fields.
+BigInteger represents arbitrary-precision integers in .NET.
+Brotli is a compression algorithm with strong ratios for text.
+Channels provide a thread-safe producer-consumer pipeline with backpressure.
+A foreign function interface calls across a native-to-managed boundary.
+WordPiece tokenization splits text into subword units for transformers.
+An embedding maps text to a vector so similarity becomes geometry.
+Cosine similarity measures the angle between two vectors.
+Apple Foundation Models run a language model on-device in iOS 26.
+ONNX is an open format for interchangeable machine-learning models.
+Quantization shrinks a model by storing weights in lower precision.
+The CLS token's output is often used as a sentence representation.
+Mean pooling averages token embeddings into one sentence vector.
+SIMD executes one instruction across multiple data lanes at once.

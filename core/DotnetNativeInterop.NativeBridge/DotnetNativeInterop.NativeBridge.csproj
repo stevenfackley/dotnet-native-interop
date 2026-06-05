@@ -41,6 +41,34 @@
     <NativeLibrary Include="$(PkgSQLitePCLRaw_lib_e_sqlcipher_ios)/static/device/e_sqlcipher.a" />
   </ItemGroup>
 
+  <!-- On-device AI (Pattern 3): the engine embeds an all-MiniLM ONNX model via
+       Microsoft.ML.OnnxRuntime. Exactly like e_sqlcipher above, ORT ships only a *static* iOS lib
+       (inside runtimes/ios/native/onnxruntime.xcframework.zip) and its auto-link targets fire only
+       for -ios TFMs, not NativeAOT RIDs — so the NativeAOT image links no ONNX at all. Hand-link it:
+       extract the xcframework, DirectPInvoke binds the "onnxruntime" P/Invokes to the statically
+       linked symbols, NativeLibrary pulls the static archive into the image, and -force_load keeps
+       ORT's operator-kernel registrations (static initializers) from being dead-stripped. ORT is
+       C++, so link libc++. On Windows (build/probe) the package resolves its win-x64 native. -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('ios'))">
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" GeneratePathProperty="true" />
+  </ItemGroup>
+  <Target Name="ExtractOnnxRuntimeIos" Condition="$(RuntimeIdentifier.StartsWith('ios'))"
+          BeforeTargets="IlcCompile">
+    <Unzip SourceFiles="$(PkgMicrosoft_ML_OnnxRuntime)/runtimes/ios/native/onnxruntime.xcframework.zip"
+           DestinationFolder="$(IntermediateOutputPath)ort-ios"
+           SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64'">
+    <DirectPInvoke Include="onnxruntime" />
+    <NativeLibrary Include="$(IntermediateOutputPath)ort-ios/onnxruntime.xcframework/ios-arm64/onnxruntime.framework/onnxruntime" />
+    <LinkerArg Include="-lc++" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'iossimulator-arm64'">
+    <DirectPInvoke Include="onnxruntime" />
+    <NativeLibrary Include="$(IntermediateOutputPath)ort-ios/onnxruntime.xcframework/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime" />
+    <LinkerArg Include="-lc++" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
   </ItemGroup>

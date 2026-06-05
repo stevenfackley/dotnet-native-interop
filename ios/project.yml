@@ -27,6 +27,11 @@ targets:
     sources:
       - path: Shared
       - path: Apps/Unified
+      # Bundle the all-MiniLM model + vocab + fact corpus as a folder reference so the app ships
+      # <App>.app/assets/{model.onnx,vocab.txt,corpus.txt}; the engine resolves them at runtime.
+      - path: ../core/DotnetNativeInterop.Engine/Ai/assets
+        type: folder
+        buildPhase: resources
     dependencies:
       - framework: Frameworks/dni.xcframework
         embed: true

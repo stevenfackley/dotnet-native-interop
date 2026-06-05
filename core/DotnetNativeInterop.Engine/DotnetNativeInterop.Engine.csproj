@@ -13,4 +13,12 @@
     <PackageReference Include="System.Numerics.Tensors" Version="10.0.0" />
   </ItemGroup>
 
+  <!-- On-device AI: all-MiniLM sentence encoder via ONNX Runtime + bundled model/vocab/corpus. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+    <None Update="Ai/assets/model.onnx" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Ai/assets/vocab.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Ai/assets/corpus.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -6,6 +6,7 @@ struct RootTabView: View {
     @ObservedObject var lab: LabViewModel
     @ObservedObject var latency: LatencyViewModel
     let telemetry: TelemetryService
+    let search: SemanticSearchService
 
     var body: some View {
         TabView {
@@ -17,6 +18,9 @@ struct RootTabView: View {
 
             LabView(lab: lab)
                 .tabItem { Label("Lab", systemImage: "cpu") }
+
+            AiHubView(search: search)
+                .tabItem { Label("AI", systemImage: "sparkles") }
 
             ComparisonView(model: comparison)
                 .tabItem { Label("Compare", systemImage: "chart.bar.xaxis") }
