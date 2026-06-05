@@ -87,6 +87,11 @@ const char* dni_sqlite_run(const char* id);     /* {id,result,elapsedMs,ok}     
  *  threadCount,processorCount,uptimeMs}; copy then release with dni_string_free. */
 const char* dni_engine_stats(void);
 
+/* ---- Onboard AI: semantic search --------------------------------------- */
+/* Ranks `corpus` ("features" | "facts") by cosine similarity to free-text `query`;
+ * returns heap UTF-8 JSON [{text,score}] (top-K). Copy then release with dni_string_free. */
+const char* dni_search(const char* query, const char* corpus);
+
 #ifdef __cplusplus
 }
 #endif

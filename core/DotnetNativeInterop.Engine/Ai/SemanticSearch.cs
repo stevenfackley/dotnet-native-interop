@@ -41,4 +41,36 @@ public sealed class SemanticSearch(ITextEncoder encoder)
         scored.Sort((a, b) => b.Score.CompareTo(a.Score));
         return scored.Take(topK).ToArray();
     }
+
+    private static SemanticSearch? _default;
+    private static readonly object Gate = new();
+
+    /// <summary>Process-wide search over two corpora ("features", "facts"), built once from bundled assets.</summary>
+    public static SemanticSearch Default
+    {
+        get
+        {
+            lock (Gate)
+            {
+                if (_default is not null)
+                {
+                    return _default;
+                }
+
+                var dir = Path.Combine(AppContext.BaseDirectory, "Ai", "assets");
+                var tokenizer = new WordPieceTokenizer(File.ReadAllLines(Path.Combine(dir, "vocab.txt")));
+                var search = new SemanticSearch(new OnnxTextEncoder(Path.Combine(dir, "model.onnx"), tokenizer));
+                search.SetCorpus("features",
+                    LanguageFeatureCatalog.Descriptors.Select(d => $"{d.Title}: {d.Version}").ToArray());
+                search.SetCorpus("facts", File.ReadAllLines(Path.Combine(dir, "corpus.txt"))
+                    .Where(l => l.Trim().Length > 0).ToArray());
+                _default = search;
+                return _default;
+            }
+        }
+    }
+
+    /// <summary>Searches the default instance; returns JSON top-K for the native export.</summary>
+    public static string SearchJson(string query, string corpusId, int topK = 5) =>
+        AiJson.Serialize(Default.Search(query, corpusId, topK));
 }
