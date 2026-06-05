@@ -1,0 +1,64 @@
+name: ci-ios
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'core/OnDeviceLlm.NativeBridge/**'
+      - 'ios/**'
+      - 'build/build-ios-framework.sh'
+      - '.github/workflows/ci-ios.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'core/OnDeviceLlm.NativeBridge/**'
+      - 'ios/**'
+      - 'build/build-ios-framework.sh'
+      - '.github/workflows/ci-ios.yml'
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      - name: Build iOS Framework (device + simulator)
+        run: |
+          chmod +x ./build/build-ios-framework.sh
+          ./build/build-ios-framework.sh
+
+      - name: Generate Xcode project
+        run: |
+          cd ios
+          xcodegen generate
+
+      - name: Build iOS app (simulator)
+        run: |
+          xcodebuild \
+            -scheme OnDeviceLlmApp \
+            -destination 'generic/platform=iOS Simulator' \
+            build
+
+      - name: Upload XCFramework artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ondevicellm-xcframework
+          path: ios/Frameworks/ondevicellm.xcframework

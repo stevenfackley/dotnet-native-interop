@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/core/">
+    <Project Path="core/OnDeviceLlm.Engine/OnDeviceLlm.Engine.csproj" />
+    <Project Path="core/OnDeviceLlm.NativeBridge/OnDeviceLlm.NativeBridge.csproj" />
+  </Folder>
+</Solution>

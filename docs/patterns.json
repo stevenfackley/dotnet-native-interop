@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "recommendation": "For an in-process, single-package app: use FFI + callback for the hot streaming path, SQLite (WAL) for durable history, and treat HTTP as the comparison harness (gRPC is kept as reference but excluded from the build) rather than the production transport.",
+  "patterns": [
+    {
+      "id": "ffi",
+      "name": "FFI + Callback",
+      "transport": "In-process C ABI (zero IPC)",
+      "summary": "The native UI calls the NativeAOT C exports directly in memory and passes a function pointer; .NET invokes it once per token. No sockets, no serialization, no disk.",
+      "bestFor": "The production hot path: lowest-latency token streaming in a single package.",
+      "features": [
+        "Zero IPC — direct in-memory calls, no serialization, no loopback, no disk",
+        "Lowest latency and highest throughput of all the patterns",
+        "Fewest moving parts at runtime: no server to bind, start, or stop",
+        "Bounded-channel backpressure maps cleanly onto the synchronous callback",
+        "No extra OS permissions; nothing ever leaves the process"
+      ],
+      "limitations": [
+        "Most complex to build: manual UTF-8 marshalling, GC lifetimes, function-pointer ABI",
+        "Callback fires on a .NET background thread — hopping to the UI thread is the caller's job",
+        "Android needs a C/JNI shim (.NET can't call Kotlin directly) with a cached JavaVM* + AttachCurrentThread",
+        "Shared address space: a managed crash takes down the host process",
+        "No process isolation or sandbox boundary between UI and engine"
+      ]
+    },
+    {
+      "id": "http",
+      "name": "HTTP Loopback",
+      "transport": "Raw System.Net.Sockets on 127.0.0.1, REST + SSE",
+      "summary": "The library starts a minimal raw-socket HTTP/1.1 server (no ASP.NET) on a dynamic 127.0.0.1 port; the UI reads tokens back as Server-Sent Events.",
+      "bestFor": "Fast prototyping and debuggability; a familiar boundary anyone can curl.",
+      "features": [
+        "Familiar REST/SSE model; debuggable with curl or a proxy",
+        "Language-agnostic boundary using stock URLSession / OkHttp",
+        "Server-Sent Events map naturally onto a token stream",
+        "Loopback (127.0.0.1) does NOT trigger the iOS Local Network permission prompt",
+        "Hand-rolled raw-socket server — no ASP.NET runtime pack needed, small binary"
+      ],
+      "limitations": [
+        "TCP + HTTP framing + JSON overhead just to talk to yourself in-process",
+        "Dynamic port handshake: the UI must read back the OS-assigned port",
+        "iOS suspends the listener on backgrounding — the socket dies and must be restarted on foreground",
+        "You hand-roll HTTP/1.1 parsing and SSE framing (no ASP.NET on mobile) — minimal but unvalidated",
+        "One-directional SSE; no backpressure beyond the TCP window"
+      ]
+    },
+    {
+      "id": "grpc",
+      "name": "gRPC over UDS",
+      "transport": "Kestrel gRPC on a Unix Domain Socket (EXCLUDED from build)",
+      "summary": "Reference design only — excluded from the build because ASP.NET Core gRPC has no NativeAOT mobile runtime pack. Would host a gRPC server bound to a .sock in the app sandbox, with the UI as a server-streaming client.",
+      "bestFor": "A strongly-typed, schema-driven boundary without exposing a TCP port (not shippable on mobile NativeAOT today).",
+      "features": [
+        "Strongly-typed protobuf contract; server-streaming fits token streams perfectly",
+        "Unix Domain Socket stays inside the sandbox: no TCP port, no Local Network prompt",
+        "Efficient binary framing over HTTP/2; mature clients (grpc-swift, grpc-java)",
+        "Clear schema-evolution and versioning story"
+      ],
+      "limitations": [
+        "No NativeAOT mobile runtime pack — cannot ship on iOS/Android (the reason it is excluded)",
+        "Serializes protobuf to talk to yourself across a socket in the same process",
+        "Pulls the full Kestrel + ASP.NET + gRPC stack into the lib — largest binary, most AOT-trim care",
+        "gRPC client dependencies (grpc-swift/NIO, grpc-java) add app size",
+        "UDS lifecycle: must place the socket in the sandbox and clean up stale files"
+      ]
+    },
+    {
+      "id": "sqlite",
+      "name": "SQLite WAL Broker",
+      "transport": "Shared embedded SQLite (WAL) as a message broker",
+      "summary": "The UI writes a request row; a .NET background loop observes the table, runs inference, and writes streaming tokens back to a response table the UI polls.",
+      "bestFor": "Durable, decoupled request/response history and offline job queues.",
+      "features": [
+        "Durable: requests and tokens survive an app kill; full transcript persists for free",
+        "Naturally reactive and decoupled; tolerates producer/consumer restarts",
+        "WAL mode lets the UI read while the broker writes concurrently",
+        "Trivial to inspect and debug — it's just a .db file; fully language-agnostic",
+        "Excellent as a job queue or offline outbox"
+      ],
+      "limitations": [
+        "Polling latency: tokens appear at the poll interval, not the instant they're produced",
+        "Per-token row INSERT is write amplification (WAL growth, disk churn) — wrong for hot streaming",
+        "No push; the reader must poll, costing battery and wakeups",
+        "You own the ordering, status, retention, and vacuum logic",
+        "Highest end-to-end latency of the patterns"
+      ]
+    }
+  ]
+}

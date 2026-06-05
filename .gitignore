@@ -1,0 +1,48 @@
+## .NET
+bin/
+obj/
+artifacts/
+*.user
+.vs/
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## NativeAOT / generated native outputs (built by build/ scripts)
+*.dylib
+*.dylib.dSYM/
+*.so
+*.a
+*.framework/
+*.xcframework/
+
+## Xcode
+ios/**/build/
+ios/**/DerivedData/
+ios/**/*.xcodeproj/xcuserdata/
+ios/**/*.xcworkspace/xcuserdata/
+ios/Pods/
+*.ipa
+
+## Android / Gradle
+.gradle/
+android/**/build/
+android/local.properties
+android/**/*.iml
+android/**/src/main/jniLibs/
+*.keystore
+!debug.keystore
+
+## macOS
+.DS_Store
+
+## SQLite runtime databases
+*.db
+*.db-wal
+*.db-shm
+
+## Native build outputs (produced by build/ scripts on macOS)
+build/ios-artifacts/
+build/frameworks/
+build/*.log

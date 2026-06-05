@@ -1,0 +1,41 @@
+name: OnDeviceLlmApp
+options:
+  bundleIdPrefix: com.ondevicellm
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  defaultConfig: Debug
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+    FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/Frameworks
+    LD_RUNPATH_SEARCH_PATHS: "@executable_path/Frameworks"
+
+targets:
+  # The one app: all three transports (FFI / HTTP / SQLCipher) with a picker + Compare tab.
+  # SQLite data crosses as JSON from the native lib (which owns the SQLCipher key), so no
+  # Swift SQLite dependency is needed.
+  OnDeviceLlmUnified:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Shared
+      - path: Apps/Unified
+    dependencies:
+      - framework: Frameworks/ondevicellm.xcframework
+        embed: true
+        codeSign: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ondevicellm.unified
+        INFOPLIST_KEY_CFBundleDisplayName: "C# Features"
+        INFOPLIST_FILE: Apps/Unified/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_OBJC_BRIDGING_HEADER: Apps/Unified/BridgingHeader.h
+        DEVELOPMENT_TEAM: ""  # Pass DEVELOPMENT_TEAM=… on the xcodebuild command line.

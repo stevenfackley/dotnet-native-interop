@@ -1,0 +1,76 @@
+name: ci-android
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'core/OnDeviceLlm.NativeBridge/**'
+      - 'android/**'
+      - 'build/build-android-so.sh'
+      - '.github/workflows/ci-android.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'core/OnDeviceLlm.NativeBridge/**'
+      - 'android/**'
+      - 'build/build-android-so.sh'
+      - '.github/workflows/ci-android.yml'
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  JAVA_VERSION: '17'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android Native Library
+        run: |
+          chmod +x ./build/build-android-so.sh
+          ./build/build-android-so.sh
+
+      - name: Copy SQLite native dependency
+        run: |
+          # Optional: auto-locate and copy e_sqlite3.so from .NET SDK
+          # Fallback: user must manually place it in android/app/src/main/jniLibs/arm64-v8a/
+          SQLITE_PATH="${HOME}/.nuget/packages/microsoft.data.sqlite.core/10.0.0/runtimes/linux-bionic-arm64/native/e_sqlite3.so"
+          if [ -f "${SQLITE_PATH}" ]; then
+            cp "${SQLITE_PATH}" "android/app/src/main/jniLibs/arm64-v8a/libe_sqlite3.so"
+            echo "Copied e_sqlite3.so to jniLibs"
+          else
+            echo "WARNING: e_sqlite3.so not found; you may need to manually copy it"
+          fi
+
+      - name: Build Android app (debug)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/
