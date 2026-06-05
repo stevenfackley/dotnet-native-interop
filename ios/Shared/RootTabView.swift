@@ -6,6 +6,7 @@ struct RootTabView: View {
     @ObservedObject var lab: LabViewModel
     @ObservedObject var latency: LatencyViewModel
     let telemetry: TelemetryService
+    let search: SemanticSearchService
 
     var body: some View {
         TabView {
@@ -26,6 +27,9 @@ struct RootTabView: View {
 
             AboutView(infos: features.orderedInfos, telemetry: telemetry)
                 .tabItem { Label("About", systemImage: "info.circle") }
+
+            AiHubView(search: search)
+                .tabItem { Label("AI", systemImage: "sparkles") }
         }
     }
 }
