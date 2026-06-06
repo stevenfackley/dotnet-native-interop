@@ -14,6 +14,9 @@ final class FFIRagService: EngineRagService, @unchecked Sendable {
         AsyncThrowingStream { continuation in
             let box = Box(continuation)
             let userData = Unmanaged.passRetained(box).toOpaque()
+            // Capture the pointer as a Sendable integer bit-pattern for the @Sendable onTermination
+            // closure (Swift 6 strict concurrency rejects capturing the raw pointer directly).
+            let userDataBits = UInt(bitPattern: userData)
 
             let callback: @convention(c) (UnsafeMutableRawPointer?, Int32, UnsafePointer<CChar>?, Int32) -> Void = { ud, _, text, isFinal in
                 guard let ud else { return }
@@ -38,7 +41,9 @@ final class FFIRagService: EngineRagService, @unchecked Sendable {
             continuation.onTermination = { _ in
                 _ = dni_session_cancel(sessionId)
                 _ = dni_session_free(sessionId)
-                Unmanaged<Box>.fromOpaque(userData).release()
+                if let p = UnsafeMutableRawPointer(bitPattern: userDataBits) {
+                    Unmanaged<Box>.fromOpaque(p).release()
+                }
             }
         }
     }
