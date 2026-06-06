@@ -27,7 +27,7 @@ final class HTTPRagService: EngineRagService, @unchecked Sendable {
                         guard let frame = try? JSONDecoder().decode(RagSSEFrame.self, from: json) else {
                             continue
                         }
-                        if frame.final { break }
+                        if frame.isFinal { break }
                         continuation.yield(frame.text)
                     }
                     continuation.finish()

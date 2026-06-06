@@ -996,7 +996,12 @@ struct RagAnswer: Codable, Sendable {
 struct RagSSEFrame: Decodable, Sendable {
     let index: Int
     let text: String
-    let final: Bool
+    let isFinal: Bool
+
+    // `final` is a Swift keyword; map the JSON key to `isFinal`.
+    enum CodingKeys: String, CodingKey {
+        case index, text, isFinal = "final"
+    }
 }
 ```
 (`SearchResult` — the shared "Sources" model — already exists at `ios/Shared/Ai/SearchResult.swift`.)
@@ -1154,7 +1159,7 @@ final class HTTPRagService: EngineRagService, @unchecked Sendable {
                         guard let frame = try? JSONDecoder().decode(RagSSEFrame.self, from: json) else {
                             continue
                         }
-                        if frame.final { break }
+                        if frame.isFinal { break }
                         continuation.yield(frame.text)
                     }
                     continuation.finish()

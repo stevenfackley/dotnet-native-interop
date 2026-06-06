@@ -9,5 +9,10 @@ struct RagAnswer: Codable, Sendable {
 struct RagSSEFrame: Decodable, Sendable {
     let index: Int
     let text: String
-    let final: Bool
+    let isFinal: Bool
+
+    // `final` is a Swift keyword; map the JSON key to `isFinal`.
+    enum CodingKeys: String, CodingKey {
+        case index, text, isFinal = "final"
+    }
 }
