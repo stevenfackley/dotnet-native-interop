@@ -14,7 +14,9 @@ if [ ! -d "$SRC" ]; then
   git clone --depth 1 --branch "$LLAMA_TAG" https://github.com/ggml-org/llama.cpp "$SRC"
 fi
 
-CMAKE_ARGS=(-S "$HERE" -B "$OUT" -DLLAMA_CPP_DIR="$SRC" -DCMAKE_BUILD_TYPE=Release)
+CMAKE_ARGS=(-S "$HERE" -B "$OUT" -DLLAMA_CPP_DIR="$SRC" -DCMAKE_BUILD_TYPE=Release
+            -DGGML_METAL=OFF -DGGML_BLAS=OFF -DGGML_ACCELERATE=OFF
+            -DLLAMA_CURL=OFF -DLLAMA_BUILD_TOOLS=OFF)
 case "$PLATFORM" in
   ios-arm64)
     CMAKE_ARGS+=(-G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64

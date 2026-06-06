@@ -77,7 +77,8 @@ public sealed class SemanticSearch(ITextEncoder encoder)
 
     // Assets land in different layouts: the .NET build output preserves "Ai/assets/", while the iOS app
     // bundle copies the folder reference to "assets/" at the bundle root. Probe the known spots for vocab.
-    private static string ResolveAssetsDir()
+    // Public so other engine components (e.g. the llama GGUF loader) resolve the same bundled-assets dir.
+    public static string ResolveAssetsDir()
     {
         var baseDir = AppContext.BaseDirectory;
         string[] candidates =

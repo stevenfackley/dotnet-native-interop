@@ -69,6 +69,30 @@
     <LinkerArg Include="-lc++" />
   </ItemGroup>
 
+  <!-- On-device LLM (Plan B): llama.cpp + a thin C shim ("dni_llama"), built CPU-only as static libs
+       by native/llama-shim/build-llama.sh, hand-linked exactly like ONNX/SQLCipher above. DirectPInvoke
+       binds the shim's P/Invokes; the NativeLibrary entries pull the shim + llama + ggml archives into
+       the NativeAOT image. llama.cpp is C++, so link libc++. The build-ios-framework scripts build the
+       static libs before publishing. -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('ios'))">
+    <DirectPInvoke Include="dni_llama" />
+    <LinkerArg Include="-lc++" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64'">
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/ios-arm64/lib/libdni_llama.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/ios-arm64/lib/libllama.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/ios-arm64/lib/libggml.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/ios-arm64/lib/libggml-cpu.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/ios-arm64/lib/libggml-base.a" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'iossimulator-arm64'">
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/iossimulator-arm64/lib/libdni_llama.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/iossimulator-arm64/lib/libllama.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/iossimulator-arm64/lib/libggml.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/iossimulator-arm64/lib/libggml-cpu.a" />
+    <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/iossimulator-arm64/lib/libggml-base.a" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
   </ItemGroup>
