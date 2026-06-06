@@ -8,6 +8,11 @@ struct DotnetNativeInteropUnifiedApp: App {
     @StateObject private var latency: LatencyViewModel
     private let telemetry = TelemetryService()
     private let search = SemanticSearchService()
+    private let engineRagServices: [TransportKind: EngineRagService] = [
+        .ffi: FFIRagService(),
+        .http: HTTPRagService(),
+        .sqlite: SQLiteRagService(),
+    ]
 
     init() {
         let services: [TransportKind: FeatureService] = [
@@ -29,7 +34,8 @@ struct DotnetNativeInteropUnifiedApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabView(features: features, comparison: comparison, lab: lab,
-                        latency: latency, telemetry: telemetry, search: search)
+                        latency: latency, telemetry: telemetry, search: search,
+                        engineRagServices: engineRagServices)
         }
     }
 }

@@ -7,6 +7,7 @@ struct RootTabView: View {
     @ObservedObject var latency: LatencyViewModel
     let telemetry: TelemetryService
     let search: SemanticSearchService
+    let engineRagServices: [TransportKind: EngineRagService]
 
     var body: some View {
         TabView {
@@ -19,7 +20,7 @@ struct RootTabView: View {
             LabView(lab: lab)
                 .tabItem { Label("Lab", systemImage: "cpu") }
 
-            AiHubView(search: search)
+            AiHubView(search: search, engineRagServices: engineRagServices)
                 .tabItem { Label("AI", systemImage: "sparkles") }
 
             ComparisonView(model: comparison)
