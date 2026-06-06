@@ -11,13 +11,18 @@ public static class EngineHost
 {
     private static readonly object Gate = new();
     private static InferenceOrchestrator? _orchestrator;
+    private static InferenceOrchestrator? _ragOrchestrator;
 
     /// <summary>The shared orchestrator. Throws if <see cref="Initialize"/> has not run.</summary>
     public static InferenceOrchestrator Orchestrator =>
         _orchestrator ?? throw new InvalidOperationException("EngineHost.Initialize() has not been called.");
 
+    /// <summary>The shared RAG orchestrator (manuals retrieval + grounded generation).</summary>
+    public static InferenceOrchestrator RagOrchestrator =>
+        _ragOrchestrator ?? throw new InvalidOperationException("EngineHost.Initialize() has not been called.");
+
     /// <summary>True once the engine is ready.</summary>
-    public static bool IsInitialized => _orchestrator is not null;
+    public static bool IsInitialized => _orchestrator is not null && _ragOrchestrator is not null;
 
     /// <summary>
     /// Idempotently builds the engine. This is the single seam where the offline
@@ -25,7 +30,7 @@ public static class EngineHost
     /// </summary>
     public static void Initialize()
     {
-        if (_orchestrator is not null)
+        if (_orchestrator is not null && _ragOrchestrator is not null)
         {
             return;
         }
@@ -34,6 +39,7 @@ public static class EngineHost
         {
             // Payload is the C# 14 / .NET 10 language-feature showcase (no LLM).
             _orchestrator ??= new InferenceOrchestrator(new FeatureShowcaseModel());
+            _ragOrchestrator ??= new InferenceOrchestrator(new ExtractiveLanguageModel());
         }
     }
 }

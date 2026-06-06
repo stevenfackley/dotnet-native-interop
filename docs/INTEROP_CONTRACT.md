@@ -96,6 +96,31 @@ CREATE TABLE IF NOT EXISTS response_tokens (
   (survives app kill, full transcript), not the lowest-latency path. WAL lets the UI read while the
   broker writes.
 
+## Onboard AI — semantic search
+
+Ranks documents by cosine similarity to free-text queries.
+
+| Transport | Surface | Shape |
+|-----------|---------|-------|
+| FFI | `dni_search(query, corpus)` | JSON `[{text,score}]`, top-K ranked by similarity |
+| SQLCipher | `dni_sqlite_features()`, `dni_sqlite_run(id)` | Pattern 4 catalog (via broker) |
+
+Corpus options: `"features"`, `"facts"`, `"manuals"`.
+
+### Ask the Manuals — RAG (Phase 5)
+
+Grounded generation over the bundled `manuals` corpus. Retrieval is in-engine (same encoder as
+`dni_search`); generation is the managed extractive generator (Plan A) — swappable for llama.cpp
+(Plan B) behind `ILanguageModel` with no ABI change.
+
+| Transport | Surface | Shape |
+|-----------|---------|-------|
+| FFI | `dni_rag_session_start(query, max_tokens, temperature, cb, user_data)` | streams fragments via `dni_token_cb`; cancel/free via `dni_session_cancel` / `dni_session_free` |
+| raw-HTTP | `GET /rag?q=<query>` (on `dni_http_start`'s port) | `text/event-stream` of `data: {index,text,final}` |
+| SQLCipher | `dni_sqlite_rag(query)` | JSON `{"answer":"…"}`, round-tripped through a key-encrypted db (non-streaming) |
+
+The shared "Sources" shown in the UI come from `dni_search(query, "manuals")`.
+
 ## Native library naming
 
 Loadable name **`dni`**. Android `System.loadLibrary("dni")` ⇒ `libdni.so`.

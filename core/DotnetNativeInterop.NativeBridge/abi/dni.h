@@ -92,6 +92,24 @@ const char* dni_engine_stats(void);
  * returns heap UTF-8 JSON [{text,score}] (top-K). Copy then release with dni_string_free. */
 const char* dni_search(const char* query, const char* corpus);
 
+/* ---- Ask the Manuals: on-device RAG ------------------------------------ */
+/* Grounded generation over the bundled manuals corpus (retrieve top-K → answer).
+ * FFI (streaming): starts a session that streams grounded-answer fragments via dni_token_cb;
+ *   cancel/free with dni_session_cancel / dni_session_free (shared with dni_session_start). */
+int64_t dni_rag_session_start(const char* query,
+                                      int32_t max_tokens,
+                                      float temperature,
+                                      dni_token_cb callback,
+                                      void* user_data);
+
+/* SQLCipher (round-trip, non-streaming): returns heap UTF-8 JSON {"answer":"…"} (or NULL on
+ * failure); copy the text, then release it with dni_string_free. */
+const char* dni_sqlite_rag(const char* query);
+
+/* HTTP loopback route (served by dni_http_start's server):
+ *   GET /rag?q=<url-encoded query>  -> text/event-stream of  data: {index,text,final}
+ *   (the same SSE frame as the legacy showcase stream).                       */
+
 #ifdef __cplusplus
 }
 #endif

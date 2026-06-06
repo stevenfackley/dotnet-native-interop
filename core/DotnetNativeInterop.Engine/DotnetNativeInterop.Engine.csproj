@@ -19,6 +19,11 @@
     <None Update="Ai/assets/model.onnx" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Ai/assets/vocab.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Ai/assets/corpus.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Ai/assets/manuals/hvac-airflow.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Ai/assets/manuals/hvac-rooftop.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Ai/assets/manuals/it-network.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Ai/assets/manuals/it-overheat.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Ai/assets/manuals/it-server-psu.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

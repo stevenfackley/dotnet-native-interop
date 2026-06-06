@@ -64,6 +64,7 @@ public sealed class SemanticSearch(ITextEncoder encoder)
                     LanguageFeatureCatalog.Descriptors.Select(d => $"{d.Title}: {d.Version}").ToArray());
                 search.SetCorpus("facts", File.ReadAllLines(Path.Combine(dir, "corpus.txt"))
                     .Where(l => l.Trim().Length > 0).ToArray());
+                search.SetCorpus("manuals", ManualsCorpus.Load(dir));
                 _default = search;
                 return _default;
             }

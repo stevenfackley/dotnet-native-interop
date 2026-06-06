@@ -68,6 +68,62 @@ internal static class ExportsFfi
     }
 
     /// <summary>
+    /// Like <see cref="SessionStart"/>, but the prompt is a free-text question answered by the RAG
+    /// orchestrator (manuals retrieval + grounded generation). Streams grounded-answer fragments via
+    /// the same callback; cancel/free with <c>dni_session_cancel</c> / <c>dni_session_free</c>.
+    /// </summary>
+    /// <param name="query">NUL-terminated UTF-8 question. Must not be null.</param>
+    /// <param name="maxTokens">Maximum tokens to generate. Must be &gt; 0.</param>
+    /// <param name="temperature">Sampling temperature. Must be &gt;= 0.</param>
+    /// <param name="callback">Per-token callback. Must not be null.</param>
+    /// <param name="userData">Opaque pointer forwarded verbatim to every callback invocation.</param>
+    /// <returns>Session id (&gt; 0) on success; a negative <see cref="NativeStatus"/> on failure.</returns>
+    [UnmanagedCallersOnly(EntryPoint = "dni_rag_session_start")]
+    public static unsafe long RagSessionStart(
+        byte* query,
+        int maxTokens,
+        float temperature,
+        delegate* unmanaged[Cdecl]<void*, int, byte*, int, void> callback,
+        void* userData)
+    {
+        try
+        {
+            if (!EngineHost.IsInitialized)
+            {
+                return NativeStatus.NotInitialized;
+            }
+
+            if (query == null || callback == null)
+            {
+                return NativeStatus.InvalidArgument;
+            }
+
+            if (maxTokens <= 0 || temperature < 0f)
+            {
+                return NativeStatus.InvalidArgument;
+            }
+
+            var queryText = NativeText.Read((nint)query);
+
+            var request = new InferenceRequest(queryText, maxTokens, temperature);
+            var session = InferenceSession.Start(EngineHost.RagOrchestrator, request);
+            var id = SessionRegistry.Add(session);
+            FfiState.AllocatedIds.TryAdd(id, 0);
+
+            var callbackAsNint = (nint)callback;
+            var userDataAsNint = (nint)userData;
+
+            _ = Task.Run(() => DrainAsync(session, callbackAsNint, userDataAsNint));
+
+            return id;
+        }
+        catch (Exception)
+        {
+            return NativeStatus.Internal;
+        }
+    }
+
+    /// <summary>
     /// Requests cancellation of a running session. The background drain task will complete
     /// asynchronously; call <c>dni_session_free</c> afterward to release resources.
     /// </summary>
