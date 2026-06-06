@@ -6,6 +6,8 @@
     <!-- Pure, transport-agnostic domain. Kept AOT/trim clean so the NativeBridge
          can compile it into the NativeAOT shared library without warnings. -->
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Required by LlamaNative (LibraryImport + delegate* unmanaged) and LlamaLanguageModel (unsafe class). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
