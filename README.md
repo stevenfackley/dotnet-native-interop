@@ -161,6 +161,12 @@ Then generate and open the iOS project (`cd ios && xcodegen generate`, then Xcod
 
 - ✅ **Engine + the 3 built transports (FFI, raw-HTTP, SQLCipher) compile and run on device** (iOS).
 - ✅ **Unified iOS app** with transport picker + side-by-side Compare tab, deployed to a physical iPad.
+- ✅ **Ask the Manuals (on-device RAG)** — in-engine retrieval over a maintenance-manuals corpus feeds a
+  real on-device LLM (**Llama-3.2-1B-Instruct Q4 via llama.cpp**, statically linked into the NativeAOT
+  engine), streamed over **all three transports** and compared head-to-head with **Apple Foundation
+  Models** over the same retrieved context. The README's `ILanguageModel` swap-in promise, made real:
+  llama.cpp is native-link **gate #3** (after SQLCipher + ONNX) — see `docs/llama-nativeaot-ios-findings.md`.
+  A managed extractive generator is the graceful fallback when the GGUF isn't bundled.
 - 🚫 **gRPC + legacy Kestrel HTTP are excluded from the build** (no NativeAOT mobile runtime pack); the
   source is kept under `Grpc/` and `Http/` for reference.
 - ⏳ **Android** trio is the open follow-on — same shared contract, Compose UI.
