@@ -53,3 +53,7 @@ build/*.log
 ## EVS: commit the vendored ONNX Runtime xcframework (Swift-side inference, Core ML EP)
 !ios/Frameworks/onnxruntime.xcframework/
 !ios/Frameworks/onnxruntime.xcframework/**
+
+## llama.cpp shim build artifacts
+native/llama-shim/.llama-src/
+native/llama-shim/build/
