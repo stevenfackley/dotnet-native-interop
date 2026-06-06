@@ -101,6 +101,33 @@ internal static class RawHttpServer
                     return;
                 }
 
+                if (path.StartsWith("/rag?q=", StringComparison.Ordinal))
+                {
+                    var query = Uri.UnescapeDataString(path["/rag?q=".Length..]);
+
+                    await WriteAsync(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
+                        cancellationToken).ConfigureAwait(false);
+
+                    var ragSession = InferenceSession.Start(
+                        EngineHost.RagOrchestrator, new InferenceRequest(query),
+                        cancellationToken: cancellationToken);
+
+                    await using (ragSession.ConfigureAwait(false))
+                    {
+                        await foreach (var token in ragSession.Reader
+                            .ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                        {
+                            var sse = $"data: {{\"index\":{token.Index},\"text\":{JsonString(token.Text)},\"final\":{(token.IsFinal ? "true" : "false")}}}\n\n";
+                            await WriteAsync(stream, sse, cancellationToken).ConfigureAwait(false);
+                            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                        }
+                    }
+
+                    return;
+                }
+
                 // Legacy: stream the showcase as Server-Sent Events.
                 await WriteAsync(
                     stream,
