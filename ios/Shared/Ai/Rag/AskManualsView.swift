@@ -15,7 +15,7 @@ struct AskManualsView: View {
                 }
                 .pickerStyle(.segmented)
                 HStack {
-                    TextField("Ask the manuals… e.g. "compressor won't start"", text: $model.query)
+                    TextField("Ask the manuals… e.g. \"compressor won't start\"", text: $model.query)
                         .textInputAutocapitalization(.never)
                         .onSubmit { Task { await model.ask() } }
                     Button {
