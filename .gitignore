@@ -46,3 +46,10 @@ android/**/src/main/jniLibs/
 build/ios-artifacts/
 build/frameworks/
 build/*.log
+
+## EVS: commit the prebuilt edge index
+!core/DotnetNativeInterop.EdgeIndexPublisher/edge-index.db
+
+## EVS: commit the vendored ONNX Runtime xcframework (Swift-side inference, Core ML EP)
+!ios/Frameworks/onnxruntime.xcframework/
+!ios/Frameworks/onnxruntime.xcframework/**

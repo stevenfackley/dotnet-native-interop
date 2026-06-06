@@ -4,3 +4,6 @@
  * resolved at link, not via dlopen.
  */
 #import "../../../core/DotnetNativeInterop.NativeBridge/abi/dni.h"
+
+/* EVS: the Objective-C ONNX Runtime + Core ML wrapper, used by EdgeSearchEngine (Swift). */
+#import "../../Shared/EdgeSearch/EvsOrt.h"
