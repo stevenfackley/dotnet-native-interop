@@ -20,6 +20,20 @@
   ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dotnet-ios-android-poc-native-frontend && <cmd>'"
   ```
   Build **as `steve`** (NuGet cache + toolchain perms — see `docs/ios-build-deploy-runbook.md`).
+- **Android env is NOT on the login shell** (verified 2026-06-06: `ANDROID_HOME`/`JAVA_HOME` unset, no
+  Android tools on PATH). The maui-android workload did provision the SDK + NDK + a JDK at fixed paths,
+  so **prepend this env prelude to every Android build/emulator command** (replace the bare `zsh -lc 'cd …'`):
+  ```bash
+  ssh steve@steve-mac-mini "zsh -lc '
+    export ANDROID_HOME=\$HOME/Library/Android/sdk
+    export ANDROID_NDK_HOME=\$ANDROID_HOME/ndk/27.2.12479018
+    export JAVA_HOME=\$HOME/Library/Java/jdk
+    export PATH=\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/emulator:\$ANDROID_HOME/cmdline-tools/latest/bin:\$PATH
+    cd /Users/steve/dotnet-ios-android-poc-native-frontend && <cmd>
+  '"
+  ```
+  Gradle also needs the SDK location: either the env above or an `android/local.properties` with
+  `sdk.dir=/Users/steve/Library/Android/sdk` (Task 0 writes it).
 - **Sync Windows → Mac before each remote build** (overlay only changed files; no commit needed for iteration). Run from the Windows repo root:
   ```bash
   tar -cf - <relative paths…> | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
@@ -46,43 +60,48 @@
 
 ---
 
-## Task 0: Verify the Mac build host & create the arm64 emulator
+## Task 0: Bootstrap the Mac's Android emulator (controller-run, environment)
 
-**Files:** none (environment). Verification only.
+**Files:** `android/local.properties` (new, git-ignored). Otherwise environment only.
 
-- [ ] **Step 1: Confirm dotnet + Android SDK/NDK present**
+**Verified state (2026-06-06):** Mac reachable; `dotnet 10.0.300`; SDK at `/Users/steve/Library/Android/sdk`
+with **NDK `27.2.12479018`**, `cmdline-tools/latest/bin/sdkmanager`, build-tools, platforms,
+platform-tools; **JDK** at `/Users/steve/Library/Java/jdk`. **Missing:** `emulator`, any
+`system-images`, `cmake`. None of the Android env is on the login shell — use the env prelude from
+Conventions.
 
-Run:
-```bash
-ssh steve@steve-mac-mini "zsh -lc 'dotnet --version; echo NDK=\$ANDROID_NDK_HOME ANDROID_HOME=\$ANDROID_HOME; ls \$ANDROID_HOME/ndk 2>/dev/null; which cmake adb emulator sdkmanager avdmanager'"
-```
-Expected: dotnet `10.x`; an `ndk/27.2.12479018` directory; `cmake`, `adb`, `emulator`, `sdkmanager` resolve. If `ANDROID_HOME` is empty it is usually `/Users/steve/Library/Android/sdk`.
-
-- [ ] **Step 2: Install the exact NDK + an arm64 system image if missing**
-
-Run (skip any line already satisfied):
+- [ ] **Step 1: Install emulator + arm64 system image + cmake** (~2 GB; backgrounded). Uses the existing
+  `sdkmanager`; no JDK/brew install needed:
 ```bash
 ssh steve@steve-mac-mini "zsh -lc '
-  yes | sdkmanager \"ndk;27.2.12479018\" \"platforms;android-35\" \"build-tools;35.0.0\" \
-                  \"system-images;android-35;google_apis;arm64-v8a\" \"emulator\" \"platform-tools\"
+  export ANDROID_HOME=\$HOME/Library/Android/sdk JAVA_HOME=\$HOME/Library/Java/jdk
+  export PATH=\$JAVA_HOME/bin:\$PATH
+  SM=\$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager
+  yes | \"\$SM\" --licenses >/dev/null 2>&1 || true
+  \"\$SM\" \"platform-tools\" \"emulator\" \"cmake;3.22.1\" \"system-images;android-35;google_apis;arm64-v8a\"
 '"
 ```
-Expected: `done`. (Accepts licenses via `yes`.)
+Expected: components installed under `\$ANDROID_HOME/{emulator,system-images,cmake}`.
+
+- [ ] **Step 2: Write `android/local.properties`** so Gradle finds the SDK (file is git-ignored):
+```
+sdk.dir=/Users/steve/Library/Android/sdk
+```
 
 - [ ] **Step 3: Create + boot a headless arm64 AVD**
-
-Run:
 ```bash
 ssh steve@steve-mac-mini "zsh -lc '
+  export ANDROID_HOME=\$HOME/Library/Android/sdk JAVA_HOME=\$HOME/Library/Java/jdk
+  export PATH=\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/emulator:\$ANDROID_HOME/cmdline-tools/latest/bin:\$PATH
   avdmanager list avd | grep -q dni_arm64 || \
     echo no | avdmanager create avd -n dni_arm64 -k \"system-images;android-35;google_apis;arm64-v8a\" --device pixel_6
   nohup emulator -avd dni_arm64 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect >/tmp/emu.log 2>&1 &
   adb wait-for-device; adb shell getprop sys.boot_completed
 '"
 ```
-Expected: eventually prints `1` (boot complete). Leave the emulator running for later tasks (re-boot with the same command if it dies).
+Expected: eventually prints `1` (boot complete). Leave it running; re-boot with the same command if it dies.
 
-- [ ] **Step 4: Record findings** (no commit — environment facts go in the findings doc in Task 13). Note the resolved `ANDROID_HOME`, NDK path, and AVD name for reuse.
+- [ ] **Step 4: Record the resolved paths + AVD name** for the Task 12 findings doc.
 
 ---
 
