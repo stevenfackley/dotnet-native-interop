@@ -26,6 +26,15 @@ public class AiTabTest {
             val dir = AssetExtractor.ensure(app)
             check(NativeBridge.nativeSetAssetsDir(dir.absolutePath) == 0) { "set assets dir failed" }
             check(NativeBridge.nativeInitialize() == 0) { "init failed" }
+            // Warm up the lazy ONNX semantic-search build; the first call on a cold process can return
+            // null while the 86MB model loads + the corpora embed, so retry briefly until it's ready.
+            var warm = false
+            for (i in 0 until 10) {
+                val r = NativeBridge.nativeSearch("warmup", "facts")
+                if (!r.isNullOrBlank()) { warm = true; break }
+                Thread.sleep(500)
+            }
+            check(warm) { "semantic search did not warm up after retries" }
         }
     }
 
