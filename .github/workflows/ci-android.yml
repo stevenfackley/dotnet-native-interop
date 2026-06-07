@@ -6,7 +6,8 @@ on:
       - main
       - develop
     paths:
-      - 'core/DotnetNativeInterop.NativeBridge/**'
+      - 'core/**'
+      - 'native/llama-shim/**'
       - 'android/**'
       - 'build/build-android-so.sh'
       - '.github/workflows/ci-android.yml'
@@ -15,7 +16,8 @@ on:
       - main
       - develop
     paths:
-      - 'core/DotnetNativeInterop.NativeBridge/**'
+      - 'core/**'
+      - 'native/llama-shim/**'
       - 'android/**'
       - 'build/build-android-so.sh'
       - '.github/workflows/ci-android.yml'
@@ -23,10 +25,16 @@ on:
 env:
   DOTNET_VERSION: '10.0.x'
   JAVA_VERSION: '17'
+  NDK_VERSION: '27.2.12479018'
 
+# Build-only verification of the SP0 native gate: it proves the complete .NET 10 NativeAOT
+# linux-bionic-arm64 image (FFI ABI + hand-linked llama/ggml + bundled SQLCipher) links and the
+# Android app assembles. The on-device proof — the NativeGateTest instrumented suite (S1 FFI ABI,
+# S2 SQLCipher, S3 llama generation) — runs on a real arm64 emulator locally; an arm64 emulator is
+# impractical on x86_64/macOS CI runners, so it is intentionally not executed here.
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-latest   # ships cmake (for the NDK llama build) and the NDK darwin prebuilt
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,22 +53,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build Android Native Library
+      - name: Install NDK ${{ env.NDK_VERSION }}
         run: |
-          chmod +x ./build/build-android-so.sh
-          ./build/build-android-so.sh
+          yes | sdkmanager "ndk;${{ env.NDK_VERSION }}" >/dev/null
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
 
-      - name: Copy SQLite native dependency
+      - name: Build the native gate library (NativeAOT bionic + llama + SQLCipher)
         run: |
-          # Optional: auto-locate and copy e_sqlite3.so from .NET SDK
-          # Fallback: user must manually place it in android/app/src/main/jniLibs/arm64-v8a/
-          SQLITE_PATH="${HOME}/.nuget/packages/microsoft.data.sqlite.core/10.0.0/runtimes/linux-bionic-arm64/native/e_sqlite3.so"
-          if [ -f "${SQLITE_PATH}" ]; then
-            cp "${SQLITE_PATH}" "android/app/src/main/jniLibs/arm64-v8a/libe_sqlite3.so"
-            echo "Copied e_sqlite3.so to jniLibs"
-          else
-            echo "WARNING: e_sqlite3.so not found; you may need to manually copy it"
-          fi
+          # WITH_LLAMA defaults to 1: builds the android-arm64 llama/ggml static libs (cmake + NDK),
+          # publishes libdni.so, and extracts libe_sqlcipher.so into jniLibs.
+          chmod +x ./build/build-android-so.sh ./native/llama-shim/build-llama.sh
+          ./build/build-android-so.sh
 
       - name: Build Android app (debug)
         run: |

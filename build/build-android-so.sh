@@ -1,107 +1,64 @@
 #!/bin/bash
 set -euo pipefail
-
 # build-android-so.sh
-# Publishes DotnetNativeInterop.NativeBridge for Android (linux-bionic-arm64),
-# and copies the .so to the Gradle jniLibs directory with the 'lib' prefix.
+# Publishes DotnetNativeInterop.NativeBridge for Android (linux-bionic-arm64) and copies the
+# resulting dni.so to the Gradle jniLibs dir as libdni.so. Produces the COMPLETE SP0 native gate:
+# the bionic image hand-links llama/ggml (S3) and ships libe_sqlcipher.so alongside (S2).
 #
-# IMPORTANT: NativeAOT for Android is experimental in .NET 10 (warning XA1040).
-# The DisableUnsupportedError flag is required to suppress the preview warning.
+# WITH_LLAMA defaults to 1 because the .csproj unconditionally hand-links the android-arm64 llama/ggml
+# static libs for linux-bionic-arm64 — so the publish (link) requires them to exist. Set WITH_LLAMA=0
+# only to skip the (incremental) llama rebuild when build/android-arm64/lib/*.a are already present.
+# Building llama needs cmake on PATH (or CMAKE=<path>); see native/llama-shim/build-llama.sh.
 #
-# SHARP EDGE: Microsoft.Data.Sqlite links e_sqlite3, which must be located
-# alongside libdni.so on the device. Comment below shows placement.
-
-# ============================================================================
-# Configuration
-# ============================================================================
+# NativeAOT for Android is experimental in .NET 10 (XA1040); DisableUnsupportedError suppresses it.
+# ILC must link with the NDK clang/lld: Apple Clang lacks a usable -fuse-ld=lld and cannot target
+# bionic, so we pass the NDK's aarch64-linux-android29-clang (API matches android minSdk=29).
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CSPROJ_PATH="${PROJECT_DIR}/core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj"
-
-# Build artifact location
-BUILD_DIR="${PROJECT_DIR}/build/android-artifacts"
-PUBLISH_DIR="${BUILD_DIR}/linux-bionic-arm64"
-
-# Android Gradle jniLibs target
+CSPROJ="${PROJECT_DIR}/core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj"
+PUBLISH_DIR="${PROJECT_DIR}/build/android-artifacts/linux-bionic-arm64"
 JNILIB_DIR="${PROJECT_DIR}/android/app/src/main/jniLibs/arm64-v8a"
+WITH_LLAMA="${WITH_LLAMA:-1}"
 
-# Cleanup and create directories
-rm -rf "${BUILD_DIR}"
-mkdir -p "${BUILD_DIR}" "${JNILIB_DIR}"
+: "${ANDROID_NDK_HOME:?set ANDROID_NDK_HOME to the NDK 27 dir (e.g. ~/Library/Android/sdk/ndk/27.2.12479018)}"
+# NDK prebuilt host dir: darwin-x86_64 on macOS (incl. Apple Silicon via Rosetta), linux-x86_64 on CI.
+NDK_BIN="$(ls -d "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin 2>/dev/null | head -1)"
+CLANG="${NDK_BIN}/aarch64-linux-android29-clang"
+[ -x "${CLANG}" ] || { echo "ERROR: NDK clang not found at ${CLANG}" >&2; exit 1; }
+export PATH="${NDK_BIN}:${PATH}"   # so the wrapper's -fuse-ld=lld resolves ld.lld
 
-echo "=== DotnetNativeInterop Android .so Build ==="
-echo "Project: ${CSPROJ_PATH}"
-echo "RID: linux-bionic-arm64"
-echo "Output: ${JNILIB_DIR}/libdni.so"
-echo ""
+rm -rf "${PROJECT_DIR}/build/android-artifacts"
+mkdir -p "${PUBLISH_DIR}" "${JNILIB_DIR}"
 
-# ============================================================================
-# Publish for Android (linux-bionic-arm64)
-# ============================================================================
+if [ "${WITH_LLAMA}" = "1" ]; then
+  echo "[llama] building android-arm64 static libs"
+  bash "${PROJECT_DIR}/native/llama-shim/build-llama.sh" android-arm64
+fi
 
-echo "[1/2] Publishing for Android (linux-bionic-arm64)..."
-echo "      (NativeAOT on Android is experimental in .NET 10; XA1040 suppressed)"
-
-dotnet publish \
-  "${CSPROJ_PATH}" \
+echo "[publish] linux-bionic-arm64 (WITH_LLAMA=${WITH_LLAMA})"
+echo "          CppCompilerAndLinker=${CLANG}"
+dotnet publish "${CSPROJ}" \
   -c Release \
   -r linux-bionic-arm64 \
   -o "${PUBLISH_DIR}" \
   -p:DisableUnsupportedError=true \
-  -p:UseAppHost=false
+  -p:UseAppHost=false \
+  -p:CppCompilerAndLinker="${CLANG}"
 
 if [ ! -f "${PUBLISH_DIR}/dni.so" ]; then
-  echo "ERROR: dni.so not found in ${PUBLISH_DIR}"
+  echo "ERROR: dni.so not produced in ${PUBLISH_DIR}" >&2
   exit 1
 fi
 
-echo "   Generated: ${PUBLISH_DIR}/dni.so"
-
-# ============================================================================
-# Copy to Android jniLibs with 'lib' prefix
-# ============================================================================
-
-echo "[2/2] Installing to Android jniLibs..."
-
-# Android JNI convention: System.loadLibrary("dni") -> libdni.so
-# The 'lib' prefix and .so extension are added automatically by the loader.
-# Copy the raw .so to jniLibs/arm64-v8a/libdni.so
 cp "${PUBLISH_DIR}/dni.so" "${JNILIB_DIR}/libdni.so"
+echo "OK: ${JNILIB_DIR}/libdni.so ($(du -h "${JNILIB_DIR}/libdni.so" | cut -f1))"
 
-echo "   Installed: ${JNILIB_DIR}/libdni.so"
-echo ""
-
-# ============================================================================
-# SHARP EDGE: Microsoft.Data.Sqlite native dependency
-# ============================================================================
-
-echo "=== IMPORTANT: SQLite Native Dependency ==="
-echo ""
-echo "Microsoft.Data.Sqlite links e_sqlite3.so, which must be present on the device."
-echo "Add the e_sqlite3.so from the Microsoft.Data.Sqlite package:"
-echo ""
-echo "  1. Locate e_sqlite3.so in your .NET 10 SDK or NuGet cache"
-echo "     (typically ~/.nuget/packages/microsoft.data.sqlite.core/10.0.0/runtimes/linux-bionic-arm64/native/)"
-echo ""
-echo "  2. Copy e_sqlite3.so to the same jniLibs directory:"
-echo "     ${JNILIB_DIR}/libe_sqlite3.so"
-echo ""
-echo "  3. The Gradle build will bundle both libraries into the APK."
-echo ""
-
-# Optional: if you want to auto-locate e_sqlite3, uncomment below
-# However, this assumes a standard .NET SDK installation path.
-#
-# SQLITE_PATH="${HOME}/.nuget/packages/microsoft.data.sqlite.core/10.0.0/runtimes/linux-bionic-arm64/native/e_sqlite3.so"
-# if [ -f "${SQLITE_PATH}" ]; then
-#   cp "${SQLITE_PATH}" "${JNILIB_DIR}/libe_sqlite3.so"
-#   echo "Auto-copied: ${JNILIB_DIR}/libe_sqlite3.so"
-# else
-#   echo "WARNING: e_sqlite3.so not found at expected path: ${SQLITE_PATH}"
-#   echo "         You will need to manually copy it to ${JNILIB_DIR}/"
-# fi
-
-echo ""
-echo "=== Build Complete ==="
-echo "Android .so: ${JNILIB_DIR}/libdni.so"
-echo ""
+# S2: ship libe_sqlcipher.so so the bionic image's dynamic P/Invoke ("e_sqlcipher") resolves at runtime
+# from the APK lib dir. The shared lib lives ONLY inside the SQLitePCLRaw.lib.e_sqlcipher.android .aar
+# (the package has no loose .so). iOS static-links the .a in the .csproj instead; Android's loader
+# resolves the .so as a sibling of libdni.so, so no static hand-link is needed here.
+SQLCIPHER_AAR="$(ls "${HOME}"/.nuget/packages/sqlitepclraw.lib.e_sqlcipher.android/*/lib/*/SQLitePCLRaw.lib.e_sqlcipher.android.aar 2>/dev/null | sort -V | tail -1)"
+[ -n "${SQLCIPHER_AAR}" ] || { echo "ERROR: SQLitePCLRaw.lib.e_sqlcipher.android .aar not found in nuget cache" >&2; exit 1; }
+unzip -o -j "${SQLCIPHER_AAR}" "jni/arm64-v8a/libe_sqlcipher.so" -d "${JNILIB_DIR}" >/dev/null
+[ -f "${JNILIB_DIR}/libe_sqlcipher.so" ] || { echo "ERROR: libe_sqlcipher.so not extracted from ${SQLCIPHER_AAR}" >&2; exit 1; }
+echo "OK: ${JNILIB_DIR}/libe_sqlcipher.so ($(du -h "${JNILIB_DIR}/libe_sqlcipher.so" | cut -f1))"
