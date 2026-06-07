@@ -43,6 +43,10 @@ public object NativeBridge {
     public external fun nativeEngineStats(): String?
     public external fun nativeSearch(query: String, corpus: String): String?
     public external fun nativeSqliteRag(query: String): String?
+
+    // SP0 gate-only probes (not part of the app ABI; see abi/dni_gate_probe.h). Take a caller-supplied
+    // writable path because Path.GetTempPath() is not reliably writable on Android.
+    public external fun nativeSqliteProbe(path: String): String?
 }
 
 /**

@@ -1,5 +1,6 @@
 package io.dotnetnativeinterop
 
+import androidx.test.platform.app.InstrumentationRegistry
 import io.dotnetnativeinterop.transport.NativeBridge
 import org.json.JSONArray
 import org.json.JSONObject
@@ -7,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
+import java.io.File
 
 /**
  * SP0 native gate. Walks the staged probe ladder on a real arm64 emulator.
@@ -45,5 +47,18 @@ public class NativeGateTest {
         assertTrue("feature_run non-empty", run.isNotBlank())
         assertTrue("feature_run ok==true", JSONObject(run).getBoolean("ok"))
         pass("dni_feature_run($firstId).ok == true")
+    }
+
+    /** S2: SQLCipher links + round-trips inside the bionic NativeAOT image (libe_sqlcipher.so). */
+    @Test
+    public fun s2_sqlcipherProbe() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val dbPath = File(ctx.cacheDir, "gate-sqlcipher.db").absolutePath
+        val json = requireNotNull(NativeBridge.nativeSqliteProbe(dbPath)) { "sqlite probe null" }
+        val obj = JSONObject(json)
+        assertTrue("sqlcipher probe ok (json=$json)", obj.getBoolean("ok"))
+        val cipher = obj.getString("cipher")
+        assertTrue("cipher_version non-empty", cipher.isNotBlank())
+        pass("dni_sqlite_probe ok, cipher=$cipher, roundtrip=${obj.getString("roundtrip")}")
     }
 }

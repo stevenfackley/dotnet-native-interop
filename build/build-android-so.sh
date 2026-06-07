@@ -51,3 +51,13 @@ fi
 
 cp "${PUBLISH_DIR}/dni.so" "${JNILIB_DIR}/libdni.so"
 echo "OK: ${JNILIB_DIR}/libdni.so ($(du -h "${JNILIB_DIR}/libdni.so" | cut -f1))"
+
+# S2: ship libe_sqlcipher.so so the bionic image's dynamic P/Invoke ("e_sqlcipher") resolves at runtime
+# from the APK lib dir. The shared lib lives ONLY inside the SQLitePCLRaw.lib.e_sqlcipher.android .aar
+# (the package has no loose .so). iOS static-links the .a in the .csproj instead; Android's loader
+# resolves the .so as a sibling of libdni.so, so no static hand-link is needed here.
+SQLCIPHER_AAR="$(ls "${HOME}"/.nuget/packages/sqlitepclraw.lib.e_sqlcipher.android/*/lib/*/SQLitePCLRaw.lib.e_sqlcipher.android.aar 2>/dev/null | sort -V | tail -1)"
+[ -n "${SQLCIPHER_AAR}" ] || { echo "ERROR: SQLitePCLRaw.lib.e_sqlcipher.android .aar not found in nuget cache" >&2; exit 1; }
+unzip -o -j "${SQLCIPHER_AAR}" "jni/arm64-v8a/libe_sqlcipher.so" -d "${JNILIB_DIR}" >/dev/null
+[ -f "${JNILIB_DIR}/libe_sqlcipher.so" ] || { echo "ERROR: libe_sqlcipher.so not extracted from ${SQLCIPHER_AAR}" >&2; exit 1; }
+echo "OK: ${JNILIB_DIR}/libe_sqlcipher.so ($(du -h "${JNILIB_DIR}/libe_sqlcipher.so" | cut -f1))"

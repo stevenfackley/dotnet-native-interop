@@ -16,6 +16,7 @@
 #include <pthread.h>
 
 #include "dni.h"
+#include "dni_gate_probe.h"   /* SP0 gate-only probes (dni_sqlite_probe); not part of the app ABI */
 
 #define TAG "DotnetNativeInteropJni"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
@@ -154,6 +155,15 @@ static jstring j_search(JNIEnv* e, jobject o, jstring q, jstring c) {
     return take_native_string(e, r);
 }
 
+/* SP0 gate probe (S2): SQLCipher at a caller-supplied (writable) path. */
+static jstring j_sqlite_probe(JNIEnv* e, jobject o, jstring path) {
+    (void)o; if (path == NULL) return NULL;
+    const char* p = (*e)->GetStringUTFChars(e, path, NULL);
+    const char* r = p ? dni_sqlite_probe(p) : NULL;
+    if (p) (*e)->ReleaseStringUTFChars(e, path, p);
+    return take_native_string(e, r);
+}
+
 /* ---- RegisterNatives table --------------------------------------------- */
 static const JNINativeMethod kMethods[] = {
     {"nativeInitialize",     "()I",                                                                      (void*)j_initialize},
@@ -173,6 +183,7 @@ static const JNINativeMethod kMethods[] = {
     {"nativeEngineStats",    "()Ljava/lang/String;",                                                     (void*)j_engine_stats},
     {"nativeSearch",         "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",                 (void*)j_search},
     {"nativeSqliteRag",      "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_rag},
+    {"nativeSqliteProbe",    "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_probe},
 };
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
