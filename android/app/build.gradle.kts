@@ -76,6 +76,10 @@ android {
         freeCompilerArgs += listOf("-Xexplicit-api=strict")
     }
 
+    androidResources {
+        noCompress += "onnx"   // store model.onnx uncompressed so ORT can read it from the extracted copy
+    }
+
     buildFeatures {
         compose = true
     }
@@ -122,6 +126,14 @@ tasks.register<Copy>("copyPatternsJson") {
     into("${projectDir}/src/main/assets")
 }
 tasks.named("preBuild") { dependsOn("copyPatternsJson") }
+
+tasks.register<Copy>("copyAiAssets") {
+    from("${rootDir.parentFile.absolutePath}/core/DotnetNativeInterop.Engine/Ai/assets") {
+        include("model.onnx", "vocab.txt", "corpus.txt", "manuals/**")
+    }
+    into("${projectDir}/src/main/assets/dni-assets")
+}
+tasks.named("preBuild") { dependsOn("copyAiAssets") }
 
 // Stage the shared gRPC contract into the protobuf plugin's default source dir (src/main/proto).
 // The proto/ tree lives at the repo root; the protobuf-gradle-plugin has no stable task-level
