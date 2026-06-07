@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only network security config.
+    Permits cleartext HTTP to loopback (127.0.0.1) so the HttpFeatureService
+    can reach the in-process NativeAOT HTTP server during instrumented tests.
+    This file is NOT included in release builds.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
