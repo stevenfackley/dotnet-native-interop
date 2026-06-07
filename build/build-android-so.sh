@@ -62,3 +62,11 @@ SQLCIPHER_AAR="$(ls "${HOME}"/.nuget/packages/sqlitepclraw.lib.e_sqlcipher.andro
 unzip -o -j "${SQLCIPHER_AAR}" "jni/arm64-v8a/libe_sqlcipher.so" -d "${JNILIB_DIR}" >/dev/null
 [ -f "${JNILIB_DIR}/libe_sqlcipher.so" ] || { echo "ERROR: libe_sqlcipher.so not extracted from ${SQLCIPHER_AAR}" >&2; exit 1; }
 echo "OK: ${JNILIB_DIR}/libe_sqlcipher.so ($(du -h "${JNILIB_DIR}/libe_sqlcipher.so" | cut -f1))"
+
+# ONNX Runtime (semantic search + RAG retrieval): ship libonnxruntime.so so the bionic image's dynamic
+# P/Invoke ("onnxruntime") resolves at runtime. The .so lives inside the ORT android .aar (no loose .so).
+ORT_AAR="$(ls "${HOME}"/.nuget/packages/microsoft.ml.onnxruntime/*/runtimes/android/native/onnxruntime.aar 2>/dev/null | sort -V | tail -1)"
+[ -n "${ORT_AAR}" ] || { echo "ERROR: onnxruntime.aar not found in nuget cache (Microsoft.ML.OnnxRuntime)" >&2; exit 1; }
+unzip -o -j "${ORT_AAR}" "jni/arm64-v8a/libonnxruntime.so" -d "${JNILIB_DIR}" >/dev/null
+[ -f "${JNILIB_DIR}/libonnxruntime.so" ] || { echo "ERROR: libonnxruntime.so not extracted from ${ORT_AAR}" >&2; exit 1; }
+echo "OK: ${JNILIB_DIR}/libonnxruntime.so ($(du -h "${JNILIB_DIR}/libonnxruntime.so" | cut -f1))"
