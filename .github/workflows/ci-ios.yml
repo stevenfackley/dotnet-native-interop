@@ -25,10 +25,15 @@ env:
 
 jobs:
   build:
+    # macos-latest ships Xcode 16.4 (the NativeAOT dni.dylib links cleanly here; macos-14's Xcode 15.4
+    # regresses it with "Undefined symbols for arm64"). The runner is Intel, but the app build below is
+    # forced to arm64 so it matches the arm64 simulator slices (dni iossimulator-arm64, onnxruntime).
     runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true   # onnxruntime.xcframework binary is Git-LFS; without this CI gets the pointer file
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -61,9 +66,13 @@ jobs:
       - name: Build iOS app (simulator)
         run: |
           cd ios   # xcodegen generated the .xcodeproj here; each run step resets to the repo root
+          # Force arm64: the dni + onnxruntime simulator slices are arm64-only, so build (cross-compile)
+          # for arm64 even on this Intel runner — a compile/link check, not an execution.
           xcodebuild \
-            -scheme DotnetNativeInteropApp \
-            -destination 'generic/platform=iOS Simulator' \
+            -scheme DotnetNativeInteropUnified \
+            -sdk iphonesimulator \
+            -arch arm64 \
+            ONLY_ACTIVE_ARCH=NO \
             build
 
       - name: Upload XCFramework artifact
