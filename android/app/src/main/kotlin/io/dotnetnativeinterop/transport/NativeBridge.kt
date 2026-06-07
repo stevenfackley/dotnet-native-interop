@@ -42,6 +42,8 @@ public object NativeBridge {
     // Introspection + onboard AI
     public external fun nativeEngineStats(): String?
     public external fun nativeSearch(query: String, corpus: String): String?
+    // Point the engine at the on-device assets dir (extracted model/vocab/corpus) + enable NNAPI. 0 = ok.
+    public external fun nativeSetAssetsDir(path: String): Int
     public external fun nativeSqliteRag(query: String): String?
 
     // SP0 gate-only probes (not part of the app ABI; see abi/dni_gate_probe.h). Take a caller-supplied
