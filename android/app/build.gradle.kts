@@ -80,6 +80,14 @@ android {
         noCompress += "onnx"   // store model.onnx uncompressed so ORT can read it from the extracted copy
     }
 
+    packaging {
+        // The engine ships libonnxruntime.so in jniLibs (ORT 1.20.1) AND the onnxruntime-android AAR
+        // bundles libonnxruntime.so (1.20.0 — the only published android build). pickFirst keeps one; both
+        // are C-ABI-stable within the 1.20.x minor, so the engine's P/Invoke and the Kotlin ai.onnxruntime
+        // API share the single resolved .so. (EVS correctness is validated on-device by EvsTabTest.)
+        jniLibs.pickFirsts += "lib/arm64-v8a/libonnxruntime.so"
+    }
+
     buildFeatures {
         compose = true
     }
@@ -131,6 +139,9 @@ tasks.register<Copy>("copyAiAssets") {
     from("${rootDir.parentFile.absolutePath}/core/DotnetNativeInterop.Engine/Ai/assets") {
         include("model.onnx", "vocab.txt", "corpus.txt", "manuals/**")
     }
+    from("${rootDir.parentFile.absolutePath}/core/DotnetNativeInterop.EdgeIndexPublisher") {
+        include("edge-index.db")
+    }
     into("${projectDir}/src/main/assets/dni-assets")
 }
 tasks.named("preBuild") { dependsOn("copyAiAssets") }
@@ -179,6 +190,10 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
+
+    // Edge Vector Search — app-layer ONNX (Kotlin); 1.20.0 is the closest AAR on Maven Central to
+    // the engine's 1.20.1 (1.20.1 was never published for Android); same minor, compatible ABI.
+    implementation(libs.onnxruntime.android)
 
     // JSON (patterns.json parsing)
     implementation(libs.kotlinx.serialization.json)
