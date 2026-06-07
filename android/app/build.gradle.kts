@@ -81,10 +81,12 @@ android {
     }
 
     packaging {
-        // The engine ships libonnxruntime.so in jniLibs (ORT 1.20.1) AND the onnxruntime-android AAR
-        // bundles libonnxruntime.so (1.20.0 — the only published android build). pickFirst keeps one; both
-        // are C-ABI-stable within the 1.20.x minor, so the engine's P/Invoke and the Kotlin ai.onnxruntime
-        // API share the single resolved .so. (EVS correctness is validated on-device by EvsTabTest.)
+        // libonnxruntime.so comes solely from the onnxruntime-android AAR (1.20.0). The build script
+        // (build/build-android-so.sh) no longer copies a jniLibs copy alongside libdni.so; libdni.so
+        // uses dlopen (no DT_NEEDED) and resolves the AAR-provided .so at runtime. libonnxruntime4j_jni.so
+        // (Kotlin EVS JNI bridge) references @VERS_1.20.0 versioned symbols — compatible with 1.20.0 only.
+        // If a jniLibs copy of libonnxruntime.so re-appears (e.g. re-running an old build script),
+        // pickFirsts keeps one silently; Gradle warnings will indicate which version was selected.
         jniLibs.pickFirsts += "lib/arm64-v8a/libonnxruntime.so"
     }
 
