@@ -39,6 +39,15 @@ jobs:
         run: |
           brew install xcodegen
 
+      - name: Build llama.cpp static libs (device + simulator)
+        run: |
+          # The .csproj hand-links the iOS llama/ggml archives into the NativeAOT image, so they must
+          # exist before build-ios-framework.sh publishes. Locally these are prebuilt on the Mac; CI
+          # builds them here (macos-latest ships cmake + Xcode). build-ios-framework.sh is unchanged.
+          chmod +x ./native/llama-shim/build-llama.sh
+          ./native/llama-shim/build-llama.sh ios-arm64
+          ./native/llama-shim/build-llama.sh iossimulator-arm64
+
       - name: Build iOS Framework (device + simulator)
         run: |
           chmod +x ./build/build-ios-framework.sh
