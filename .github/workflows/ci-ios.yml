@@ -25,10 +25,14 @@ env:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # arm64 runner: the iOS simulator slices (dni built as iossimulator-arm64, onnxruntime.xcframework)
+    # are arm64, so an Intel runner's x86_64 simulator build can't link them.
+    runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true   # onnxruntime.xcframework binary is Git-LFS; without this CI gets the pointer file
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
