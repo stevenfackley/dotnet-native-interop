@@ -75,11 +75,23 @@ public sealed class SemanticSearch(ITextEncoder encoder)
     public static string SearchJson(string query, string corpusId, int topK = 5) =>
         AiJson.Serialize(Default.Search(query, corpusId, topK));
 
-    // Assets land in different layouts: the .NET build output preserves "Ai/assets/", while the iOS app
-    // bundle copies the folder reference to "assets/" at the bundle root. Probe the known spots for vocab.
+    // Assets land in different layouts: the .NET build output preserves "Ai/assets/", the iOS app bundle
+    // copies the folder reference to "assets/" at the bundle root, and the Android host extracts them to a
+    // filesDir path supplied via SetAssetsDirOverride. Probe the known spots for vocab.
     // Public so other engine components (e.g. the llama GGUF loader) resolve the same bundled-assets dir.
+    private static string? _assetsDirOverride;
+
+    /// <summary>Platform host (Android) points the engine at the extracted on-device assets dir.</summary>
+    public static void SetAssetsDirOverride(string path) => _assetsDirOverride = path;
+
     public static string ResolveAssetsDir()
     {
+        var ov = _assetsDirOverride;
+        if (!string.IsNullOrEmpty(ov) && File.Exists(Path.Combine(ov, "vocab.txt")))
+        {
+            return ov;
+        }
+
         var baseDir = AppContext.BaseDirectory;
         string[] candidates =
         [

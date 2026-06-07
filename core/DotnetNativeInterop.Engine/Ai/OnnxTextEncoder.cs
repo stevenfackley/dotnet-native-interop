@@ -21,9 +21,31 @@ public sealed class OnnxTextEncoder : ITextEncoder, IDisposable
 
     public OnnxTextEncoder(string modelPath, WordPieceTokenizer tokenizer)
     {
-        _session = new OrtSession(modelPath);
+        _session = CreateSession(modelPath);
         _tokenizer = tokenizer;
         _outputName = _session.OutputMetadata.Keys.First();
+    }
+
+    // NNAPI is appended only when the Android host enabled it (OnnxRuntimeConfig.UseNnapi). The CPU EP is
+    // left enabled, so unsupported ops and the emulator's no-accelerator case fall back to CPU. iOS keeps
+    // the plain CPU session (its ORT framework has no NNAPI symbol; appending would throw).
+    private static OrtSession CreateSession(string modelPath)
+    {
+        if (!OnnxRuntimeConfig.UseNnapi)
+        {
+            return new OrtSession(modelPath);
+        }
+
+        try
+        {
+            var options = new SessionOptions();
+            options.AppendExecutionProvider_Nnapi();   // default flags: NNAPI with CPU fallback
+            return new OrtSession(modelPath, options);
+        }
+        catch (Exception)
+        {
+            return new OrtSession(modelPath);          // NNAPI unavailable -> CPU
+        }
     }
 
     public float[] Encode(string text)
