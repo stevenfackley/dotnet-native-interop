@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug manifest overlay — merged on top of src/main/AndroidManifest.xml for
+    debug builds only. Adds network security config that permits cleartext HTTP
+    to 127.0.0.1 (loopback) so instrumented tests can reach the in-process
+    NativeAOT HTTP server.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>
