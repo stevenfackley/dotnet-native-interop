@@ -60,6 +60,7 @@ jobs:
 
       - name: Build iOS app (simulator)
         run: |
+          cd ios   # xcodegen generated the .xcodeproj here; each run step resets to the repo root
           xcodebuild \
             -scheme DotnetNativeInteropApp \
             -destination 'generic/platform=iOS Simulator' \
