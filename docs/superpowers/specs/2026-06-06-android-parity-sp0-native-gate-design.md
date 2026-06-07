@@ -49,10 +49,38 @@ Today, Android is frozen at commit `2e54afe` (#2) and is **broken**, not merely 
 
 ## SP0 goal / definition of done
 
-On an **arm64 Android emulator hosted on the Mac mini**: a full-stack `libdni.so` loads, the **current**
-ABI round-trips over JNI, and llama RAG streams a real token — **or**, per the document-failures rule,
-the failing layer is captured with its exact error plus a shipped fallback. **The gate is *answered*,
-not necessarily all-green.**
+On an **arm64 Android emulator hosted on the Mac mini**: a `libdni.so` with SQLCipher + llama
+statically linked loads over JNI; the **asset-free** ABI round-trips for real (`dni_features_json` /
+`dni_feature_run`); and the two hostile native libs are proven to link + run via **path-parameterized
+gate probes** (SQLCipher encrypts a caller-supplied db; llama loads a caller-supplied GGUF and decodes
+≥1 token) — **or**, per the document-failures rule, the failing layer is captured with its exact error
+plus a shipped fallback. **The gate is *answered*, not necessarily all-green.**
+
+### Why probes, not the real RAG/SQLite data paths (correction after engine read, 2026-06-06)
+
+The gate's question is narrow: *does NativeAOT-bionic statically link + run SQLCipher and llama.cpp?*
+The real data paths can't answer it cleanly on Android yet, for reasons that belong to later
+sub-projects:
+
+- **`dni_rag_session_start` needs ONNX.** `BuildRagModel()` wires
+  `RagLanguageModel(LlamaLanguageModel(gguf), SemanticSearch.Default)`, and **both** RAG generators
+  (llama *and* the extractive fallback) retrieve via `SemanticSearch.Default`, whose only encoder is
+  `OnnxTextEncoder` (ONNX Runtime). ONNX-for-bionic is **SP3**. So proving llama through full RAG would
+  fail at *retrieval*, before llama runs. → Prove llama with a **direct probe** that bypasses retrieval.
+- **`dni_sqlite_features` writes to `Path.GetTempPath()`** → `/tmp`, which is **not writable on
+  Android**; and assets (`vocab.txt`, `model.onnx`, the GGUF, manuals) are resolved from
+  `AppContext.BaseDirectory` on the filesystem, but Android ships them inside the APK. Android-writable
+  temp + APK-asset extraction is **SP1/SP2** plumbing. → Prove SQLCipher with a probe that takes a
+  **caller-supplied writable db path**.
+- **The bare `.so` still compiles** because `Engine.csproj` references `Microsoft.ML.OnnxRuntime`
+  *unconditionally* (managed assembly is cross-platform); only the native `onnxruntime` lib is absent on
+  bionic, and it's reached only at runtime via `[DllImport]`, so publish succeeds and ONNX-dependent
+  calls simply return 0 until SP3.
+
+**Program-ordering consequence:** full RAG on Android (**SP2**) depends on ONNX-for-bionic (**SP3**) —
+the reverse of the iOS order. SP2's cycle will either pull ONNX-for-Android forward or add a managed
+embedding fallback for retrieval. Out of scope for SP0; recorded here so the SP2 brainstorm starts
+informed.
 
 Proof surface: **arm64 emulator on the Mac mini** (Apple-Silicon runs `arm64-v8a` system images
 natively — closest no-extra-hardware match to a device; build + install + logcat over the existing ssh
@@ -64,14 +92,20 @@ The make-or-break unknown is whether NativeAOT for `linux-bionic-arm64` tolerate
 (llama + ggml) and SQLCipher at all. Each rung is build → install → logcat `PASS:`, isolating its own
 failure, mirroring the iOS host-probe philosophy.
 
-- **S1 — bare bionic AOT.** `libdni.so` with **zero** native deps (engine + FFI features + raw-HTTP).
-  Proves NativeAOT-bionic works at all. Round-trip: `dni_initialize` → `dni_features_json` →
-  `dni_feature_run`.
-- **S2 — +SQLCipher.** Add the bionic hand-link. Round-trip: `dni_sqlite_features` / `dni_sqlite_run`.
-  **First unknown:** does `SQLitePCLRaw.bundle_e_sqlcipher` ship a `linux-bionic-arm64` static lib, or
-  must SQLCipher be built for Android NDK? Resolve during S2.
-- **S3 — +llama.cpp.** New `build-llama.sh android-arm64` target → static `.a`s; bionic hand-link
-  `dni_llama` + NDK `libc++`. Round-trip: `dni_rag_session_start` streams ≥1 token.
+- **S1 — bare bionic AOT.** `libdni.so` with **zero** added native deps (engine + FFI features +
+  raw-HTTP). Proves NativeAOT-bionic works at all. **Real round-trip** (asset-free, pure code):
+  `dni_initialize` → `dni_features_json` → `dni_feature_run`. The full ABI is also JNI-bound here (every
+  export already exists as a symbol); ONNX/asset-dependent calls return 0 until later cycles.
+- **S2 — +SQLCipher.** Add the bionic hand-link, plus a new `dni_sqlite_probe(db_path)` export (opens an
+  `e_sqlcipher` connection with `Password=` → `PRAGMA key`, creates + reads a row, returns JSON `ok`).
+  Proof: `dni_sqlite_probe(<app-files>/gate.db)` returns ok. **First unknown:** does
+  `SQLitePCLRaw.bundle_e_sqlcipher` ship a `linux-bionic-arm64` static lib, or must SQLCipher be built
+  for the Android NDK? Resolve during S2.
+- **S3 — +llama.cpp.** New `build-llama.sh android-arm64` target (NDK) → static `.a`s; bionic hand-link
+  `dni_llama` + NDK `libc++`; plus a new `dni_llama_probe(gguf_path, prompt)` export (loads the GGUF,
+  decodes a few tokens, returns JSON `{text}`). Proof: `dni_llama_probe(<pushed small GGUF>, "Hello")`
+  returns non-empty text. Probe model = a small throwaway (Qwen2.5-0.5B-Instruct Q4, ~300 MiB), mirroring
+  the iOS host probe — the real Llama-3.2-1B is SP2's bundle.
 
 ## Components & work
 
@@ -93,6 +127,22 @@ failure, mirroring the iOS host-probe philosophy.
     `libc++`.
   - ONNX intentionally **excluded** here (SP3).
 
+### Gate-probe exports (new, Android-link verification only)
+- **`core/.../NativeBridge/Ffi/Exports.GateProbe.cs`** (new) — two `[UnmanagedCallersOnly]` exports
+  added for the gate, declared in a **separate** `abi/dni_gate_probe.h` so the frozen `dni.h` contract is
+  untouched:
+  - `dni_sqlite_probe(const char* db_path)` → opens `e_sqlcipher` with `Password=` at `db_path`,
+    `CREATE`/`INSERT`/`SELECT` a row, returns heap string `ok:<rows>` (NULL on failure). Calls
+    `SQLitePCL.Batteries_V2.Init()` first.
+  - `dni_llama_probe(const char* gguf_path, const char* prompt)` → `new LlamaLanguageModel(gguf_path)`,
+    decode a few tokens, return the heap UTF-8 generated text (NULL on failure).
+  - Returns are **plain strings, not JSON** — keeps the probes reflection-free under NativeAOT (no
+    `JsonSerializerContext` needed for throwaway code). Freed by `dni_string_free` like every other
+    string return.
+  - Both are harmless on iOS (extra unused symbols). They isolate the *linkage* question from the
+    real-data plumbing that SP1/SP2/SP3 own. Marked for removal/replacement once the real paths work on
+    Android.
+
 ### JNI rewrite — RegisterNatives (decision)
 - **`android/app/src/main/cpp/jni_bridge.c`** — `JNI_OnLoad` registers a `JNINativeMethod[]` table for
   `io/dotnetnativeinterop/transport/NativeBridge` (rename-proof; one row per function). Cover the full
@@ -112,8 +162,13 @@ failure, mirroring the iOS host-probe philosophy.
   listener interface.
 
 ### Proof harness
-- **Instrumented `androidTest`** that walks S1 → S3, asserting each round-trip and emitting `PASS:` lines
-  to logcat (mirrors the iOS gate signal). Repeatable + runnable on the macOS CI emulator.
+- **Instrumented `androidTest`** that walks S1 → S3, asserting each step and emitting `PASS:` lines to
+  logcat (mirrors the iOS gate signal). Repeatable + runnable on the macOS emulator. Assertions:
+  - **S1:** `nativeInitialize()==0`; `nativeFeaturesJson()` parses to a non-empty catalog;
+    `nativeFeatureRun(<first id>)` has `ok==true`.
+  - **S2:** `nativeSqliteProbe(filesDir/gate.db)` returns a string starting with `ok:`.
+  - **S3:** `nativeLlamaProbe(<pushed gguf>, "Hello")` returns non-null, non-empty text.
+- The small probe GGUF is `adb push`ed to the emulator before the S3 test; its path is passed to the probe.
 - The existing `InferenceScreen` / `InferenceViewModel` stay as the manual FFI-stream demo — **additive,
   not replaced.**
 
