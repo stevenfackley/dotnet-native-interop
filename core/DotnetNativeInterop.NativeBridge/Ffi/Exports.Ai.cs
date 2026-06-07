@@ -21,4 +21,29 @@ internal static class ExportsAi
             return 0;
         }
     }
+
+    /// <summary>
+    /// Points the engine at an on-device assets dir (model.onnx/vocab.txt/corpus.txt/manuals) and enables
+    /// the Android NNAPI EP. Call before the first dni_search/RAG. Returns 0 on success, -1 on a bad path.
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "dni_set_assets_dir")]
+    public static unsafe int SetAssetsDir(byte* path)
+    {
+        try
+        {
+            var dir = NativeText.Read((nint)path);
+            if (string.IsNullOrEmpty(dir) || !System.IO.File.Exists(System.IO.Path.Combine(dir, "vocab.txt")))
+            {
+                return -1;
+            }
+
+            SemanticSearch.SetAssetsDirOverride(dir);
+            OnnxRuntimeConfig.UseNnapi = true;
+            return 0;
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
+    }
 }

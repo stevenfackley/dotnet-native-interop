@@ -92,6 +92,10 @@ const char* dni_engine_stats(void);
  * returns heap UTF-8 JSON [{text,score}] (top-K). Copy then release with dni_string_free. */
 const char* dni_search(const char* query, const char* corpus);
 
+/* Point the engine at an on-device assets dir (model.onnx/vocab.txt/corpus.txt/manuals) and enable the
+ * Android NNAPI execution provider. Call once before the first dni_search/RAG. 0 = ok, -1 = bad path. */
+int32_t dni_set_assets_dir(const char* path);
+
 /* ---- Ask the Manuals: on-device RAG ------------------------------------ */
 /* Grounded generation over the bundled manuals corpus (retrieve top-K → answer).
  * FFI (streaming): starts a session that streams grounded-answer fragments via dni_token_cb;

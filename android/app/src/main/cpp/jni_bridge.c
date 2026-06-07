@@ -155,6 +155,15 @@ static jstring j_search(JNIEnv* e, jobject o, jstring q, jstring c) {
     return take_native_string(e, r);
 }
 
+/* AI: point the engine at the on-device assets dir + enable NNAPI (0 ok, -1 bad path). */
+static jint j_set_assets_dir(JNIEnv* e, jobject o, jstring path) {
+    (void)o; if (path == NULL) return -1;
+    const char* p = (*e)->GetStringUTFChars(e, path, NULL);
+    int32_t r = p ? dni_set_assets_dir(p) : -1;
+    if (p) (*e)->ReleaseStringUTFChars(e, path, p);
+    return r;
+}
+
 /* SP0 gate probe (S2): SQLCipher at a caller-supplied (writable) path. */
 static jstring j_sqlite_probe(JNIEnv* e, jobject o, jstring path) {
     (void)o; if (path == NULL) return NULL;
@@ -191,6 +200,7 @@ static const JNINativeMethod kMethods[] = {
     {"nativeSqliteRun",      "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_run},
     {"nativeEngineStats",    "()Ljava/lang/String;",                                                     (void*)j_engine_stats},
     {"nativeSearch",         "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",                 (void*)j_search},
+    {"nativeSetAssetsDir",   "(Ljava/lang/String;)I",                                                    (void*)j_set_assets_dir},
     {"nativeSqliteRag",      "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_rag},
     {"nativeSqliteProbe",    "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_probe},
     {"nativeLlamaProbe",     "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_llama_probe},

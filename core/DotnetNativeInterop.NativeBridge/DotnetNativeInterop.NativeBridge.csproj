@@ -146,6 +146,14 @@
        given on the link line into libdni_jni.so's DT_NEEDED; Android's loader only searches the APK's
        lib/<abi>/ dir, so that path is unresolvable on device (UnsatisfiedLinkError at dlopen). The
        published file is dni.so; build-android-so.sh copies it to libdni.so, which this soname matches. -->
+  <!-- ONNX Runtime native for Android: restored only so build-android-so.sh can extract
+       jni/arm64-v8a/libonnxruntime.so from this package's .aar into jniLibs (dynamic .so, like
+       e_sqlcipher). Contributes no build assets (the managed ORT comes from the Engine's reference). -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux-bionic'))">
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1"
+                      GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+  </ItemGroup>
+
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux-bionic'))">
     <LinkerArg Include="-Wl,-soname,libdni.so" />
   </ItemGroup>

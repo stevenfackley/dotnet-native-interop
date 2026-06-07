@@ -49,6 +49,9 @@ public class DotnetNativeInteropApp : Application() {
         // Initialize the engine on a background coroutine — never block the main thread.
         appScope.launch {
             runCatching {
+                val assetsDir = AssetExtractor.ensure(this@DotnetNativeInteropApp)
+                val setRc = NativeBridge.nativeSetAssetsDir(assetsDir.absolutePath)
+                Log.i(TAG, "assets dir set rc=$setRc (${assetsDir.absolutePath})")
                 val status = NativeBridge.nativeInitialize()
                 if (status == 0) {
                     Log.i(TAG, "Engine initialized successfully")
@@ -56,7 +59,7 @@ public class DotnetNativeInteropApp : Application() {
                     Log.e(TAG, "Engine initialization failed: status $status")
                 }
             }.onFailure {
-                Log.e(TAG, "nativeInitialize threw", it)
+                Log.e(TAG, "engine init / asset extraction threw", it)
             }
         }
     }
