@@ -27,6 +27,11 @@
     <!-- Restored only to resolve the iOS static-lib path below; contributes no assets. -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlcipher.ios" Version="2.1.11"
                       GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+    <!-- Restored so build-android-so.sh can extract jni/arm64-v8a/libe_sqlcipher.so from this package's
+         .aar into jniLibs (Android ships the .so dynamically; see the gate findings doc). Without this
+         reference the package is absent from a clean nuget cache (e.g. CI) and the extraction fails. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlcipher.android" Version="2.1.11"
+                      GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Hand-link the e_sqlcipher static lib into the NativeAOT image for Apple RIDs.
