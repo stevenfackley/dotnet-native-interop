@@ -32,6 +32,7 @@ import io.dotnetnativeinterop.ui.tabs.DashboardScreen
 import io.dotnetnativeinterop.ui.tabs.FeatureDetailScreen
 import io.dotnetnativeinterop.ui.tabs.FeaturesScreen
 import io.dotnetnativeinterop.ui.tabs.AiScreen
+import io.dotnetnativeinterop.ui.tabs.EdgeSearchScreen
 import io.dotnetnativeinterop.ui.tabs.GatedTabScreen
 import io.dotnetnativeinterop.ui.tabs.LatencyScreen
 import kotlinx.coroutines.launch
@@ -95,7 +96,10 @@ internal fun AppShell(
                 Tab.Latency -> LatencyScreen(latency, content)
                 Tab.About -> AboutScreen(content)
                 Tab.Ai -> AiScreen(content)
-                Tab.Manuals -> GatedTabScreen("Manuals", "Offline Edge Vector Search over the maintenance corpus.", "ONNX-on-Android native gate", content)
+                Tab.Manuals -> {
+                    val vm: io.dotnetnativeinterop.evs.EvsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+                    EdgeSearchScreen(vm, content)
+                }
                 Tab.Lab -> GatedTabScreen("Lab", "Fractal / raymarcher / SIMD compute benchmarks in the .NET engine.", "Lab compute C-ABI exports + JNI", content)
                 Tab.Stream -> InferenceScreen(viewModel = inference, modifier = content)
             }

@@ -63,10 +63,10 @@ unzip -o -j "${SQLCIPHER_AAR}" "jni/arm64-v8a/libe_sqlcipher.so" -d "${JNILIB_DI
 [ -f "${JNILIB_DIR}/libe_sqlcipher.so" ] || { echo "ERROR: libe_sqlcipher.so not extracted from ${SQLCIPHER_AAR}" >&2; exit 1; }
 echo "OK: ${JNILIB_DIR}/libe_sqlcipher.so ($(du -h "${JNILIB_DIR}/libe_sqlcipher.so" | cut -f1))"
 
-# ONNX Runtime (semantic search + RAG retrieval): ship libonnxruntime.so so the bionic image's dynamic
-# P/Invoke ("onnxruntime") resolves at runtime. The .so lives inside the ORT android .aar (no loose .so).
-ORT_AAR="$(ls "${HOME}"/.nuget/packages/microsoft.ml.onnxruntime/*/runtimes/android/native/onnxruntime.aar 2>/dev/null | sort -V | tail -1)"
-[ -n "${ORT_AAR}" ] || { echo "ERROR: onnxruntime.aar not found in nuget cache (Microsoft.ML.OnnxRuntime)" >&2; exit 1; }
-unzip -o -j "${ORT_AAR}" "jni/arm64-v8a/libonnxruntime.so" -d "${JNILIB_DIR}" >/dev/null
-[ -f "${JNILIB_DIR}/libonnxruntime.so" ] || { echo "ERROR: libonnxruntime.so not extracted from ${ORT_AAR}" >&2; exit 1; }
-echo "OK: ${JNILIB_DIR}/libonnxruntime.so ($(du -h "${JNILIB_DIR}/libonnxruntime.so" | cut -f1))"
+# libonnxruntime.so is NOT extracted here. The Kotlin onnxruntime-android AAR (com.microsoft.onnxruntime:
+# onnxruntime-android:1.20.0) ships its own libonnxruntime.so (1.20.0) + libonnxruntime4j_jni.so into
+# the APK via the Gradle dependency. libdni.so uses dlopen (no DT_NEEDED) so it resolves the AAR-provided
+# 1.20.0 .so at runtime — version-compatible with the .NET engine's 1.20.1 P/Invoke ABI. If we bundle a
+# duplicate from jniLibs the pickFirsts merge picks the jniLibs 1.20.1 version, which breaks the Kotlin
+# JNI bridge (libonnxruntime4j_jni.so uses @VERS_1.20.0 versioned symbol refs — only 1.20.0 satisfies).
+echo "INFO: libonnxruntime.so sourced from onnxruntime-android AAR (Gradle); not copied to jniLibs."
