@@ -169,7 +169,13 @@ Then generate and open the iOS project (`cd ios && xcodegen generate`, then Xcod
   A managed extractive generator is the graceful fallback when the GGUF isn't bundled.
 - 🚫 **gRPC + legacy Kestrel HTTP are excluded from the build** (no NativeAOT mobile runtime pack); the
   source is kept under `Grpc/` and `Http/` for reference.
-- ⏳ **Android** trio is the open follow-on — same shared contract, Compose UI.
+- ✅ **Android native gate (SP0)** — the complete NativeAOT `linux-bionic-arm64` engine (full JNI/FFI
+  ABI + **SQLCipher** + **llama.cpp** on-device generation) links into one `libdni.so` and runs on an
+  arm64 emulator, proven by an instrumented test (S1 ABI · S2 SQLCipher · S3 llama). The hard parts are
+  Android-specific: NDK clang as the AOT linker, a stamped `DT_SONAME`, SQLCipher as a dynamic `.so`, and
+  hand-linking the NDK static libc++ for llama — see `docs/nativeaot-android-gate-findings.md`.
+- ⏳ **Android UI parity** (the transport trio + Ask-the-Manuals screens in Compose) is the open
+  follow-on, now de-risked — same shared contract, every native dependency proven to load on device.
 
 ---
 

@@ -2,12 +2,13 @@
 set -euo pipefail
 # build-android-so.sh
 # Publishes DotnetNativeInterop.NativeBridge for Android (linux-bionic-arm64) and copies the
-# resulting dni.so to the Gradle jniLibs dir as libdni.so.
+# resulting dni.so to the Gradle jniLibs dir as libdni.so. Produces the COMPLETE SP0 native gate:
+# the bionic image hand-links llama/ggml (S3) and ships libe_sqlcipher.so alongside (S2).
 #
-# Staged with the native gate (SP0):
-#   - S1 (default):        bare publish, no extra native libs.
-#   - S3 (WITH_LLAMA=1):   build llama android static libs first (build-llama.sh android-arm64);
-#                          the .csproj hand-links them + e_sqlcipher for linux-bionic-arm64.
+# WITH_LLAMA defaults to 1 because the .csproj unconditionally hand-links the android-arm64 llama/ggml
+# static libs for linux-bionic-arm64 — so the publish (link) requires them to exist. Set WITH_LLAMA=0
+# only to skip the (incremental) llama rebuild when build/android-arm64/lib/*.a are already present.
+# Building llama needs cmake on PATH (or CMAKE=<path>); see native/llama-shim/build-llama.sh.
 #
 # NativeAOT for Android is experimental in .NET 10 (XA1040); DisableUnsupportedError suppresses it.
 # ILC must link with the NDK clang/lld: Apple Clang lacks a usable -fuse-ld=lld and cannot target
@@ -17,7 +18,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CSPROJ="${PROJECT_DIR}/core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj"
 PUBLISH_DIR="${PROJECT_DIR}/build/android-artifacts/linux-bionic-arm64"
 JNILIB_DIR="${PROJECT_DIR}/android/app/src/main/jniLibs/arm64-v8a"
-WITH_LLAMA="${WITH_LLAMA:-0}"
+WITH_LLAMA="${WITH_LLAMA:-1}"
 
 : "${ANDROID_NDK_HOME:?set ANDROID_NDK_HOME to the NDK 27 dir (e.g. ~/Library/Android/sdk/ndk/27.2.12479018)}"
 # NDK prebuilt host dir: darwin-x86_64 on macOS (incl. Apple Silicon via Rosetta), linux-x86_64 on CI.

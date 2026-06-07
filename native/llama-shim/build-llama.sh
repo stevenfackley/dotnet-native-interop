@@ -2,8 +2,10 @@
 set -euo pipefail
 # Builds dni_llama + llama.cpp as a static lib for one platform.
 # Usage: build-llama.sh <host|ios-arm64|iossimulator-arm64|android-arm64>
-# Pinned llama.cpp tag (same tag across iOS + Android so the shim C-API + C# ABI stay in lockstep):
-LLAMA_TAG="${LLAMA_TAG:-b4585}"
+# Pinned llama.cpp tag (same tag across iOS + Android so the shim C-API + C# ABI stay in lockstep).
+# b9542: the shim's modern-API calls (llama_model_load_from_file, llama_init_from_model,
+# llama_get_memory/llama_memory_clear, llama_sampler_chain_*, llama_vocab_is_eog) compile clean here.
+LLAMA_TAG="${LLAMA_TAG:-b9542}"
 # CMake is overridable so the android-arm64 build can use the Android SDK's bundled cmake
 # (export CMAKE=$ANDROID_HOME/cmake/3.22.1/bin/cmake) when no cmake is on PATH.
 CMAKE="${CMAKE:-cmake}"
