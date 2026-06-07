@@ -1,31 +1,17 @@
 /*
- * jni_bridge.c — JNI shim between Kotlin and the NativeAOT C ABI.
+ * jni_bridge.c — JNI shim (dni_jni) binding the NativeAOT C ABI (dni.h) to
+ * io.dotnetnativeinterop.transport.NativeBridge via RegisterNatives.
  *
- * Load order required from Kotlin:
- *   System.loadLibrary("dni")       // NativeAOT .so — must be first
- *   System.loadLibrary("dni_jni")   // this shim
+ * Load order from Kotlin: System.loadLibrary("dni") then System.loadLibrary("dni_jni").
+ * RegisterNatives (in JNI_OnLoad) decouples these C functions from the Kotlin package name,
+ * so a future reverse-DNS rename cannot break symbol resolution.
  *
- * Threading contract (FFI callback):
- *   The NativeAOT runtime invokes dni_token_cb on a .NET background thread.
- *   That thread is NOT a JVM thread; we must AttachCurrentThread once per worker
- *   thread before calling back into Java/Kotlin.  We use a pthread_once-per-thread
- *   TLS destructor to DetachCurrentThread when the thread exits, preventing leaks.
- *
- *   Flow:
- *     1. JNI_OnLoad caches the JavaVM*.
- *     2. Kotlin calls nativeSessionStart(prompt, maxTokens, temp, listener).
- *        listener is a global ref to a FfiTokenListener Kotlin object.
- *     3. We store (global JavaVM*, global listener ref, methodID) in a heap-
- *        allocated CallbackState passed as user_data.
- *     4. C callback fires on .NET thread → AttachCurrentThread (idempotent if
- *        already attached via TLS flag) → CallVoidMethod → check for Exception.
- *     5. When is_final==1, DeleteGlobalRef(listener) and free(state).
+ * gRPC is intentionally absent: it is <Compile Remove>'d from the engine, so dni_grpc_* are
+ * not exported by libdni.so.
  */
-
 #include <jni.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <android/log.h>
 #include <pthread.h>
 
@@ -35,286 +21,171 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
 
-/* --------------------------------------------------------------------------
- * Cached JVM — set in JNI_OnLoad, valid for the process lifetime.
- * -------------------------------------------------------------------------- */
 static JavaVM* g_jvm = NULL;
-
-/* --------------------------------------------------------------------------
- * Per-thread attach tracking via TLS destructor.
- * -------------------------------------------------------------------------- */
 static pthread_key_t  g_tls_key;
 static pthread_once_t g_tls_once = PTHREAD_ONCE_INIT;
 
 static void tls_destructor(void* attached) {
     if (attached != NULL && g_jvm != NULL) {
         (*g_jvm)->DetachCurrentThread(g_jvm);
-        LOGD("DetachCurrentThread on worker thread exit");
     }
 }
+static void create_tls_key(void) { pthread_key_create(&g_tls_key, tls_destructor); }
 
-static void create_tls_key(void) {
-    pthread_key_create(&g_tls_key, tls_destructor);
-}
-
-/*
- * attach_current_thread — attaches the calling thread to the JVM if needed.
- * Returns a valid JNIEnv* or NULL on failure.
- * The TLS destructor ensures DetachCurrentThread is called when the .NET
- * background thread is eventually destroyed.
- */
 static JNIEnv* attach_current_thread(void) {
     if (g_jvm == NULL) return NULL;
-
     pthread_once(&g_tls_once, create_tls_key);
-
     JNIEnv* env = NULL;
     jint res = (*g_jvm)->GetEnv(g_jvm, (void**)&env, JNI_VERSION_1_6);
-
-    if (res == JNI_OK) {
-        /* Already attached (e.g. this is the main thread or a re-entrant call). */
-        return env;
-    }
-
+    if (res == JNI_OK) return env;
     if (res == JNI_EDETACHED) {
-        JavaVMAttachArgs args = {
-            .version = JNI_VERSION_1_6,
-            .name    = "dotnet-worker",
-            .group   = NULL,
-        };
-        if ((*g_jvm)->AttachCurrentThread(g_jvm, &env, &args) != JNI_OK) {
-            LOGE("AttachCurrentThread failed");
-            return NULL;
-        }
-        /* Mark TLS so the destructor will Detach when this thread exits. */
+        JavaVMAttachArgs args = { .version = JNI_VERSION_1_6, .name = "dotnet-worker", .group = NULL };
+        if ((*g_jvm)->AttachCurrentThread(g_jvm, &env, &args) != JNI_OK) { LOGE("attach failed"); return NULL; }
         pthread_setspecific(g_tls_key, (void*)1);
-        LOGD("AttachCurrentThread succeeded for .NET worker");
         return env;
     }
-
-    LOGE("GetEnv returned unexpected code %d", res);
+    LOGE("GetEnv unexpected %d", res);
     return NULL;
 }
 
-/* --------------------------------------------------------------------------
- * Per-session callback state (heap-allocated, owned by the callback).
- * -------------------------------------------------------------------------- */
-typedef struct {
-    jobject  listener_ref;  /* global ref to FfiTokenListener Kotlin object */
-    jmethodID on_token;     /* void onToken(int index, String text, boolean isFinal) */
-} CallbackState;
+/* ---- streaming callback (Pattern 3, shared by FFI + RAG) ----------------- */
+typedef struct { jobject listener_ref; jmethodID on_token; } CallbackState;
 
-/* --------------------------------------------------------------------------
- * The C callback invoked by .NET per token.
- * -------------------------------------------------------------------------- */
-static void ffi_token_callback(void* user_data,
-                                int32_t index,
-                                const char* text,
-                                int32_t is_final) {
-    CallbackState* state = (CallbackState*)user_data;
-    if (state == NULL) return;
-
+static void ffi_token_callback(void* user_data, int32_t index, const char* text, int32_t is_final) {
+    CallbackState* st = (CallbackState*)user_data;
+    if (st == NULL) return;
     JNIEnv* env = attach_current_thread();
-    if (env == NULL) {
-        LOGE("ffi_token_callback: could not obtain JNIEnv");
-        return;
-    }
-
-    /* Copy text to a Java String immediately — the C string is only valid now. */
+    if (env == NULL) return;
     jstring jtext = (*env)->NewStringUTF(env, text != NULL ? text : "");
-    if (jtext == NULL) {
-        LOGE("ffi_token_callback: NewStringUTF OOM");
-        return;
-    }
-
-    (*env)->CallVoidMethod(env,
-                           state->listener_ref,
-                           state->on_token,
-                           (jint)index,
-                           jtext,
-                           (jboolean)(is_final != 0));
-
+    if (jtext == NULL) return;
+    (*env)->CallVoidMethod(env, st->listener_ref, st->on_token, (jint)index, jtext, (jboolean)(is_final != 0));
     (*env)->DeleteLocalRef(env, jtext);
-
-    if ((*env)->ExceptionCheck(env)) {
-        (*env)->ExceptionDescribe(env);
-        (*env)->ExceptionClear(env);
-        LOGE("ffi_token_callback: Kotlin onToken threw an exception");
-    }
-
-    /* When the stream is done, release the global ref and free state. */
-    if (is_final) {
-        (*env)->DeleteGlobalRef(env, state->listener_ref);
-        free(state);
-    }
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionDescribe(env); (*env)->ExceptionClear(env); }
+    if (is_final) { (*env)->DeleteGlobalRef(env, st->listener_ref); free(st); }
 }
 
-/* ==========================================================================
- * JNI_OnLoad — called when System.loadLibrary("dni_jni") executes.
- * ========================================================================== */
+/* ---- helpers ------------------------------------------------------------ */
+/* Copy a heap C string returned by the ABI into a jstring, then release it. */
+static jstring take_native_string(JNIEnv* env, const char* s) {
+    if (s == NULL) return NULL;
+    jstring js = (*env)->NewStringUTF(env, s);
+    dni_string_free(s);
+    return js;
+}
+
+static jlong start_streaming(JNIEnv* env, jstring text, jint max_tokens, jfloat temp,
+                             jobject listener, int is_rag) {
+    if (text == NULL || listener == NULL) return (jlong)DNI_INVALID_ARGUMENT;
+    jclass lc = (*env)->GetObjectClass(env, listener);
+    jmethodID on_token = (*env)->GetMethodID(env, lc, "onToken", "(ILjava/lang/String;Z)V");
+    (*env)->DeleteLocalRef(env, lc);
+    if (on_token == NULL) { LOGE("onToken not found"); return (jlong)DNI_INVALID_ARGUMENT; }
+    CallbackState* st = (CallbackState*)malloc(sizeof(CallbackState));
+    if (st == NULL) return (jlong)DNI_INTERNAL;
+    st->listener_ref = (*env)->NewGlobalRef(env, listener);
+    st->on_token = on_token;
+    const char* c_text = (*env)->GetStringUTFChars(env, text, NULL);
+    if (c_text == NULL) { (*env)->DeleteGlobalRef(env, st->listener_ref); free(st); return (jlong)DNI_INTERNAL; }
+    int64_t sid = is_rag
+        ? dni_rag_session_start(c_text, (int32_t)max_tokens, (float)temp, ffi_token_callback, st)
+        : dni_session_start(c_text, (int32_t)max_tokens, (float)temp, ffi_token_callback, st);
+    (*env)->ReleaseStringUTFChars(env, text, c_text);
+    if (sid <= 0) { (*env)->DeleteGlobalRef(env, st->listener_ref); free(st); }
+    return (jlong)sid;
+}
+
+/* ---- native method implementations (receiver is the NativeBridge object) - */
+static jint    j_initialize(JNIEnv* e, jobject o) { (void)e; (void)o; return dni_initialize(); }
+static void    j_shutdown  (JNIEnv* e, jobject o) { (void)e; (void)o; dni_shutdown(); }
+
+static jlong   j_session_start(JNIEnv* e, jobject o, jstring p, jint mt, jfloat t, jobject l) {
+    (void)o; return start_streaming(e, p, mt, t, l, 0); }
+static jlong   j_rag_session_start(JNIEnv* e, jobject o, jstring q, jint mt, jfloat t, jobject l) {
+    (void)o; return start_streaming(e, q, mt, t, l, 1); }
+static jint    j_session_cancel(JNIEnv* e, jobject o, jlong id) { (void)e; (void)o; return dni_session_cancel((int64_t)id); }
+static jint    j_session_free  (JNIEnv* e, jobject o, jlong id) { (void)e; (void)o; return dni_session_free((int64_t)id); }
+
+static jint    j_http_start(JNIEnv* e, jobject o) { (void)e; (void)o; return dni_http_start(); }
+static jint    j_http_stop (JNIEnv* e, jobject o) { (void)e; (void)o; return dni_http_stop(); }
+
+static jint    j_broker_start(JNIEnv* e, jobject o, jstring path) {
+    (void)o;
+    if (path == NULL) return DNI_INVALID_ARGUMENT;
+    const char* p = (*e)->GetStringUTFChars(e, path, NULL);
+    if (p == NULL) return DNI_INTERNAL;
+    int32_t r = dni_broker_start(p);
+    (*e)->ReleaseStringUTFChars(e, path, p);
+    return r;
+}
+static jint    j_broker_stop(JNIEnv* e, jobject o) { (void)e; (void)o; return dni_broker_stop(); }
+
+static jstring j_features_json (JNIEnv* e, jobject o) { (void)o; return take_native_string(e, dni_features_json()); }
+static jstring j_sqlite_features(JNIEnv* e, jobject o) { (void)o; return take_native_string(e, dni_sqlite_features()); }
+static jstring j_engine_stats  (JNIEnv* e, jobject o) { (void)o; return take_native_string(e, dni_engine_stats()); }
+
+static jstring j_feature_run(JNIEnv* e, jobject o, jstring id) {
+    (void)o; if (id == NULL) return NULL;
+    const char* cid = (*e)->GetStringUTFChars(e, id, NULL);
+    const char* r = dni_feature_run(cid);
+    (*e)->ReleaseStringUTFChars(e, id, cid);
+    return take_native_string(e, r);
+}
+static jstring j_sqlite_run(JNIEnv* e, jobject o, jstring id) {
+    (void)o; if (id == NULL) return NULL;
+    const char* cid = (*e)->GetStringUTFChars(e, id, NULL);
+    const char* r = dni_sqlite_run(cid);
+    (*e)->ReleaseStringUTFChars(e, id, cid);
+    return take_native_string(e, r);
+}
+static jstring j_sqlite_rag(JNIEnv* e, jobject o, jstring q) {
+    (void)o; if (q == NULL) return NULL;
+    const char* cq = (*e)->GetStringUTFChars(e, q, NULL);
+    const char* r = dni_sqlite_rag(cq);
+    (*e)->ReleaseStringUTFChars(e, q, cq);
+    return take_native_string(e, r);
+}
+static jstring j_search(JNIEnv* e, jobject o, jstring q, jstring c) {
+    (void)o; if (q == NULL || c == NULL) return NULL;
+    const char* cq = (*e)->GetStringUTFChars(e, q, NULL);
+    const char* cc = (*e)->GetStringUTFChars(e, c, NULL);
+    const char* r = (cq && cc) ? dni_search(cq, cc) : NULL;
+    if (cq) (*e)->ReleaseStringUTFChars(e, q, cq);
+    if (cc) (*e)->ReleaseStringUTFChars(e, c, cc);
+    return take_native_string(e, r);
+}
+
+/* ---- RegisterNatives table --------------------------------------------- */
+static const JNINativeMethod kMethods[] = {
+    {"nativeInitialize",     "()I",                                                                      (void*)j_initialize},
+    {"nativeShutdown",       "()V",                                                                      (void*)j_shutdown},
+    {"nativeSessionStart",   "(Ljava/lang/String;IFLio/dotnetnativeinterop/transport/FfiTokenListener;)J", (void*)j_session_start},
+    {"nativeRagSessionStart","(Ljava/lang/String;IFLio/dotnetnativeinterop/transport/FfiTokenListener;)J", (void*)j_rag_session_start},
+    {"nativeSessionCancel",  "(J)I",                                                                     (void*)j_session_cancel},
+    {"nativeSessionFree",    "(J)I",                                                                     (void*)j_session_free},
+    {"nativeHttpStart",      "()I",                                                                      (void*)j_http_start},
+    {"nativeHttpStop",       "()I",                                                                      (void*)j_http_stop},
+    {"nativeBrokerStart",    "(Ljava/lang/String;)I",                                                    (void*)j_broker_start},
+    {"nativeBrokerStop",     "()I",                                                                      (void*)j_broker_stop},
+    {"nativeFeaturesJson",   "()Ljava/lang/String;",                                                     (void*)j_features_json},
+    {"nativeFeatureRun",     "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_feature_run},
+    {"nativeSqliteFeatures", "()Ljava/lang/String;",                                                     (void*)j_sqlite_features},
+    {"nativeSqliteRun",      "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_run},
+    {"nativeEngineStats",    "()Ljava/lang/String;",                                                     (void*)j_engine_stats},
+    {"nativeSearch",         "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",                 (void*)j_search},
+    {"nativeSqliteRag",      "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_rag},
+};
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     (void)reserved;
     g_jvm = vm;
-    LOGD("JNI_OnLoad — dni_jni loaded, JavaVM cached");
+    JNIEnv* env = NULL;
+    if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+    jclass clazz = (*env)->FindClass(env, "io/dotnetnativeinterop/transport/NativeBridge");
+    if (clazz == NULL) { LOGE("NativeBridge class not found"); return JNI_ERR; }
+    if ((*env)->RegisterNatives(env, clazz, kMethods, (jint)(sizeof(kMethods)/sizeof(kMethods[0]))) != JNI_OK) {
+        LOGE("RegisterNatives failed"); return JNI_ERR;
+    }
+    (*env)->DeleteLocalRef(env, clazz);
+    LOGD("dni_jni loaded; %d natives registered", (int)(sizeof(kMethods)/sizeof(kMethods[0])));
     return JNI_VERSION_1_6;
-}
-
-/* ==========================================================================
- * Lifecycle
- * ========================================================================== */
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeInitialize(
-        JNIEnv* env, jclass clazz) {
-    (void)env; (void)clazz;
-    return dni_initialize();
-}
-
-JNIEXPORT void JNICALL
-Java_io_dni_transport_NativeBridge_nativeShutdown(
-        JNIEnv* env, jclass clazz) {
-    (void)env; (void)clazz;
-    dni_shutdown();
-}
-
-/* ==========================================================================
- * Pattern 3 — FFI
- *
- * Kotlin signature:
- *   external fun nativeSessionStart(
- *       prompt: String, maxTokens: Int, temperature: Float,
- *       listener: FfiTokenListener
- *   ): Long
- * ========================================================================== */
-
-JNIEXPORT jlong JNICALL
-Java_io_dni_transport_NativeBridge_nativeSessionStart(
-        JNIEnv* env, jclass clazz,
-        jstring prompt, jint max_tokens, jfloat temperature,
-        jobject listener) {
-    (void)clazz;
-
-    if (prompt == NULL || listener == NULL) {
-        return (jlong)DNI_INVALID_ARGUMENT;
-    }
-
-    /* Cache the listener method ID (class invariant — same for every call). */
-    jclass listener_class = (*env)->GetObjectClass(env, listener);
-    jmethodID on_token = (*env)->GetMethodID(
-        env, listener_class, "onToken", "(ILjava/lang/String;Z)V");
-    (*env)->DeleteLocalRef(env, listener_class);
-    if (on_token == NULL) {
-        LOGE("nativeSessionStart: onToken method not found");
-        return (jlong)DNI_INVALID_ARGUMENT;
-    }
-
-    CallbackState* state = (CallbackState*)malloc(sizeof(CallbackState));
-    if (state == NULL) {
-        LOGE("nativeSessionStart: malloc failed");
-        return (jlong)DNI_INTERNAL;
-    }
-    state->listener_ref = (*env)->NewGlobalRef(env, listener);
-    state->on_token     = on_token;
-
-    const char* c_prompt = (*env)->GetStringUTFChars(env, prompt, NULL);
-    if (c_prompt == NULL) {
-        (*env)->DeleteGlobalRef(env, state->listener_ref);
-        free(state);
-        return (jlong)DNI_INTERNAL;
-    }
-
-    int64_t session_id = dni_session_start(
-        c_prompt,
-        (int32_t)max_tokens,
-        (float)temperature,
-        ffi_token_callback,
-        state);
-
-    (*env)->ReleaseStringUTFChars(env, prompt, c_prompt);
-
-    if (session_id <= 0) {
-        /* Start failed — release resources immediately. */
-        (*env)->DeleteGlobalRef(env, state->listener_ref);
-        free(state);
-    }
-
-    return (jlong)session_id;
-}
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeSessionCancel(
-        JNIEnv* env, jclass clazz, jlong session_id) {
-    (void)env; (void)clazz;
-    return dni_session_cancel((int64_t)session_id);
-}
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeSessionFree(
-        JNIEnv* env, jclass clazz, jlong session_id) {
-    (void)env; (void)clazz;
-    return dni_session_free((int64_t)session_id);
-}
-
-/* ==========================================================================
- * Pattern 1 — HTTP loopback
- * ========================================================================== */
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeHttpStart(
-        JNIEnv* env, jclass clazz) {
-    (void)env; (void)clazz;
-    return dni_http_start();
-}
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeHttpStop(
-        JNIEnv* env, jclass clazz) {
-    (void)env; (void)clazz;
-    return dni_http_stop();
-}
-
-/* ==========================================================================
- * Pattern 2 — gRPC over UDS
- * ========================================================================== */
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeGrpcStart(
-        JNIEnv* env, jclass clazz, jstring socket_path) {
-    (void)clazz;
-    if (socket_path == NULL) return DNI_INVALID_ARGUMENT;
-    const char* path = (*env)->GetStringUTFChars(env, socket_path, NULL);
-    if (path == NULL) return DNI_INTERNAL;
-    int32_t result = dni_grpc_start(path);
-    (*env)->ReleaseStringUTFChars(env, socket_path, path);
-    return result;
-}
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeGrpcStop(
-        JNIEnv* env, jclass clazz) {
-    (void)env; (void)clazz;
-    return dni_grpc_stop();
-}
-
-/* ==========================================================================
- * Pattern 4 — SQLite WAL broker
- * ========================================================================== */
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeBrokerStart(
-        JNIEnv* env, jclass clazz, jstring db_path) {
-    (void)clazz;
-    if (db_path == NULL) return DNI_INVALID_ARGUMENT;
-    const char* path = (*env)->GetStringUTFChars(env, db_path, NULL);
-    if (path == NULL) return DNI_INTERNAL;
-    int32_t result = dni_broker_start(path);
-    (*env)->ReleaseStringUTFChars(env, db_path, path);
-    return result;
-}
-
-JNIEXPORT jint JNICALL
-Java_io_dni_transport_NativeBridge_nativeBrokerStop(
-        JNIEnv* env, jclass clazz) {
-    (void)env; (void)clazz;
-    return dni_broker_stop();
 }

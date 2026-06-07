@@ -12,6 +12,8 @@ grpcKotlin           = "1.4.1"
 protobuf             = "4.28.2"
 protobufPlugin       = "0.9.4"
 room                 = "2.6.1"
+androidxTestRunner   = "1.6.2"
+androidxTestExtJunit = "1.2.1"
 # hilt not added — DI is manual for this POC
 
 [libraries]
@@ -53,6 +55,8 @@ kotlinx-serialization-json  = { group = "org.jetbrains.kotlinx", name = "kotlinx
 # Test
 junit                       = { group = "junit", name = "junit", version = "4.13.2" }
 coroutines-test             = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+androidx-test-runner        = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-ext-junit     = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 
 [plugins]
 android-application = { id = "com.android.application",        version.ref = "agp" }

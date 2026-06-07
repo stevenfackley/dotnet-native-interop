@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
-import dni.v1.InferRequest as ProtoInferRequest
+import dni.v1.Dni.InferRequest as ProtoInferRequest
 import dni.v1.InferenceGrpcKt
 import java.io.File
 import java.net.InetSocketAddress
@@ -93,7 +93,8 @@ public class GrpcUdsClient(
             .build()
 
         s.infer(protoRequest).collect { inferToken ->
-            emit(Token(inferToken.index, inferToken.text, inferToken.final))
+            // `final` is a Kotlin hard keyword → backtick the generated accessor.
+            emit(Token(inferToken.index, inferToken.text, inferToken.`final`))
         }
     }.flowOn(Dispatchers.IO)
 }

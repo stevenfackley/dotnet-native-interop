@@ -98,15 +98,18 @@ protobuf {
     }
     generateProtoTasks {
         all().forEach { task ->
+            // protobuf-lite stack (grpc-protobuf-lite + protobuf-kotlin-lite): both the Java messages
+            // and the Kotlin DSL must be generated in "lite" mode, and the Java builtin must be present
+            // (the Kotlin DSL wraps the Java message classes — without it, the generated `Dni` class is
+            // missing and the Kotlin code fails to resolve).
+            task.builtins {
+                id("java") { option("lite") }
+                id("kotlin") { option("lite") }
+            }
             task.plugins {
-                id("grpc")
+                id("grpc") { option("lite") }
                 id("grpckt")
             }
-            task.builtins {
-                id("kotlin")
-            }
-            // Point at the shared proto directory
-            task.protoSourceDirs.add(file("${rootDir.parentFile.absolutePath}/proto"))
         }
     }
 }
@@ -119,6 +122,18 @@ tasks.register<Copy>("copyPatternsJson") {
     into("${projectDir}/src/main/assets")
 }
 tasks.named("preBuild") { dependsOn("copyPatternsJson") }
+
+// Stage the shared gRPC contract into the protobuf plugin's default source dir (src/main/proto).
+// The proto/ tree lives at the repo root; the protobuf-gradle-plugin has no stable task-level
+// "extra source dir" API in 0.9.x, so we copy it in before codegen runs.
+tasks.register<Copy>("copyProto") {
+    from("${rootDir.parentFile.absolutePath}/proto") { include("**/*.proto") }
+    into("${projectDir}/src/main/proto")
+}
+afterEvaluate {
+    tasks.matching { it.name.startsWith("generate") && it.name.endsWith("Proto") }
+        .configureEach { dependsOn("copyProto") }
+}
 
 dependencies {
     // Compose BOM + core UI
@@ -159,4 +174,9 @@ dependencies {
     // Test
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+
+    // Instrumented test (SP0 native gate) — runs on the arm64 emulator
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }

@@ -1,76 +1,53 @@
 package io.dotnetnativeinterop.transport
 
 /**
- * Kotlin facade for the JNI shim (dni_jni.so).
+ * Kotlin facade for the JNI shim (dni_jni). Native methods are bound via RegisterNatives in the
+ * shim's JNI_OnLoad, so these names are decoupled from the package name.
  *
- * Load order matters:
- *   1. "dni"     — the NativeAOT library; all C symbols must be resident first.
- *   2. "dni_jni" — this shim that calls those symbols.
- *
- * Both loads are performed in [DotnetNativeInteropApp] (or MainActivity) so that any
- * class referencing this object is guaranteed to find the libraries already loaded.
+ * Load order: System.loadLibrary("dni") then System.loadLibrary("dni_jni").
  */
 public object NativeBridge {
-
-    // --- Lifecycle ----------------------------------------------------------
-
-    /** Calls dni_initialize(). Returns 0 on success, negative NativeStatus. */
+    // Lifecycle
     public external fun nativeInitialize(): Int
-
-    /** Calls dni_shutdown(). */
     public external fun nativeShutdown()
 
-    // --- Pattern 3: FFI -----------------------------------------------------
-
-    /**
-     * Starts an inference session.  Tokens are delivered by calling
-     * [FfiTokenListener.onToken] on a .NET background thread (already attached
-     * to the JVM by the C shim).  Returns session id (> 0) or negative status.
-     */
-    public external fun nativeSessionStart(
-        prompt: String,
-        maxTokens: Int,
-        temperature: Float,
-        listener: FfiTokenListener,
-    ): Long
-
-    /** Returns 0 on success, negative status. */
+    // Pattern 3 — FFI streaming (RAG shares cancel/free + the FfiTokenListener callback)
+    public external fun nativeSessionStart(prompt: String, maxTokens: Int, temperature: Float, listener: FfiTokenListener): Long
+    public external fun nativeRagSessionStart(query: String, maxTokens: Int, temperature: Float, listener: FfiTokenListener): Long
     public external fun nativeSessionCancel(sessionId: Long): Int
-
-    /** Returns 0 on success, negative status. */
     public external fun nativeSessionFree(sessionId: Long): Int
 
-    // --- Pattern 1: HTTP loopback -------------------------------------------
-
-    /** Returns the bound port (> 0) or negative status. */
+    // Pattern 1 — HTTP loopback
     public external fun nativeHttpStart(): Int
-
-    /** Returns 0 on success, negative status. */
     public external fun nativeHttpStop(): Int
 
-    // --- Pattern 2: gRPC over UDS -------------------------------------------
+    // Pattern 4 — SQLite WAL broker
+    public external fun nativeBrokerStart(dbPath: String): Int
+    public external fun nativeBrokerStop(): Int
 
-    /** Returns 0 on success, negative status. */
+    // Pattern 2 — gRPC over UDS: EXCLUDED transport. The engine exports no dni_grpc_* (gRPC has no
+    // NativeAOT mobile runtime pack), so these are deliberately NOT registered in the JNI table — they
+    // exist only so the legacy GrpcUdsClient still compiles. Invoking them throws UnsatisfiedLinkError
+    // (no regression: the pre-rename shim referenced a non-existent dni_grpc_start, so gRPC never worked
+    // on Android). TODO(SP1): remove GrpcUdsClient + these two declarations together.
     public external fun nativeGrpcStart(socketPath: String): Int
-
-    /** Returns 0 on success, negative status. */
     public external fun nativeGrpcStop(): Int
 
-    // --- Pattern 4: SQLite WAL broker ---------------------------------------
+    // Structured feature catalog (string-returning; null on failure)
+    public external fun nativeFeaturesJson(): String?
+    public external fun nativeFeatureRun(id: String): String?
+    public external fun nativeSqliteFeatures(): String?
+    public external fun nativeSqliteRun(id: String): String?
 
-    /** Returns 0 on success, negative status. */
-    public external fun nativeBrokerStart(dbPath: String): Int
-
-    /** Returns 0 on success, negative status. */
-    public external fun nativeBrokerStop(): Int
+    // Introspection + onboard AI
+    public external fun nativeEngineStats(): String?
+    public external fun nativeSearch(query: String, corpus: String): String?
+    public external fun nativeSqliteRag(query: String): String?
 }
 
 /**
- * Callback interface matching the C shim's CallVoidMethod signature:
- *   void onToken(int index, String text, boolean isFinal)
- *
- * Called on a .NET background thread (already attached to the JVM).
- * Implementations MUST NOT block; enqueue to a channel and return immediately.
+ * Per-token callback (Pattern 3). onToken fires on a .NET background thread already attached to the
+ * JVM by the shim; implementations MUST NOT block — enqueue and return. Reused for RAG streaming.
  */
 public interface FfiTokenListener {
     public fun onToken(index: Int, text: String, isFinal: Boolean)

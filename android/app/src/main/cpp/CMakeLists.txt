@@ -17,19 +17,19 @@ target_include_directories(dni_jni PRIVATE
     ${DNI_INCLUDE_DIR}
 )
 
-# Link against the pre-built NativeAOT .so (libdni.so) which lives in
-# app/src/main/jniLibs/arm64-v8a/.  Android's dynamic linker resolves it at
-# runtime because jniLibs/ is added to the APK's lib/ directory automatically.
-# We declare it as an IMPORTED target so the compiler resolves the ABI headers
-# without needing the .so at CMake configure time.
+# Import the prebuilt NativeAOT library (built by build/build-android-so.sh into
+# jniLibs/<abi>/libdni.so). Linking against it resolves the dni_* C ABI symbols at
+# link time, satisfying the NDK toolchain's -Wl,--no-undefined. At runtime the loader
+# pulls libdni.so in as a NEEDED dependency (it is also explicitly loaded first via
+# System.loadLibrary("dni") before System.loadLibrary("dni_jni")).
+add_library(dni SHARED IMPORTED)
+set_target_properties(dni PROPERTIES IMPORTED_LOCATION
+    ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libdni.so)
+
 find_library(log-lib log)
 target_link_libraries(dni_jni
     ${log-lib}
-    # Do NOT link dni here at link time; it is loaded first via
-    # System.loadLibrary("dni") before System.loadLibrary("dni_jni")
-    # in Kotlin, so all C symbols are already resident.
-    # If the toolchain complains about undefined symbols, add:
-    #   -Wl,--allow-shlib-undefined
+    dni
 )
 
 target_compile_options(dni_jni PRIVATE -Wall -Wextra -Werror)

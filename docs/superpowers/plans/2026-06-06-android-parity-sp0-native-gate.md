@@ -15,9 +15,9 @@
 ## Conventions (read once, apply to every task)
 
 - **Edit on Windows** in the repo root `C:\Users\steve\projects\dotnet-ios-android-poc-native-frontend`. Commit there (authoritative git history). Branch: `feat/android-parity-sp0-native-gate` (already created).
-- **Build/run on the Mac mini.** The Windows box has no C/C++ toolchain. Repo on the Mac: `/Users/steve/dotnet-ios-android-poc-native-frontend`. Wrap remote commands in a login shell so `dotnet`/`sdkmanager`/`cmake` are on PATH:
+- **Build/run on the Mac mini.** The Windows box has no C/C++ toolchain. Repo on the Mac: `/Users/steve/dni-build`. Wrap remote commands in a login shell so `dotnet`/`sdkmanager`/`cmake` are on PATH:
   ```bash
-  ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dotnet-ios-android-poc-native-frontend && <cmd>'"
+  ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dni-build && <cmd>'"
   ```
   Build **as `steve`** (NuGet cache + toolchain perms — see `docs/ios-build-deploy-runbook.md`).
 - **Android env is NOT on the login shell** (verified 2026-06-06: `ANDROID_HOME`/`JAVA_HOME` unset, no
@@ -29,14 +29,14 @@
     export ANDROID_NDK_HOME=\$ANDROID_HOME/ndk/27.2.12479018
     export JAVA_HOME=\$HOME/Library/Java/jdk
     export PATH=\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/emulator:\$ANDROID_HOME/cmdline-tools/latest/bin:\$PATH
-    cd /Users/steve/dotnet-ios-android-poc-native-frontend && <cmd>
+    cd /Users/steve/dni-build && <cmd>
   '"
   ```
   Gradle also needs the SDK location: either the env above or an `android/local.properties` with
   `sdk.dir=/Users/steve/Library/Android/sdk` (Task 0 writes it).
 - **Sync Windows → Mac before each remote build** (overlay only changed files; no commit needed for iteration). Run from the Windows repo root:
   ```bash
-  tar -cf - <relative paths…> | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
+  tar -cf - <relative paths…> | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
   ```
 - **Commits:** Conventional Commits, no AI/Co-Authored-By trailer (workspace rule). Frequent, one per task minimum.
 - **Definition of done is "answered, not all-green":** if a rung won't link/run on bionic, capture the exact error in a findings doc and ship the fallback — that is a *passing* SP0 outcome (Task 13 covers this regardless).
@@ -161,8 +161,8 @@ echo "OK: ${JNILIB_DIR}/libdni.so ($(du -h "${JNILIB_DIR}/libdni.so" | cut -f1))
 
 Run from the Windows repo root:
 ```bash
-tar -cf - build/build-android-so.sh | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
-ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dotnet-ios-android-poc-native-frontend && bash build/build-android-so.sh'"
+tar -cf - build/build-android-so.sh | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
+ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dni-build && bash build/build-android-so.sh'"
 ```
 Expected: `OK: …/jniLibs/arm64-v8a/libdni.so (NN M)`. **This is the S1 make-or-break: does NativeAOT publish for `linux-bionic-arm64` at all?** If it fails, capture the exact error (Task 13) before proceeding.
 
@@ -510,9 +510,9 @@ public class NativeGateTest {
 
 Run from the Windows repo root:
 ```bash
-tar -cf - android/app/src core/DotnetNativeInterop.NativeBridge/abi | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
+tar -cf - android/app/src core/DotnetNativeInterop.NativeBridge/abi | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
 ssh steve@steve-mac-mini "zsh -lc '
-  cd /Users/steve/dotnet-ios-android-poc-native-frontend &&
+  cd /Users/steve/dni-build &&
   bash build/build-android-so.sh &&
   adb wait-for-device &&
   cd android && ./gradlew :app:connectedDebugAndroidTest --tests io.dotnetnativeinterop.NativeGateTest
@@ -681,8 +681,8 @@ git commit -m "feat(engine): add dni_sqlite_probe gate export + dni_gate_probe.h
 
 Run from the Windows repo root:
 ```bash
-tar -cf - core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
-ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dotnet-ios-android-poc-native-frontend && bash build/build-android-so.sh'"
+tar -cf - core/DotnetNativeInterop.NativeBridge/DotnetNativeInterop.NativeBridge.csproj | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
+ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dni-build && bash build/build-android-so.sh'"
 ```
 Expected: `OK: …/libdni.so`. **This answers the S2 unknown: does `e_sqlcipher` static-link under NativeAOT-bionic?** Capture any linker error for Task 13.
 
@@ -751,9 +751,9 @@ static jstring j_sqlite_probe(JNIEnv* e, jobject o, jstring path) {
 - [ ] **Step 6: Sync, rebuild `.so`, run S1+S2 on the emulator**
 
 ```bash
-tar -cf - android/app/src core/DotnetNativeInterop.NativeBridge | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
+tar -cf - android/app/src core/DotnetNativeInterop.NativeBridge | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
 ssh steve@steve-mac-mini "zsh -lc '
-  cd /Users/steve/dotnet-ios-android-poc-native-frontend &&
+  cd /Users/steve/dni-build &&
   bash build/build-android-so.sh &&
   adb wait-for-device &&
   cd android && ./gradlew :app:connectedDebugAndroidTest --tests io.dotnetnativeinterop.NativeGateTest
@@ -795,9 +795,9 @@ Add a new `case` arm (after the `iossimulator-arm64)` block, before `host)`):
 - [ ] **Step 2: Build the android static libs on the Mac**
 
 ```bash
-tar -cf - native/llama-shim/build-llama.sh | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
+tar -cf - native/llama-shim/build-llama.sh | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
 ssh steve@steve-mac-mini "zsh -lc '
-  cd /Users/steve/dotnet-ios-android-poc-native-frontend &&
+  cd /Users/steve/dni-build &&
   export ANDROID_NDK_HOME=\"\$ANDROID_HOME/ndk/27.2.12479018\" &&
   bash native/llama-shim/build-llama.sh android-arm64
 '"
@@ -880,9 +880,9 @@ Add inside the `GateProbe` class:
 - [ ] **Step 3: Build the full-stack `.so` (llama + SQLCipher)**
 
 ```bash
-tar -cf - core/DotnetNativeInterop.NativeBridge | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
+tar -cf - core/DotnetNativeInterop.NativeBridge | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
 ssh steve@steve-mac-mini "zsh -lc '
-  cd /Users/steve/dotnet-ios-android-poc-native-frontend &&
+  cd /Users/steve/dni-build &&
   export ANDROID_NDK_HOME=\"\$ANDROID_HOME/ndk/27.2.12479018\" &&
   WITH_LLAMA=1 bash build/build-android-so.sh
 '"
@@ -960,9 +960,9 @@ Expected: the file lists on the device. (If the URL 404s, any small Q4 GGUF work
 - [ ] **Step 6: Rebuild full-stack `.so`, run S1+S2+S3 on the emulator**
 
 ```bash
-tar -cf - android/app/src | ssh steve-mac-mini "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
+tar -cf - android/app/src | ssh steve-mac-mini "tar -xf - -C /Users/steve/dni-build"
 ssh steve@steve-mac-mini "zsh -lc '
-  cd /Users/steve/dotnet-ios-android-poc-native-frontend &&
+  cd /Users/steve/dni-build &&
   export ANDROID_NDK_HOME=\"\$ANDROID_HOME/ndk/27.2.12479018\" &&
   WITH_LLAMA=1 bash build/build-android-so.sh &&
   adb wait-for-device &&
@@ -993,7 +993,7 @@ git commit -m "test(android): bind + assert dni_llama_probe on emulator (S3 gree
 - [ ] **Step 2: Update `ci-android.yml`** to build the real path. Minimum viable (no emulator in CI): install NDK 27, `WITH_LLAMA=1 bash build/build-android-so.sh`, then `./gradlew :app:assembleDebug`. Add a comment that the instrumented gate test runs on the Mac mini emulator (emulator-in-CI is a stretch). Verify the workflow file parses:
 
 ```bash
-ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dotnet-ios-android-poc-native-frontend && python3 -c \"import yaml,sys; yaml.safe_load(open(\\\".github/workflows/ci-android.yml\\\"))\" && echo YAML-OK'"
+ssh steve@steve-mac-mini "zsh -lc 'cd /Users/steve/dni-build && python3 -c \"import yaml,sys; yaml.safe_load(open(\\\".github/workflows/ci-android.yml\\\"))\" && echo YAML-OK'"
 ```
 Expected: `YAML-OK`.
 
