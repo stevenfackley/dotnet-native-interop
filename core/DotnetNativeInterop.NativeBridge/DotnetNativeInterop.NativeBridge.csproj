@@ -93,6 +93,29 @@
     <NativeLibrary Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/iossimulator-arm64/lib/libggml-base.a" />
   </ItemGroup>
 
+  <!-- Android (Plan B, SP0 S3): same llama/ggml + shim static libs, built for arm64-v8a by
+       build-llama.sh android-arm64 via the NDK toolchain. Unlike iOS (system libc++ via -lc++), the
+       .NET NativeAOT bionic runtime links only the sliver of libc++ it uses itself, so llama/ggml's
+       ~137 libc++ symbols (e.g. typeinfo for std::length_error, __gxx_personality_v0) are otherwise
+       left undefined and fail at dlopen on device. Android has no app-facing system libc++, so link the
+       NDK's static C++ runtime (libc++_static + libc++abi; the base _Unwind unwinder is already
+       provided by the .NET runtime). Everything sits inside one linker group (start-group/end-group)
+       because ld.lld is single-pass (unlike Apple's ld64) and these archives reference each other
+       cyclically; passing them as ordered LinkerArgs keeps llama before libc++ on the link line
+       regardless of how MSBuild orders NativeLibrary vs LinkerArg items. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-bionic-arm64'">
+    <DirectPInvoke Include="dni_llama" />
+    <LinkerArg Include="-Wl,--start-group" />
+    <LinkerArg Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/android-arm64/lib/libdni_llama.a" />
+    <LinkerArg Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/android-arm64/lib/libllama.a" />
+    <LinkerArg Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/android-arm64/lib/libggml.a" />
+    <LinkerArg Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/android-arm64/lib/libggml-cpu.a" />
+    <LinkerArg Include="$(MSBuildProjectDirectory)/../../native/llama-shim/build/android-arm64/lib/libggml-base.a" />
+    <LinkerArg Include="-l:libc++_static.a" />
+    <LinkerArg Include="-l:libc++abi.a" />
+    <LinkerArg Include="-Wl,--end-group" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
   </ItemGroup>

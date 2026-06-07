@@ -61,4 +61,17 @@ public class NativeGateTest {
         assertTrue("cipher_version non-empty", cipher.isNotBlank())
         pass("dni_sqlite_probe ok, cipher=$cipher, roundtrip=${obj.getString("roundtrip")}")
     }
+
+    /** S3: llama.cpp + ggml link and a GGUF model loads + generates inside the bionic NativeAOT image. */
+    @Test
+    public fun s3_llamaProbe() {
+        // Pushed before the run: adb push model.gguf /data/local/tmp/gate.gguf
+        val modelPath = "/data/local/tmp/gate.gguf"
+        assertTrue("model present at $modelPath (adb push first)", File(modelPath).exists())
+        val json = requireNotNull(NativeBridge.nativeLlamaProbe(modelPath)) { "llama probe null" }
+        val obj = JSONObject(json)
+        assertTrue("llama probe ok (json=$json)", obj.getBoolean("ok"))
+        assertTrue("llama generated tokens", obj.optInt("tokens") > 0)
+        pass("dni_llama_probe ok, tokens=${obj.optInt("tokens")}, sample=${obj.optString("sample")}")
+    }
 }

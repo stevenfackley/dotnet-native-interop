@@ -45,8 +45,9 @@ public object NativeBridge {
     public external fun nativeSqliteRag(query: String): String?
 
     // SP0 gate-only probes (not part of the app ABI; see abi/dni_gate_probe.h). Take a caller-supplied
-    // writable path because Path.GetTempPath() is not reliably writable on Android.
+    // path: writable temp for SQLCipher, the pushed GGUF model for llama.
     public external fun nativeSqliteProbe(path: String): String?
+    public external fun nativeLlamaProbe(path: String): String?
 }
 
 /**

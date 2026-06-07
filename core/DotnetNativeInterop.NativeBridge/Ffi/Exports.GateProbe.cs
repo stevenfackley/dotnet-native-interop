@@ -1,7 +1,11 @@
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+using DotnetNativeInterop.Engine;
+using DotnetNativeInterop.Engine.Llama;
 using Microsoft.Data.Sqlite;
 
 namespace DotnetNativeInterop.NativeBridge.Ffi;
@@ -94,6 +98,64 @@ internal static class ExportsGateProbe
             : new ProbeResult(false, Error: $"roundtrip mismatch: '{readBack}'");
     }
 
+    /// <summary>
+    /// Loads a GGUF model at <paramref name="path"/> via the real <see cref="LlamaLanguageModel"/>
+    /// (proving the C# → DirectPInvoke → static llama/ggml chain links inside the NativeAOT image),
+    /// generates a few tokens on CPU, and frees it. Returns JSON {"ok":bool,"tokens":int,"sample":str}
+    /// or {"ok":false,"error":str}; 0 only if the result can't be allocated.
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "dni_llama_probe")]
+    public static unsafe nint LlamaProbe(byte* path)
+    {
+        ProbeResult result;
+        try
+        {
+            result = RunLlamaProbe(NativeText.Read((nint)path));
+        }
+        catch (Exception ex)
+        {
+            result = new ProbeResult(false, Error: ex.Message);
+        }
+
+        return NativeText.Allocate(
+            JsonSerializer.Serialize(result, GateProbeJsonContext.Default.ProbeResult));
+    }
+
+    private static ProbeResult RunLlamaProbe(string ggufPath)
+    {
+        if (string.IsNullOrEmpty(ggufPath))
+        {
+            return new ProbeResult(false, Error: "empty path");
+        }
+
+        if (!File.Exists(ggufPath))
+        {
+            return new ProbeResult(false, Error: $"gguf not found: {ggufPath}");
+        }
+
+        using var model = new LlamaLanguageModel(ggufPath);   // throws if llama.cpp fails to load
+        var sample = new StringBuilder();
+        var pieces = 0;
+        var request = new InferenceRequest("The capital of France is", MaxTokens: 8, Temperature: 0.2f);
+
+        // Drain the async stream synchronously — the probe is a single blocking native call.
+        Task.Run(async () =>
+        {
+            await foreach (var piece in model.GenerateAsync(request).ConfigureAwait(false))
+            {
+                sample.Append(piece);
+                if (++pieces >= 8)
+                {
+                    break;
+                }
+            }
+        }).GetAwaiter().GetResult();
+
+        return pieces > 0
+            ? new ProbeResult(true, Tokens: pieces, Sample: sample.ToString())
+            : new ProbeResult(false, Error: "model loaded but generated 0 tokens");
+    }
+
     private static string Scalar(SqliteConnection conn, string sql)
     {
         using var cmd = conn.CreateCommand();
@@ -109,7 +171,13 @@ internal static class ExportsGateProbe
     }
 }
 
-internal sealed record ProbeResult(bool Ok, string? Cipher = null, string? Roundtrip = null, string? Error = null);
+internal sealed record ProbeResult(
+    bool Ok,
+    string? Cipher = null,
+    string? Roundtrip = null,
+    string? Error = null,
+    int? Tokens = null,
+    string? Sample = null);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

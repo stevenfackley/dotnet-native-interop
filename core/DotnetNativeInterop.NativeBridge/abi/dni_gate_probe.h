@@ -19,6 +19,13 @@ extern "C" {
  */
 const char* dni_sqlite_probe(const char* path);
 
+/*
+ * Load a GGUF model at `path` (CPU), generate a few tokens, and free it — proves llama.cpp + ggml
+ * link and a model loads/runs inside the NativeAOT image.
+ * Returns {"ok":true,"tokens":int,"sample":str} or {"ok":false,"error":str}; NULL on alloc failure.
+ */
+const char* dni_llama_probe(const char* path);
+
 #ifdef __cplusplus
 }
 #endif

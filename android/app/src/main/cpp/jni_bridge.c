@@ -164,6 +164,15 @@ static jstring j_sqlite_probe(JNIEnv* e, jobject o, jstring path) {
     return take_native_string(e, r);
 }
 
+/* SP0 gate probe (S3): load a GGUF model at `path`, generate a few tokens, free it. */
+static jstring j_llama_probe(JNIEnv* e, jobject o, jstring path) {
+    (void)o; if (path == NULL) return NULL;
+    const char* p = (*e)->GetStringUTFChars(e, path, NULL);
+    const char* r = p ? dni_llama_probe(p) : NULL;
+    if (p) (*e)->ReleaseStringUTFChars(e, path, p);
+    return take_native_string(e, r);
+}
+
 /* ---- RegisterNatives table --------------------------------------------- */
 static const JNINativeMethod kMethods[] = {
     {"nativeInitialize",     "()I",                                                                      (void*)j_initialize},
@@ -184,6 +193,7 @@ static const JNINativeMethod kMethods[] = {
     {"nativeSearch",         "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",                 (void*)j_search},
     {"nativeSqliteRag",      "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_rag},
     {"nativeSqliteProbe",    "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_probe},
+    {"nativeLlamaProbe",     "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_llama_probe},
 };
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
