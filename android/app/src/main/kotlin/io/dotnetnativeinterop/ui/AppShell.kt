@@ -33,7 +33,7 @@ import io.dotnetnativeinterop.ui.tabs.FeatureDetailScreen
 import io.dotnetnativeinterop.ui.tabs.FeaturesScreen
 import io.dotnetnativeinterop.ui.tabs.AiScreen
 import io.dotnetnativeinterop.ui.tabs.EdgeSearchScreen
-import io.dotnetnativeinterop.ui.tabs.GatedTabScreen
+import io.dotnetnativeinterop.ui.tabs.LabScreen
 import io.dotnetnativeinterop.ui.tabs.LatencyScreen
 import kotlinx.coroutines.launch
 
@@ -100,7 +100,10 @@ internal fun AppShell(
                     val vm: io.dotnetnativeinterop.evs.EvsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
                     EdgeSearchScreen(vm, content)
                 }
-                Tab.Lab -> GatedTabScreen("Lab", "Fractal / raymarcher / SIMD compute benchmarks in the .NET engine.", "Lab compute C-ABI exports + JNI", content)
+                Tab.Lab -> {
+                    val lab: io.dotnetnativeinterop.lab.LabViewModel = viewModel()
+                    LabScreen(lab, content)
+                }
                 Tab.Stream -> InferenceScreen(viewModel = inference, modifier = content)
             }
         }
