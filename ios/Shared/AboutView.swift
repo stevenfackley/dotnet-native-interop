@@ -27,14 +27,12 @@ struct AboutView: View {
                          + "and shows the runtime's behaviour live.")
                         .font(.callout)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
 
                 Section("Architecture") {
                     Text(architecture).font(.system(.caption, design: .monospaced))
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
 
                 Section("Why NativeAOT") {
                     Text("The engine is compiled ahead-of-time straight to a native binary — no JIT, no "
@@ -42,8 +40,7 @@ struct AboutView: View {
                          + "FFI calls are in-memory and there's no JIT warmup (see the Latency jitter view).")
                         .font(.callout)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
 
                 Section("Why these transports") {
                     bullet("Raw-socket HTTP, not Kestrel — ASP.NET Core ships no NativeAOT runtime pack for "
@@ -52,8 +49,7 @@ struct AboutView: View {
                            + "e_sqlcipher is the only one with iOS static libs, so the store is encrypted at rest for free.")
                     bullet("gRPC is kept in the tree but excluded — no NativeAOT mobile runtime pack.")
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
 
                 Section("Live runtime facts") {
                     if let s = stats {
@@ -66,8 +62,7 @@ struct AboutView: View {
                         Text("Reading engine telemetry…").font(.caption).foregroundStyle(Instrument.textSecondary)
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
 
                 ForEach(infos, id: \.id) { info in
                     Section(info.displayName) {
@@ -83,8 +78,7 @@ struct AboutView: View {
                             }
                         }
                     }
-                    .listRowBackground(Instrument.bg1)
-                    .listRowSeparatorTint(Instrument.hairline)
+                    .instrumentRow()
                 }
             }
             .navigationTitle("About")

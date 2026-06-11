@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,6 +35,7 @@ import io.dotnetnativeinterop.model.FeatureResult
 import io.dotnetnativeinterop.ui.Instrument
 import io.dotnetnativeinterop.ui.Radii
 import io.dotnetnativeinterop.ui.Spacing
+import io.dotnetnativeinterop.ui.components.ErrorBanner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -76,13 +76,16 @@ internal fun RasterDemoHost(
                         image = decoded
                         dims = "${decoded.width}×${decoded.height}"
                         decodeError = null
+                        val ms = (System.nanoTime() - start) / 1_000_000.0
+                        frameMs = ms
+                        fps = if (ms > 0) minOf(120.0, 1000.0 / ms) else 0.0
+                        last = command
                     } else {
+                        // Decode failure: keep `last` unset so a paused demo retries instead of
+                        // idling forever on one corrupt frame; back off like a failed render.
                         decodeError = "Couldn't decode the frame payload (${result.result.length} chars)"
+                        delay(250)
                     }
-                    val ms = (System.nanoTime() - start) / 1_000_000.0
-                    frameMs = ms
-                    fps = if (ms > 0) minOf(120.0, 1000.0 / ms) else 0.0
-                    last = command
                 } else {
                     // Failed render: back off instead of hammering a failing transport at full speed.
                     delay(250)
@@ -120,21 +123,17 @@ internal fun RasterCanvas(
                 .then(gestureModifier),
             contentAlignment = Alignment.Center,
         ) {
-            when {
-                image != null -> Image(
-                    bitmap = image.toImageBitmap(),
+            if (image != null) {
+                val bitmap = remember(image) { image.toImageBitmap() }
+                Image(
+                    bitmap = bitmap,
                     contentDescription = "rendered frame",
                     filterQuality = FilterQuality.None,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
-                errorMessage != null -> Text(
-                    errorMessage,
-                    color = Instrument.fail,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(Spacing.l),
-                )
-                else -> Text(
+            } else {
+                Text(
                     "Rendering…",
                     color = Instrument.textSecondary,
                     style = MaterialTheme.typography.bodyMedium,
@@ -153,6 +152,11 @@ internal fun RasterCanvas(
                 fontFamily = FontFamily.Monospace, color = Instrument.textSecondary)
             Text(transport, style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace, color = Instrument.textSecondary)
+        }
+        // Shown even while a stale frame is on screen — a failing transport must never
+        // masquerade as a merely frozen demo.
+        if (errorMessage != null) {
+            ErrorBanner(errorMessage)
         }
     }
 }

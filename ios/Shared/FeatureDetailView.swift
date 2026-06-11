@@ -34,8 +34,7 @@ struct FeatureDetailView: View {
                     }
                 }
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             Section {
                 Button {
@@ -49,8 +48,7 @@ struct FeatureDetailView: View {
                 }
                 .disabled(isRunning)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             if let result {
                 Section("Result") {
@@ -92,8 +90,7 @@ struct FeatureDetailView: View {
                         }
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
 
             if let errorMessage = viewModel.errorMessage {

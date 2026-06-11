@@ -10,22 +10,19 @@ struct FeaturesView: View {
         NavigationStack {
             List {
                 Section { TransportPicker(viewModel: viewModel) }
-                    .listRowBackground(Instrument.bg1)
-                    .listRowSeparatorTint(Instrument.hairline)
+                    .instrumentRow()
 
                 if viewModel.isLoading && viewModel.descriptors.isEmpty {
                     Section {
                         HStack(spacing: 8) { ProgressView(); Text("Loading features…") }
                     }
-                    .listRowBackground(Instrument.bg1)
-                    .listRowSeparatorTint(Instrument.hairline)
+                    .instrumentRow()
                 } else if viewModel.descriptors.isEmpty {
                     Section {
                         Text(viewModel.errorMessage ?? "No features. Tap Refresh.")
                             .foregroundStyle(Instrument.textSecondary)
                     }
-                    .listRowBackground(Instrument.bg1)
-                    .listRowSeparatorTint(Instrument.hairline)
+                    .instrumentRow()
                 } else {
                     groups
                 }
@@ -84,8 +81,7 @@ struct FeaturesView: View {
                         .background(.quaternary, in: Capsule())
                 }
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
         }
     }
 

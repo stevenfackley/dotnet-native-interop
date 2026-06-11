@@ -17,6 +17,13 @@ struct InstrumentCardStyle: ViewModifier {
 extension View {
     func instrumentCard() -> some View { modifier(InstrumentCardStyle()) }
 
+    /// Themed list row: bg1 surface + hairline separators. Apply to every Section in a themed List.
+    func instrumentRow() -> some View {
+        self
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
+    }
+
     /// Staggered entrance: fade + rise, driven by a single `revealed` flag flipped on appear.
     func revealCard(_ revealed: Bool, delay: Double) -> some View {
         self

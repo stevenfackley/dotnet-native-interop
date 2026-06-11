@@ -91,7 +91,12 @@ struct RasterCanvas: View {
                 Text(transport).foregroundStyle(Instrument.textSecondary)
             }
             .font(.caption.monospacedDigit())
-            .contentTransition(.numericText())
+
+            // Shown even while a stale frame is on screen — a failing transport must never
+            // masquerade as a merely frozen demo.
+            if let errorMessage {
+                ErrorBanner(message: errorMessage)
+            }
         }
     }
 }

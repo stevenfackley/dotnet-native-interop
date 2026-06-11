@@ -47,11 +47,17 @@ public class LatencyViewModel(
             var failed = 0
             // Failure policy (user decision 2026-06-10, mirrored from the iOS LatencyViewModel):
             // skip + disclose — a failed call never produces a sample, but is always shown.
-            repeat(count) {
+            // A dead transport would burn `count` sequential timeouts, so if the first few calls
+            // ALL fail, stop early and disclose.
+            for (i in 0 until count) {
                 val start = System.nanoTime()
                 runCatching { service.run(id) }
                     .onSuccess { out.add((System.nanoTime() - start) / 1_000_000.0) }
                     .onFailure { failed++ }
+                if (out.isEmpty() && failed >= 5) {
+                    failed = count
+                    break
+                }
             }
             _state.update {
                 it.copy(

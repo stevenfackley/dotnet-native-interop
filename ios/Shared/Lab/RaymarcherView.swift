@@ -46,21 +46,18 @@ struct RaymarcherView: View {
                              errorMessage: lab.lastError)
                     .gesture(orbit)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
             Section("Controls") {
                 Toggle("Auto-rotate", isOn: $model.spinning)
                 LabTransportPicker(transport: $lab.transport)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
             Section {
                 Text("A signed-distance-field raymarcher — sphere, ground plane, soft shadow — with every "
                      + "ray traced on the CPU in C#. No GPU, no Metal, no shaders.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
         }
         .instrumentScreen()
         .navigationTitle("Raymarched 3D")

@@ -19,8 +19,7 @@ struct LabView: View {
                         Label("Raymarched 3D", systemImage: "cube.transparent")
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
                 Section("Benchmarks — NativeAOT throughput") {
                     NavigationLink {
                         BenchmarkDetailView(lab: lab, title: "SIMD Matmul", command: "bench-matmul~max_384")
@@ -33,8 +32,7 @@ struct LabView: View {
                         Label("Parallel Scaling", systemImage: "cpu.fill")
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
             .instrumentScreen()
             .navigationTitle("Lab")

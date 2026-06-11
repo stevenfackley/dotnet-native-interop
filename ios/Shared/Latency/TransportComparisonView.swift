@@ -29,8 +29,7 @@ struct TransportComparisonView: View {
                 Text("Fires \(count) pings over FFI, HTTP, and SQLCipher and compares the distributions.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             if totalFailures > 0 {
                 Section {
@@ -60,8 +59,7 @@ struct TransportComparisonView: View {
                         .padding(.vertical, 2)
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
                 Section("Distribution overlay (CDF)") {
                     Chart {
                         ForEach(TransportKind.allCases) { kind in
@@ -76,8 +74,7 @@ struct TransportComparisonView: View {
                     .chartLegend(position: .bottom)
                     .frame(height: 240)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
         }
         .instrumentScreen()

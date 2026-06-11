@@ -32,8 +32,7 @@ struct SemanticSearchView: View {
                      + "then cosine-ranked against the corpus — all in-process, no cloud.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             if let error = model.errorMessage {
                 Section {
@@ -58,8 +57,7 @@ struct SemanticSearchView: View {
                         .padding(.vertical, 2)
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
         }
         .instrumentScreen()

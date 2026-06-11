@@ -25,13 +25,15 @@ public class LabViewModel(
     public fun setTransport(t: TransportKind) { _transport.value = t }
 
     /** Runs one command over the currently selected transport; null on error. The failure is never
-     *  silent: [lastError] carries the context for the Lab screens to display. */
+     *  silent: [lastError] carries the context for the Lab screens to display. The message strips
+     *  per-frame parameters (after '~') so retry ticks don't republish a new string every frame. */
     public suspend fun render(command: String): FeatureResult? =
         runCatching { serviceFor(_transport.value).run(command) }
             .onSuccess { _lastError.value = null }
             .onFailure { e ->
+                val name = command.substringBefore('~')
                 _lastError.value =
-                    "‘$command’ over ${_transport.value.displayName} failed: ${e.message}"
+                    "‘$name’ over ${_transport.value.displayName} failed: ${e.message ?: e.javaClass.simpleName}"
             }
             .getOrNull()
 }

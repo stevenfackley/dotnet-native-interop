@@ -13,8 +13,7 @@ struct AiHubView: View {
                         Label("Semantic search", systemImage: "magnifyingglass")
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
                 Section("Grounded Q&A") {
                     NavigationLink {
                         AskManualsView(search: search, engineServices: engineRagServices)
@@ -22,15 +21,13 @@ struct AiHubView: View {
                         Label("Ask the Manuals (RAG)", systemImage: "text.book.closed")
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
                 Section("Apple, for comparison") {
                     NavigationLink { AppleChatView() } label: {
                         Label("Apple chat", systemImage: "apple.logo")
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
             .instrumentScreen()
             .navigationTitle("AI")

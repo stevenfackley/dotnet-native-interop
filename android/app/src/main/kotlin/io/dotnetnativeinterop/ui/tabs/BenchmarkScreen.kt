@@ -57,7 +57,8 @@ internal fun BenchmarkScreen(
                     error = null
                     val r = lab.render(command)
                     when {
-                        r == null -> error = "The native library returned no data."
+                        // lab.lastError carries the command + transport context for this failure.
+                        r == null -> error = lab.lastError.value ?: "The native library returned no data."
                         else -> {
                             val p = Benchmark.decode(r.result)
                             if (p == null) error = "Could not decode benchmark JSON." else payload = p

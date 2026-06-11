@@ -31,8 +31,7 @@ struct AskManualsView: View {
                      + "answering the same retrieved context.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             if let error = model.errorMessage {
                 Section {
@@ -54,16 +53,14 @@ struct AskManualsView: View {
                         }
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
 
             if !model.engineAnswer.isEmpty || model.engineRunning {
                 Section(engineHeader) {
                     Text(model.engineAnswer.isEmpty ? "…" : model.engineAnswer)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
 
             Section("Apple Foundation Models") {
@@ -81,8 +78,7 @@ struct AskManualsView: View {
                     Text(model.appleAnswer.isEmpty ? "Ask to compare." : model.appleAnswer)
                 }
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
         }
         .instrumentScreen()
         .navigationTitle("Ask the Manuals")

@@ -29,7 +29,8 @@ final class ComparisonViewModel: ObservableObject {
         running = true
         defer { running = false }
         await loadDescriptorsIfNeeded()
-        timings = [:]
+        guard !descriptors.isEmpty else { return }   // keep the load error visible; nothing to run
+        var collected: [String: [TransportKind: Double]] = [:]
         var failed: [String] = []
         for descriptor in descriptors {
             for kind in TransportKind.allCases {
@@ -41,17 +42,22 @@ final class ComparisonViewModel: ObservableObject {
                 if callFailed {
                     failed.append("\(descriptor.id) (\(kind.displayName))")
                 } else {
-                    timings[descriptor.id, default: [:]][kind] = ms
+                    collected[descriptor.id, default: [:]][kind] = ms
                 }
             }
         }
-        errorMessage = failed.isEmpty ? nil : "Skipped failed runs: \(failed.joined(separator: ", "))"
+        timings = collected
+        errorMessage = failed.isEmpty
+            ? nil
+            : "Skipped failed runs (excluded from totals): \(failed.joined(separator: ", "))"
     }
 
-    /// Total round-trip ms per transport across all measured features.
+    /// Total round-trip ms per transport — summed ONLY over features measured on every transport,
+    /// so the bars always compare the same feature set (a flaky transport must not look fast by
+    /// skipping its slow features).
     var totals: [TransportKind: Double] {
         var out: [TransportKind: Double] = [:]
-        for perFeature in timings.values {
+        for perFeature in timings.values where perFeature.count == TransportKind.allCases.count {
             for (kind, ms) in perFeature {
                 out[kind, default: 0] += ms
             }

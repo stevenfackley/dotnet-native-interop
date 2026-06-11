@@ -18,15 +18,13 @@ struct AppleChatView: View {
                      + "from Swift, not the .NET engine.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
             if let reason = unavailableReason {
                 Section {
                     ContentUnavailableView("Apple Intelligence unavailable", systemImage: "sparkles.slash",
                                            description: Text(reason))
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             } else {
                 Section {
                     HStack {
@@ -40,12 +38,10 @@ struct AppleChatView: View {
                         .disabled(thinking || prompt.isEmpty)
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
                 if !answer.isEmpty {
                     Section("Response") { Text(answer) }
-                        .listRowBackground(Instrument.bg1)
-                        .listRowSeparatorTint(Instrument.hairline)
+                        .instrumentRow()
                 }
             }
         }

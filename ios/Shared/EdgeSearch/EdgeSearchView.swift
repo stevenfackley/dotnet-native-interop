@@ -20,8 +20,7 @@ struct EdgeSearchView: View {
                         Text("Loading the on-device search engine…").foregroundStyle(Instrument.textSecondary)
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             } else {
                 Section {
                     HStack {
@@ -39,8 +38,7 @@ struct EdgeSearchView: View {
                          + "ranked against a SQLite index the .NET publisher compiled offline. No network.")
                         .font(.caption).foregroundStyle(Instrument.textSecondary)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
 
                 if !model.allErrorCodes.isEmpty || !model.allTools.isEmpty {
                     Section("Filters") {
@@ -51,8 +49,7 @@ struct EdgeSearchView: View {
                             FacetRow(title: "Tools", all: model.allTools, active: $model.activeTools)
                         }
                     }
-                    .listRowBackground(Instrument.bg1)
-                    .listRowSeparatorTint(Instrument.hairline)
+                    .instrumentRow()
                 }
 
                 if let error = model.errorMessage {
@@ -67,8 +64,7 @@ struct EdgeSearchView: View {
                     Section("Results") {
                         ForEach(model.hits) { EdgeHitRow(hit: $0) }
                     }
-                    .listRowBackground(Instrument.bg1)
-                    .listRowSeparatorTint(Instrument.hairline)
+                    .instrumentRow()
                 } else if !model.query.isEmpty && !model.searching {
                     Section { Text("No matches \u{2265} 70% similarity.").foregroundStyle(Instrument.textSecondary) }
                     .listRowBackground(Instrument.bg1)

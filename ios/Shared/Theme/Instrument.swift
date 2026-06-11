@@ -40,7 +40,6 @@ enum Instrument {
         static let m: CGFloat = 12
         static let l: CGFloat = 16
         static let xl: CGFloat = 24
-        static let xxl: CGFloat = 32
     }
 
     // MARK: Radii
@@ -55,9 +54,7 @@ enum Instrument {
 
     /// Section headers: small caps-style monospaced label, the "engraved front panel" look.
     static let panelLabel = Font.system(.caption, design: .monospaced).weight(.semibold)
-    /// Large readouts (heap MB, elapsed ms).
-    static let readout = Font.system(.title2, design: .monospaced).weight(.semibold)
-    /// Secondary readouts.
+    /// Monospaced readouts (heap MB, elapsed ms).
     static let readoutSmall = Font.system(.subheadline, design: .monospaced).weight(.medium)
     static let code = Font.system(.footnote, design: .monospaced)
 }

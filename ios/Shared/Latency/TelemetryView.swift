@@ -21,8 +21,7 @@ struct TelemetryView: View {
                      + "GC counts, and pause time move live.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
             if let error = poller.errorMessage {
                 Section {
                     ErrorBanner(message: error)
@@ -33,8 +32,7 @@ struct TelemetryView: View {
             Section("Live runtime") {
                 TelemetryStrip(stats: poller.stats)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
             Section("Managed heap (MB)") {
                 Chart {
                     ForEach(Array(poller.heapHistory.enumerated()), id: \.offset) { index, mb in
@@ -45,8 +43,7 @@ struct TelemetryView: View {
                 .chartYAxisLabel("heap MB")
                 .frame(height: 200)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
         }
         .instrumentScreen()
         .navigationTitle("Engine telemetry")

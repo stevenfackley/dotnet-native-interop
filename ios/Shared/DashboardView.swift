@@ -15,8 +15,14 @@ struct DashboardView: View {
                     runCard.revealCard(revealed, delay: 0.16)
 
                     if let errorMessage = viewModel.errorMessage {
-                        ErrorBanner(message: errorMessage) {
-                            Task { await viewModel.load() }
+                        // Retry reloads the catalog — only offer it when that's what failed.
+                        // A failed feature run is retried from its own row, not here.
+                        if viewModel.descriptors.isEmpty {
+                            ErrorBanner(message: errorMessage) {
+                                Task { await viewModel.load() }
+                            }
+                        } else {
+                            ErrorBanner(message: errorMessage)
                         }
                     }
                 }
@@ -34,9 +40,7 @@ struct DashboardView: View {
             PanelHeader("Transport")
             TransportPicker(viewModel: viewModel)
             HStack(spacing: Instrument.Space.s) {
-                Circle()
-                    .fill(Instrument.transport(viewModel.selected))
-                    .frame(width: 7, height: 7)
+                TransportDot(kind: viewModel.selected)
                 Text(viewModel.transport.mechanism)
                     .font(.footnote)
                     .foregroundStyle(Instrument.textSecondary)

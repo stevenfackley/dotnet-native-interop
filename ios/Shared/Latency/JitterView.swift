@@ -29,8 +29,7 @@ struct JitterView: View {
                 Text("Each point is one `ping` round-trip in order over \(model.transport.displayName).")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             if series.failures > 0 {
                 Section {
@@ -54,8 +53,7 @@ struct JitterView: View {
                     .chartYAxisLabel("round-trip (ms)")
                     .frame(height: 240)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
         }
         .instrumentScreen()

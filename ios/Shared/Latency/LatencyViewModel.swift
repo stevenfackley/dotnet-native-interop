@@ -37,6 +37,12 @@ final class LatencyViewModel: ObservableObject {
                 series.samples.append(ms)
             } else {
                 series.failures += 1
+                // A dead transport would otherwise burn `count` sequential timeouts: if the first
+                // few calls ALL fail, stop early — the user gets the failure banner in seconds.
+                if series.samples.isEmpty && series.failures >= 5 {
+                    series.failures = count - series.samples.count
+                    break
+                }
             }
         }
         return series

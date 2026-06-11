@@ -31,8 +31,7 @@ struct DistributionView: View {
                      + "histogram is pure transport cost.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             if samples.isEmpty {
                 Section {
@@ -58,16 +57,15 @@ struct DistributionView: View {
                     .chartYAxisLabel("calls")
                     .frame(height: 220)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
                 Section("Stats (ms)") {
-                    LabeledContent("min") { mono(samples.min() ?? 0) }
-                    LabeledContent("median") { mono(LatencyStats.percentile(samples.sorted(), 0.5)) }
-                    LabeledContent("p95") { mono(LatencyStats.percentile(samples.sorted(), 0.95)) }
-                    LabeledContent("max") { mono(samples.max() ?? 0) }
+                    let sorted = samples.sorted()
+                    LabeledContent("min") { mono(sorted.first ?? 0) }
+                    LabeledContent("median") { mono(LatencyStats.percentile(sorted, 0.5)) }
+                    LabeledContent("p95") { mono(LatencyStats.percentile(sorted, 0.95)) }
+                    LabeledContent("max") { mono(sorted.last ?? 0) }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
         }
         .instrumentScreen()

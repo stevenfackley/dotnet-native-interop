@@ -32,8 +32,7 @@ struct PayloadScalingView: View {
                      + "over \(reps) reps per size.")
                     .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
-            .listRowBackground(Instrument.bg1)
-            .listRowSeparatorTint(Instrument.hairline)
+            .instrumentRow()
 
             if !failedSizes.isEmpty {
                 Section {
@@ -55,8 +54,7 @@ struct PayloadScalingView: View {
                     .chartYAxisLabel("round-trip (ms)")
                     .frame(height: 240)
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
                 Section("Values") {
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
                         LabeledContent(point.label) {
@@ -64,8 +62,7 @@ struct PayloadScalingView: View {
                         }
                     }
                 }
-                .listRowBackground(Instrument.bg1)
-                .listRowSeparatorTint(Instrument.hairline)
+                .instrumentRow()
             }
         }
         .instrumentScreen()
