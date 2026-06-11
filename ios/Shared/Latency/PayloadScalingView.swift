@@ -7,6 +7,7 @@ struct PayloadScalingView: View {
     @ObservedObject var model: LatencyViewModel
 
     @State private var points: [(label: String, ms: Double)] = []
+    @State private var failedSizes: [String] = []
     @State private var running = false
 
     private let sizes: [(label: String, bytes: Int)] =
@@ -29,7 +30,18 @@ struct PayloadScalingView: View {
                 .disabled(running)
                 Text("Round-trips an N-byte `bench-echo` over \(model.transport.displayName), averaged "
                      + "over \(reps) reps per size.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
+            }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
+
+            if !failedSizes.isEmpty {
+                Section {
+                    ErrorBanner(message: "No successful round-trips for \(failedSizes.joined(separator: ", ")) "
+                        + "over \(model.transport.displayName) — excluded from the chart.")
+                        .listRowInsets(EdgeInsets())
+                }
+                .listRowBackground(Color.clear)
             }
 
             if !points.isEmpty {
@@ -37,12 +49,14 @@ struct PayloadScalingView: View {
                     Chart {
                         ForEach(Array(points.enumerated()), id: \.offset) { _, point in
                             BarMark(x: .value("size", point.label), y: .value("ms", point.ms))
-                                .foregroundStyle(ComparisonView.color(model.transport))
+                                .foregroundStyle(Instrument.transport(model.transport))
                         }
                     }
                     .chartYAxisLabel("round-trip (ms)")
                     .frame(height: 240)
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
                 Section("Values") {
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
                         LabeledContent(point.label) {
@@ -50,8 +64,11 @@ struct PayloadScalingView: View {
                         }
                     }
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
             }
         }
+        .instrumentScreen()
         .navigationTitle("Payload scaling")
     }
 
@@ -60,6 +77,7 @@ struct PayloadScalingView: View {
         running = true
         defer { running = false }
         var collected: [(label: String, ms: Double)] = []
+        var failed: [String] = []
         for size in sizes {
             var total = 0.0
             var hits = 0
@@ -69,8 +87,13 @@ struct PayloadScalingView: View {
                     hits += 1
                 }
             }
-            collected.append((label: size.label, ms: hits > 0 ? total / Double(hits) : 0))
+            if hits > 0 {
+                collected.append((label: size.label, ms: total / Double(hits)))
+            } else {
+                failed.append(size.label)
+            }
         }
         points = collected
+        failedSizes = failed
     }
 }

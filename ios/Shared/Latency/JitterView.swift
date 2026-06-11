@@ -6,9 +6,11 @@ import SwiftUI
 struct JitterView: View {
     @ObservedObject var model: LatencyViewModel
 
-    @State private var samples: [Double] = []
+    @State private var series = LatencyViewModel.Series()
     @State private var running = false
     private let count = 400
+
+    private var samples: [Double] { series.samples }
 
     var body: some View {
         List {
@@ -25,7 +27,19 @@ struct JitterView: View {
                 }
                 .disabled(running)
                 Text("Each point is one `ping` round-trip in order over \(model.transport.displayName).")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
+            }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
+
+            if series.failures > 0 {
+                Section {
+                    ErrorBanner(message: samples.isEmpty
+                        ? "All \(series.failures) pings failed over \(model.transport.displayName)."
+                        : "\(series.failures) of \(count) pings failed — gaps are excluded from the line.")
+                        .listRowInsets(EdgeInsets())
+                }
+                .listRowBackground(Color.clear)
             }
 
             if !samples.isEmpty {
@@ -33,15 +47,18 @@ struct JitterView: View {
                     Chart {
                         ForEach(Array(samples.enumerated()), id: \.offset) { index, ms in
                             LineMark(x: .value("call #", index), y: .value("ms", ms))
-                                .foregroundStyle(ComparisonView.color(model.transport))
+                                .foregroundStyle(Instrument.transport(model.transport))
                         }
                     }
                     .chartXAxisLabel("call #")
                     .chartYAxisLabel("round-trip (ms)")
                     .frame(height: 240)
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
             }
         }
+        .instrumentScreen()
         .navigationTitle("Jitter over time")
     }
 
@@ -49,6 +66,6 @@ struct JitterView: View {
     private func run() async {
         running = true
         defer { running = false }
-        samples = await model.pingSeries(count: count, on: model.transport)
+        series = await model.pingSeries(count: count, on: model.transport)
     }
 }

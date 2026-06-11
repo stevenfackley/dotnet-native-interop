@@ -6,9 +6,11 @@ struct VersionBadge: View {
     var body: some View {
         Text(version)
             .font(.caption2.monospaced())
+            .foregroundStyle(Instrument.accent)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
-            .background(.quaternary, in: Capsule())
+            .background(Instrument.accent.opacity(0.12), in: Capsule())
+            .overlay(Capsule().strokeBorder(Instrument.accent.opacity(0.35), lineWidth: 1))
     }
 }
 
@@ -28,10 +30,14 @@ struct CodeBlock: View {
     let code: String
     var body: some View {
         Text(code)
-            .font(.system(.footnote, design: .monospaced))
+            .font(Instrument.code)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+            .padding(Instrument.Space.m)
+            .background(Instrument.bg2, in: RoundedRectangle(cornerRadius: Instrument.Radius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: Instrument.Radius.card)
+                    .strokeBorder(Instrument.hairline, lineWidth: 1)
+            )
             .textSelection(.enabled)
     }
 }

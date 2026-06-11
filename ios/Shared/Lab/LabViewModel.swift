@@ -6,15 +6,25 @@ import Foundation
 @MainActor
 final class LabViewModel: ObservableObject {
     @Published var transport: TransportKind = .ffi
+    /// Most recent render failure, with command + transport context. Cleared on the next success.
+    @Published var lastError: String?
 
-    private let services: [TransportKind: FeatureService]
+    private let services: TransportMap<FeatureService>
 
-    init(services: [TransportKind: FeatureService]) {
+    init(services: TransportMap<FeatureService>) {
         self.services = services
     }
 
-    /// Runs one command over the currently selected transport; nil on error (surfaced as a fallback view).
+    /// Runs one command over the currently selected transport; nil on error. The failure is never
+    /// silent: `lastError` carries the context for the Lab screens to display.
     func render(_ command: String) async -> FeatureResult? {
-        try? await services[transport]?.run(command)
+        do {
+            let result = try await services[transport].run(command)
+            lastError = nil
+            return result
+        } catch {
+            lastError = "‘\(command)’ over \(transport.displayName) failed: \(error.localizedDescription)"
+            return nil
+        }
     }
 }

@@ -6,9 +6,12 @@ import SwiftUI
 struct TransportComparisonView: View {
     @ObservedObject var model: LatencyViewModel
 
-    @State private var samples: [TransportKind: [Double]] = [:]
+    @State private var series: [TransportKind: LatencyViewModel.Series] = [:]
     @State private var running = false
     private let count = 200
+
+    private func samples(_ kind: TransportKind) -> [Double] { series[kind]?.samples ?? [] }
+    private var totalFailures: Int { series.values.reduce(0) { $0 + $1.failures } }
 
     var body: some View {
         List {
@@ -24,27 +27,45 @@ struct TransportComparisonView: View {
                 }
                 .disabled(running)
                 Text("Fires \(count) pings over FFI, HTTP, and SQLCipher and compares the distributions.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
+            }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
+
+            if totalFailures > 0 {
+                Section {
+                    ErrorBanner(message: "\(totalFailures) pings failed and are excluded — "
+                        + failureBreakdown)
+                        .listRowInsets(EdgeInsets())
+                }
+                .listRowBackground(Color.clear)
             }
 
-            if !samples.isEmpty {
+            if !series.isEmpty {
                 Section("Percentiles + throughput") {
                     ForEach(TransportKind.allCases) { kind in
-                        let s = LatencyStats.summary(samples[kind] ?? [])
+                        let s = LatencyStats.summary(samples(kind))
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(kind.displayName).font(.subheadline)
+                            HStack {
+                                Text(kind.displayName).font(.subheadline)
+                                if let f = series[kind]?.failures, f > 0 {
+                                    Text("\(f) failed").font(.caption2).foregroundStyle(Instrument.warn)
+                                }
+                            }
                             HStack {
                                 stat("p50", s.p50); stat("p95", s.p95); stat("p99", s.p99); stat("max", s.max)
                             }
-                            Text("\(Int(s.throughput)) calls/sec").font(.caption2).foregroundStyle(.secondary)
+                            Text("\(Int(s.throughput)) calls/sec").font(.caption2).foregroundStyle(Instrument.textSecondary)
                         }
                         .padding(.vertical, 2)
                     }
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
                 Section("Distribution overlay (CDF)") {
                     Chart {
                         ForEach(TransportKind.allCases) { kind in
-                            ForEach(Array(LatencyStats.cdf(samples[kind] ?? []).enumerated()), id: \.offset) { _, point in
+                            ForEach(Array(LatencyStats.cdf(samples(kind)).enumerated()), id: \.offset) { _, point in
                                 LineMark(x: .value("ms", point.value), y: .value("fraction", point.fraction))
                                     .foregroundStyle(by: .value("transport", kind.displayName))
                             }
@@ -55,27 +76,40 @@ struct TransportComparisonView: View {
                     .chartLegend(position: .bottom)
                     .frame(height: 240)
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
             }
         }
+        .instrumentScreen()
         .navigationTitle("Transport comparison")
     }
 
     private func stat(_ label: String, _ value: Double) -> some View {
         VStack(spacing: 1) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(label).font(.caption2).foregroundStyle(Instrument.textSecondary)
             Text(String(format: "%.2f", value)).font(.caption.monospacedDigit())
+                .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var failureBreakdown: String {
+        TransportKind.allCases
+            .compactMap { kind -> String? in
+                guard let f = series[kind]?.failures, f > 0 else { return nil }
+                return "\(kind.displayName): \(f)"
+            }
+            .joined(separator: ", ")
     }
 
     @MainActor
     private func run() async {
         running = true
         defer { running = false }
-        var collected: [TransportKind: [Double]] = [:]
+        var collected: [TransportKind: LatencyViewModel.Series] = [:]
         for kind in TransportKind.allCases {
             collected[kind] = await model.pingSeries(count: count, on: kind)
         }
-        samples = collected
+        series = collected
     }
 }

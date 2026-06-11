@@ -22,12 +22,17 @@ struct LatencyHubView: View {
                         Label("Payload scaling", systemImage: "arrow.up.right.square")
                     }
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
                 Section("Runtime") {
                     NavigationLink { TelemetryView(service: telemetry, model: model) } label: {
                         Label("Engine telemetry", systemImage: "gauge.with.dots.needle.67percent")
                     }
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
             }
+            .instrumentScreen()
             .navigationTitle("Latency")
         }
     }

@@ -19,25 +19,36 @@ struct TelemetryView: View {
                 Toggle("Run stress (loop benchmarks)", isOn: $stressing)
                 Text("Stress loops `bench-parallel` over FFI to allocate and churn the GC. Watch heap, "
                      + "GC counts, and pause time move live.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
+            }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
+            if let error = poller.errorMessage {
+                Section {
+                    ErrorBanner(message: error)
+                        .listRowInsets(EdgeInsets())
+                }
+                .listRowBackground(Color.clear)
             }
             Section("Live runtime") {
                 TelemetryStrip(stats: poller.stats)
-                if let error = poller.errorMessage {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                }
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
             Section("Managed heap (MB)") {
                 Chart {
                     ForEach(Array(poller.heapHistory.enumerated()), id: \.offset) { index, mb in
                         LineMark(x: .value("t", index), y: .value("MB", mb))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Instrument.accent)
                     }
                 }
                 .chartYAxisLabel("heap MB")
                 .frame(height: 200)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
         }
+        .instrumentScreen()
         .navigationTitle("Engine telemetry")
         .task { await poller.loop() }
         .task(id: stressing) { await stressLoop() }

@@ -42,19 +42,27 @@ struct RaymarcherView: View {
         List {
             Section {
                 RasterCanvas(payload: model.payload, fps: model.fps, frameMs: model.frameMs,
-                             dims: model.dims, transport: lab.transport.displayName)
+                             dims: model.dims, transport: lab.transport.displayName,
+                             errorMessage: lab.lastError)
                     .gesture(orbit)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
             Section("Controls") {
                 Toggle("Auto-rotate", isOn: $model.spinning)
                 LabTransportPicker(transport: $lab.transport)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
             Section {
                 Text("A signed-distance-field raymarcher — sphere, ground plane, soft shadow — with every "
                      + "ray traced on the CPU in C#. No GPU, no Metal, no shaders.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
         }
+        .instrumentScreen()
         .navigationTitle("Raymarched 3D")
         .task { await model.renderLoop() }
     }

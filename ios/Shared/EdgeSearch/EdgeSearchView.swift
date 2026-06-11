@@ -9,17 +9,19 @@ struct EdgeSearchView: View {
         List {
             if let reason = model.unavailable {
                 Section {
-                    ContentUnavailableView("Edge search engine unavailable",
-                                           systemImage: "wrench.adjustable",
-                                           description: Text(reason))
+                    ErrorBanner(message: reason)
+                        .listRowInsets(EdgeInsets())
                 }
+                .listRowBackground(Color.clear)
             } else if !model.ready {
                 Section {
                     HStack {
                         ProgressView()
-                        Text("Loading the on-device search engine…").foregroundStyle(.secondary)
+                        Text("Loading the on-device search engine…").foregroundStyle(Instrument.textSecondary)
                     }
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
             } else {
                 Section {
                     HStack {
@@ -35,8 +37,10 @@ struct EdgeSearchView: View {
                     }
                     Text("Embedded on-device by ONNX Runtime + Core ML (Apple Neural Engine), then cosine-"
                          + "ranked against a SQLite index the .NET publisher compiled offline. No network.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(Instrument.textSecondary)
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
 
                 if !model.allErrorCodes.isEmpty || !model.allTools.isEmpty {
                     Section("Filters") {
@@ -47,21 +51,31 @@ struct EdgeSearchView: View {
                             FacetRow(title: "Tools", all: model.allTools, active: $model.activeTools)
                         }
                     }
+                    .listRowBackground(Instrument.bg1)
+                    .listRowSeparatorTint(Instrument.hairline)
                 }
 
                 if let error = model.errorMessage {
-                    Section { Text(error).foregroundStyle(.red) }
+                    Section {
+                        ErrorBanner(message: error)
+                            .listRowInsets(EdgeInsets())
+                    }
+                    .listRowBackground(Color.clear)
                 }
 
                 if !model.hits.isEmpty {
                     Section("Results") {
                         ForEach(model.hits) { EdgeHitRow(hit: $0) }
                     }
+                    .listRowBackground(Instrument.bg1)
+                    .listRowSeparatorTint(Instrument.hairline)
                 } else if !model.query.isEmpty && !model.searching {
-                    Section { Text("No matches \u{2265} 70% similarity.").foregroundStyle(.secondary) }
+                    Section { Text("No matches \u{2265} 70% similarity.").foregroundStyle(Instrument.textSecondary) }
+                    .listRowBackground(Instrument.bg1)
                 }
             }
         }
+        .instrumentScreen()
         .navigationTitle("Edge Vector Search")
         .task { await model.prepare() }
     }
@@ -75,14 +89,14 @@ private struct FacetRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.caption).foregroundStyle(Instrument.textSecondary)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack {
                     ForEach(all, id: \.self) { tag in
                         let on = active.contains(tag)
                         Button(tag) { if on { active.remove(tag) } else { active.insert(tag) } }
                             .buttonStyle(.bordered)
-                            .tint(on ? .blue : .gray)
+                            .tint(on ? Instrument.accent : Instrument.textTertiary)
                     }
                 }
             }
@@ -97,14 +111,18 @@ private struct EdgeHitRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(hit.chunk.sectionTitle).font(.headline)
-            Text(hit.chunk.contentText).font(.subheadline).foregroundStyle(.secondary).lineLimit(4)
+            Text(hit.chunk.contentText).font(.subheadline).foregroundStyle(Instrument.textSecondary).lineLimit(4)
             HStack {
-                ProgressView(value: Double(max(0, min(1, hit.score)))).tint(.blue)
-                Text(String(format: "%.0f%%", hit.score * 100)).font(.caption2.monospacedDigit())
+                ProgressView(value: Double(max(0, min(1, hit.score))))
+                    .tint(Instrument.accent)
+                    .background(Instrument.bg2, in: Capsule())
+                Text(String(format: "%.0f%%", hit.score * 100))
+                    .font(.caption2.monospacedDigit())
+                    .contentTransition(.numericText())
             }
             if !hit.chunk.errorCodes.isEmpty {
                 Text("Codes: " + hit.chunk.errorCodes.joined(separator: ", "))
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(Instrument.textTertiary)
             }
         }
         .padding(.vertical, 2)

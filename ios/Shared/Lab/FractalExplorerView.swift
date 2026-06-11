@@ -55,9 +55,12 @@ struct FractalExplorerView: View {
         List {
             Section {
                 RasterCanvas(payload: model.payload, fps: model.fps, frameMs: model.frameMs,
-                             dims: model.dims, transport: lab.transport.displayName)
+                             dims: model.dims, transport: lab.transport.displayName,
+                             errorMessage: lab.lastError)
                     .gesture(magnify.simultaneously(with: drag))
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
             Section("Controls") {
                 Toggle("Dive (auto-zoom)", isOn: $model.diving)
                 HStack {
@@ -68,13 +71,18 @@ struct FractalExplorerView: View {
                 Button("Reset view") { model.reset() }
                 LabTransportPicker(transport: $lab.transport)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
             Section {
                 Text("Every pixel of this Mandelbrot set is computed in C# inside the NativeAOT library "
                      + "and sent to SwiftUI as raw bytes — no GPU, no shader, no cloud. Switch transport "
                      + "to watch the frame rate change.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
         }
+        .instrumentScreen()
         .navigationTitle("Fractal Explorer")
         .task { await model.renderLoop() }
     }

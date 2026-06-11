@@ -30,11 +30,17 @@ struct SemanticSearchView: View {
                 }
                 Text("The query is embedded by an all-MiniLM model running in the NativeAOT .NET engine, "
                      + "then cosine-ranked against the corpus — all in-process, no cloud.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
 
             if let error = model.errorMessage {
-                Section { Text(error).foregroundStyle(.red) }
+                Section {
+                    ErrorBanner(message: error, retry: { Task { await model.run() } })
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             }
 
             if !model.results.isEmpty {
@@ -43,15 +49,20 @@ struct SemanticSearchView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(result.text)
                             ProgressView(value: max(0, min(1, result.score)))
-                                .tint(.blue)
+                                .tint(Instrument.accent)
                             Text(String(format: "similarity %.3f", result.score))
-                                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(Instrument.textSecondary)
+                                .contentTransition(.numericText())
                         }
                         .padding(.vertical, 2)
                     }
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
             }
         }
+        .instrumentScreen()
         .navigationTitle("Semantic search")
     }
 }

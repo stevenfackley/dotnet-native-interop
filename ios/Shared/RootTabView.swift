@@ -7,7 +7,7 @@ struct RootTabView: View {
     @ObservedObject var latency: LatencyViewModel
     let telemetry: TelemetryService
     let search: SemanticSearchService
-    let engineRagServices: [TransportKind: EngineRagService]
+    let engineRagServices: TransportMap<EngineRagService>
 
     var body: some View {
         TabView {
@@ -35,5 +35,7 @@ struct RootTabView: View {
             EdgeSearchHubView()
                 .tabItem { Label("Manuals", systemImage: "wrench.and.screwdriver") }
         }
+        .preferredColorScheme(.dark)
+        .tint(Instrument.accent)
     }
 }

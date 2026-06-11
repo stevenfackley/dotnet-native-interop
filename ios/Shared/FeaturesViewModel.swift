@@ -13,17 +13,17 @@ final class FeaturesViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var onlyFailed = false
 
-    private let services: [TransportKind: FeatureService]
-    let infos: [TransportKind: TransportInfo]
+    private let services: TransportMap<FeatureService>
+    let infos: TransportMap<TransportInfo>
 
-    init(services: [TransportKind: FeatureService], infos: [TransportKind: TransportInfo]) {
+    init(services: TransportMap<FeatureService>, infos: TransportMap<TransportInfo>) {
         self.services = services
         self.infos = infos
     }
 
-    private var service: FeatureService { services[selected]! }
-    var transport: TransportInfo { infos[selected]! }
-    var orderedInfos: [TransportInfo] { TransportKind.allCases.compactMap { infos[$0] } }
+    private var service: FeatureService { services[selected] }
+    var transport: TransportInfo { infos[selected] }
+    var orderedInfos: [TransportInfo] { TransportKind.allCases.map { infos[$0] } }
 
     /// Descriptors grouped into ordered (version, items) sections, after the optional failed filter.
     var grouped: [(String, [FeatureDescriptor])] {
@@ -57,7 +57,7 @@ final class FeaturesViewModel: ObservableObject {
             descriptors = try await service.descriptors()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Loading the \(selected.displayName) catalog failed: \(error.localizedDescription)"
         }
     }
 
@@ -69,7 +69,7 @@ final class FeaturesViewModel: ObservableObject {
             runCounts[id, default: 0] += 1
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Running ‘\(id)’ over \(selected.displayName) failed: \(error.localizedDescription)"
         }
     }
 
@@ -77,21 +77,6 @@ final class FeaturesViewModel: ObservableObject {
         for descriptor in descriptors {
             await run(descriptor.id)
         }
-    }
-
-    /// Fires the no-op `ping` feature `count` times over the active transport and returns each call's
-    /// client-side round-trip in milliseconds — i.e. the pure transport overhead, since the engine work
-    /// is trivial. Used by the Latency histogram.
-    func pingLatencies(count: Int) async -> [Double] {
-        var samples: [Double] = []
-        samples.reserveCapacity(count)
-        for _ in 0..<count {
-            let start = DispatchTime.now().uptimeNanoseconds
-            _ = try? await service.run("ping")
-            let elapsed = DispatchTime.now().uptimeNanoseconds - start
-            samples.append(Double(elapsed) / 1_000_000)
-        }
-        return samples
     }
 
     var ranCount: Int { results.count }

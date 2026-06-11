@@ -10,18 +10,18 @@ final class ComparisonViewModel: ObservableObject {
     @Published var running = false
     @Published var errorMessage: String?
 
-    private let services: [TransportKind: FeatureService]
+    private let services: TransportMap<FeatureService>
 
-    init(services: [TransportKind: FeatureService]) {
+    init(services: TransportMap<FeatureService>) {
         self.services = services
     }
 
     func loadDescriptorsIfNeeded() async {
-        guard descriptors.isEmpty, let ffi = services[.ffi] else { return }
+        guard descriptors.isEmpty else { return }
         do {
-            descriptors = try await ffi.descriptors()
+            descriptors = try await services.ffi.descriptors()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Loading the catalog over FFI failed: \(error.localizedDescription)"
         }
     }
 
@@ -30,13 +30,22 @@ final class ComparisonViewModel: ObservableObject {
         defer { running = false }
         await loadDescriptorsIfNeeded()
         timings = [:]
+        var failed: [String] = []
         for descriptor in descriptors {
             for kind in TransportKind.allCases {
-                guard let service = services[kind] else { continue }
-                let ms = await Self.measureMs { _ = try? await service.run(descriptor.id) }
-                timings[descriptor.id, default: [:]][kind] = ms
+                let service = services[kind]
+                var callFailed = false
+                let ms = await Self.measureMs {
+                    do { _ = try await service.run(descriptor.id) } catch { callFailed = true }
+                }
+                if callFailed {
+                    failed.append("\(descriptor.id) (\(kind.displayName))")
+                } else {
+                    timings[descriptor.id, default: [:]][kind] = ms
+                }
             }
         }
+        errorMessage = failed.isEmpty ? nil : "Skipped failed runs: \(failed.joined(separator: ", "))"
     }
 
     /// Total round-trip ms per transport across all measured features.

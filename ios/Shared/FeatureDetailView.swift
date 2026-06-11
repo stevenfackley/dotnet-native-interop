@@ -14,26 +14,28 @@ struct FeatureDetailView: View {
         List {
             Section("Overview") {
                 LabeledContent("Feature") {
-                    Text(descriptor.id).font(.callout.monospaced()).foregroundStyle(.secondary)
+                    Text(descriptor.id).font(.callout.monospaced()).foregroundStyle(Instrument.textSecondary)
                 }
                 LabeledContent("Version") { VersionBadge(version: descriptor.version) }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Code").font(.caption).foregroundStyle(.secondary)
+                    Text("Code").font(.caption).foregroundStyle(Instrument.textSecondary)
                     CodeBlock(code: descriptor.code)
                 }
                 if isVisual {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Preview (every pixel computed in .NET)")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(Instrument.textSecondary)
                         FractalImageView(payload: descriptor.expected)
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Expected").font(.caption).foregroundStyle(.secondary)
+                        Text("Expected").font(.caption).foregroundStyle(Instrument.textSecondary)
                         Text(descriptor.expected).font(.callout.monospaced()).textSelection(.enabled)
                     }
                 }
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
 
             Section {
                 Button {
@@ -47,6 +49,8 @@ struct FeatureDetailView: View {
                 }
                 .disabled(isRunning)
             }
+            .listRowBackground(Instrument.bg1)
+            .listRowSeparatorTint(Instrument.hairline)
 
             if let result {
                 Section("Result") {
@@ -64,11 +68,11 @@ struct FeatureDetailView: View {
                         Text("\(viewModel.runCounts[descriptor.id] ?? 1)")
                             .monospacedDigit()
                             .contentTransition(.numericText())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Instrument.textSecondary)
                             .animation(.snappy, value: viewModel.runCounts[descriptor.id])
                     }
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Output").font(.caption).foregroundStyle(.secondary)
+                        Text("Output").font(.caption).foregroundStyle(Instrument.textSecondary)
                         if isVisual {
                             FractalImageView(payload: result.result)
                         } else {
@@ -77,26 +81,31 @@ struct FeatureDetailView: View {
                     }
                     if !result.ok {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Expected").font(.caption).foregroundStyle(.secondary)
+                            Text("Expected").font(.caption).foregroundStyle(Instrument.textSecondary)
                             if isVisual {
                                 FractalImageView(payload: descriptor.expected)
                             } else {
                                 Text(descriptor.expected)
                                     .font(.callout.monospaced())
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Instrument.textSecondary)
                             }
                         }
                     }
                 }
+                .listRowBackground(Instrument.bg1)
+                .listRowSeparatorTint(Instrument.hairline)
             }
 
             if let errorMessage = viewModel.errorMessage {
-                Section("Error") {
-                    Text(errorMessage).foregroundStyle(.red).textSelection(.enabled)
+                Section {
+                    ErrorBanner(message: errorMessage, retry: { Task { await viewModel.run(descriptor.id) } })
                 }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             }
         }
         .navigationTitle(descriptor.title)
         .navigationBarTitleDisplayMode(.inline)
+        .instrumentScreen()
     }
 }

@@ -15,19 +15,18 @@ final class RagViewModel: ObservableObject {
     @Published var appleUnavailable: String? = AppleRagService.availabilityMessage()
 
     private let search: SemanticSearchService
-    private let engineServices: [TransportKind: EngineRagService]
+    private let engineServices: TransportMap<EngineRagService>
     private let apple = AppleRagService()
     private var engineTask: Task<Void, Never>?
     private var appleTask: Task<Void, Never>?
 
-    init(search: SemanticSearchService, engineServices: [TransportKind: EngineRagService]) {
+    init(search: SemanticSearchService, engineServices: TransportMap<EngineRagService>) {
         self.search = search
         self.engineServices = engineServices
     }
 
     func ask() async {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return }
+        guard let q = QueryInput.sanitize(query) else { return }
 
         cancel()
         errorMessage = nil
@@ -40,28 +39,28 @@ final class RagViewModel: ObservableObject {
         do {
             sources = try await search.search(q, corpus: "manuals")
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Retrieving sources failed: \(error.localizedDescription)"
             return
         }
 
         // 2) Engine pane over the selected transport (appends deltas).
-        if let service = engineServices[transport] {
-            engineRunning = true
-            let start = Date()
-            engineTask = Task { @MainActor in
-                do {
-                    for try await delta in service.answer(to: q) {
-                        if engineFirstTokenMs == nil {
-                            engineFirstTokenMs = Date().timeIntervalSince(start) * 1000
-                        }
-                        engineAnswer += delta
+        let service = engineServices[transport]
+        let kind = transport
+        engineRunning = true
+        let start = Date()
+        engineTask = Task { @MainActor in
+            do {
+                for try await delta in service.answer(to: q) {
+                    if engineFirstTokenMs == nil {
+                        engineFirstTokenMs = Date().timeIntervalSince(start) * 1000
                     }
-                } catch {
-                    errorMessage = error.localizedDescription
+                    engineAnswer += delta
                 }
-                engineTotalMs = Date().timeIntervalSince(start) * 1000
-                engineRunning = false
+            } catch {
+                errorMessage = "Engine answer over \(kind.displayName) failed: \(error.localizedDescription)"
             }
+            engineTotalMs = Date().timeIntervalSince(start) * 1000
+            engineRunning = false
         }
 
         // 3) Apple pane over the SAME sources (replaces with cumulative snapshots).
