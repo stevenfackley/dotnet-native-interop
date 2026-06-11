@@ -31,7 +31,7 @@ ssh steve@steve-mac-mini "zsh -lc '
 |------|-------|
 | SSH host | `steve-mac-mini` → **user `steve`** (the alias forces it). **Build as `steve`, not `clawagent`.** |
 | Why not clawagent | `clawagent`'s `~/.local/share/NuGet/http-cache` is **root-owned** → restore fails, and `TreatWarningsAsErrors` promotes the resulting `NU1900` to a hard error. Signing certs also live in **steve's** keychain. `clawagent` also has no passwordless sudo. |
-| Project on Mac | `/Users/steve/dotnet-ios-android-poc-native-frontend` (owned by `steve`) |
+| Project on Mac | **`/Users/steve/dni-rag-build`** — the live build tree (verified 2026-06-10: has `dni.xcframework` + `onnxruntime.xcframework`, `ios/Tests`, `ios/ScreenshotTests`, EVS assets). ⚠️ `/Users/steve/dotnet-ios-android-poc-native-frontend` is a **stale pre-rename snapshot** (`OnDeviceLlm.*`, old framework) — do NOT build there; xcodegen fails on missing dirs. The other `dni-*-build` dirs are older per-feature snapshots. |
 | Xcode | 26.5.1 (Swift 6, iOS deploy target 17.0) |
 | `dotnet` | `/usr/local/share/dotnet/dotnet` — **only on the login PATH**, so wrap remote cmds in `zsh -lc '…'` |
 | Workloads | `maui` / `maui-ios` / `maui-android` (SDK 10.0.300) |
