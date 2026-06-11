@@ -167,6 +167,8 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.foundation)
+    // Per-tab navigation icons (BOM-managed; R8 strips unused glyphs in release).
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.activity.compose)
     debugImplementation(libs.compose.ui.tooling)
 

@@ -42,7 +42,6 @@ public object Spacing {
     public val m: Dp = 12.dp
     public val l: Dp = 16.dp
     public val xl: Dp = 24.dp
-    public val xxl: Dp = 32.dp
 }
 
 public object Radii {
@@ -58,14 +57,21 @@ private val InstrumentDarkScheme = darkColorScheme(
     onPrimaryContainer = Color(0xFFBDEDF6),
     secondary = Instrument.textSecondary,
     onSecondary = Instrument.bg0,
+    // Selection pills (nav rail indicator, chips) — accent-tinted, NOT the M3 default purple.
+    secondaryContainer = Color(0xFF11343C),
+    onSecondaryContainer = Color(0xFFBDEDF6),
     tertiary = Instrument.ok,
     onTertiary = Instrument.bg0,
     background = Instrument.bg0,
     onBackground = Instrument.textPrimary,
     surface = Instrument.bg1,
     onSurface = Instrument.textPrimary,
+    // Kill tonal-elevation tinting: elevated surfaces must stay flat graphite, not glow cyan.
+    surfaceTint = Instrument.bg1,
     surfaceVariant = Instrument.bg2,
     onSurfaceVariant = Instrument.textSecondary,
+    surfaceContainerLowest = Instrument.bg0,
+    surfaceContainerLow = Instrument.bg1,
     surfaceContainer = Instrument.bg1,
     surfaceContainerHigh = Instrument.bg2,
     surfaceContainerHighest = Instrument.bg2,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +24,7 @@ import io.dotnetnativeinterop.ui.components.ErrorBanner
 import io.dotnetnativeinterop.ui.components.InstrumentCard
 import io.dotnetnativeinterop.ui.components.PanelHeader
 import io.dotnetnativeinterop.ui.components.StatCell
+import io.dotnetnativeinterop.ui.components.TransportDot
 import io.dotnetnativeinterop.ui.components.TransportPicker
 
 @Composable
@@ -38,17 +40,34 @@ internal fun DashboardScreen(
             .padding(Spacing.l),
         verticalArrangement = Arrangement.spacedBy(Spacing.l),
     ) {
-        TransportPicker(
-            selected = s.transport,
-            onSelect = vm::selectTransport,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        InstrumentCard {
+            PanelHeader("Transport")
+            TransportPicker(
+                selected = s.transport,
+                onSelect = vm::selectTransport,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+            ) {
+                TransportDot(s.transport)
+                Text(
+                    s.transport.mechanism,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Instrument.textSecondary,
+                )
+            }
+        }
 
-        Button(
-            onClick = { vm.runAll() },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Run all")
+        InstrumentCard {
+            PanelHeader("Run")
+            Button(
+                onClick = { vm.runAll() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Run all")
+            }
         }
 
         InstrumentCard {
