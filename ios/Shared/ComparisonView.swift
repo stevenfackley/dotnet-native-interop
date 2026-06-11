@@ -31,7 +31,7 @@ struct ComparisonView: View {
                             TimingBar(label: kind.displayName,
                                       ms: model.totals[kind],
                                       maxMs: model.maxTotal,
-                                      color: Self.color(kind))
+                                      color: Instrument.transport(kind))
                         }
                     }
                 }
@@ -44,7 +44,7 @@ struct ComparisonView: View {
                                 TimingBar(label: kind.displayName,
                                           ms: model.timings[descriptor.id]?[kind],
                                           maxMs: model.maxForFeature(descriptor.id),
-                                          color: Self.color(kind))
+                                          color: Instrument.transport(kind))
                             }
                         }
                         .padding(.vertical, 2)
@@ -52,19 +52,15 @@ struct ComparisonView: View {
                 }
 
                 if let errorMessage = model.errorMessage {
-                    Section("Error") { Text(errorMessage).foregroundStyle(.red) }
+                    Section {
+                        ErrorBanner(message: errorMessage) {
+                            Task { await model.runComparison() }
+                        }
+                    }
                 }
             }
             .navigationTitle("Compare")
             .task { await model.loadDescriptorsIfNeeded() }
-        }
-    }
-
-    static func color(_ kind: TransportKind) -> Color {
-        switch kind {
-        case .ffi:    return .green
-        case .http:   return .orange
-        case .sqlite: return .red
         }
     }
 }
@@ -80,17 +76,20 @@ struct TimingBar: View {
         HStack(spacing: 8) {
             Text(label)
                 .font(.caption.monospaced())
+                .foregroundStyle(Instrument.textSecondary)
                 .frame(width: 52, alignment: .leading)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.quaternary)
+                    Capsule().fill(Instrument.bg2)
                     Capsule().fill(color).frame(width: barWidth(geo.size.width))
+                        .animation(.spring(duration: 0.45), value: ms)
                 }
             }
             .frame(height: 14)
             Text(ms.map { String(format: "%.2f", $0) } ?? "—")
                 .font(.caption2.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Instrument.textSecondary)
+                .contentTransition(.numericText())
                 .frame(width: 62, alignment: .trailing)
         }
     }

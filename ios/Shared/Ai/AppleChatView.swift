@@ -16,13 +16,15 @@ struct AppleChatView: View {
             Section {
                 Text("Apple's on-device model (Foundation Models), shown for contrast — this one is driven "
                      + "from Swift, not the .NET engine.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
+            .instrumentRow()
             if let reason = unavailableReason {
                 Section {
                     ContentUnavailableView("Apple Intelligence unavailable", systemImage: "sparkles.slash",
                                            description: Text(reason))
                 }
+                .instrumentRow()
             } else {
                 Section {
                     HStack {
@@ -36,11 +38,14 @@ struct AppleChatView: View {
                         .disabled(thinking || prompt.isEmpty)
                     }
                 }
+                .instrumentRow()
                 if !answer.isEmpty {
                     Section("Response") { Text(answer) }
+                        .instrumentRow()
                 }
             }
         }
+        .instrumentScreen()
         .navigationTitle("Apple chat")
         .task { checkAvailability() }
     }

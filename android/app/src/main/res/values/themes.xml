@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        Theme.DotnetNativeInterop — a minimal Material3 base theme.
-        Compose handles actual theming; this XML theme only satisfies the
-        android:theme attribute required by the Activity window before
-        Compose renders.
+        Theme.DotnetNativeInterop — minimal dark window theme. Compose handles real theming;
+        this only styles the Activity window BEFORE Compose's first frame (cold-start flash)
+        and must match the Instrument bg0 (#0B0E11) of the dark-only design system.
     -->
-    <style name="Theme.DotnetNativeInterop" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.DotnetNativeInterop" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0B0E11</item>
+    </style>
 </resources>

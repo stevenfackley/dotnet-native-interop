@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.dotnetnativeinterop.AssetExtractor
 import io.dotnetnativeinterop.model.EdgeHit
+import io.dotnetnativeinterop.model.QueryInput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +37,9 @@ public class EvsViewModel(app: Application) : AndroidViewModel(app) {
                 .onSuccess { (codes, tools) ->
                     _state.update { it.copy(availableErrorCodes = codes, availableTools = tools) }
                 }
-                .onFailure { e -> _state.update { it.copy(error = e.message) } }
+                .onFailure { e ->
+                    _state.update { it.copy(error = "Loading the search engine failed: ${e.message}") }
+                }
         }
     }
 
@@ -48,12 +51,14 @@ public class EvsViewModel(app: Application) : AndroidViewModel(app) {
 
     public fun search() {
         val s = _state.value
-        if (s.query.isBlank()) return
+        val q = QueryInput.sanitize(s.query) ?: return
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            runCatching { engine.search(s.query, errorCodes = s.activeErrorCodes, tools = s.activeTools) }
+            runCatching { engine.search(q, errorCodes = s.activeErrorCodes, tools = s.activeTools) }
                 .onSuccess { r -> _state.update { it.copy(results = r, loading = false) } }
-                .onFailure { e -> _state.update { it.copy(loading = false, error = e.message) } }
+                .onFailure { e ->
+                    _state.update { it.copy(loading = false, error = "Edge search failed: ${e.message}") }
+                }
         }
     }
 

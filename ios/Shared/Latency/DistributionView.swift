@@ -7,9 +7,11 @@ import SwiftUI
 struct DistributionView: View {
     @ObservedObject var model: LatencyViewModel
 
-    @State private var samples: [Double] = []
+    @State private var series = LatencyViewModel.Series()
     @State private var running = false
     private let sampleCount = 300
+
+    private var samples: [Double] { series.samples }
 
     var body: some View {
         List {
@@ -27,33 +29,53 @@ struct DistributionView: View {
                 .disabled(running)
                 Text("Each call round-trips a no-op `ping` over \(model.transport.displayName) — the "
                      + "histogram is pure transport cost.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
+            .instrumentRow()
 
             if samples.isEmpty {
                 Section {
-                    ContentUnavailableView("No samples yet", systemImage: "chart.bar",
-                                           description: Text("Tap Measure to fire \(sampleCount) pings."))
+                    if series.failures > 0 {
+                        ErrorBanner(message: "All \(series.failures) pings failed over "
+                                    + "\(model.transport.displayName) — no samples to chart.") {
+                            Task { await measure() }
+                        }
+                        .listRowInsets(EdgeInsets())
+                    } else {
+                        ContentUnavailableView("No samples yet", systemImage: "chart.bar",
+                                               description: Text("Tap Measure to fire \(sampleCount) pings."))
+                    }
                 }
+                .listRowBackground(Color.clear)
             } else {
-                Section("Distribution — \(samples.count) calls") {
+                Section(distributionTitle) {
                     Chart(bins) { bin in
                         BarMark(x: .value("round-trip (ms)", bin.midpoint), y: .value("calls", bin.count))
-                            .foregroundStyle(ComparisonView.color(model.transport))
+                            .foregroundStyle(Instrument.transport(model.transport))
                     }
                     .chartXAxisLabel("round-trip (ms)")
                     .chartYAxisLabel("calls")
                     .frame(height: 220)
                 }
+                .instrumentRow()
                 Section("Stats (ms)") {
-                    LabeledContent("min") { mono(samples.min() ?? 0) }
-                    LabeledContent("median") { mono(LatencyStats.percentile(samples.sorted(), 0.5)) }
-                    LabeledContent("p95") { mono(LatencyStats.percentile(samples.sorted(), 0.95)) }
-                    LabeledContent("max") { mono(samples.max() ?? 0) }
+                    let sorted = samples.sorted()
+                    LabeledContent("min") { mono(sorted.first ?? 0) }
+                    LabeledContent("median") { mono(LatencyStats.percentile(sorted, 0.5)) }
+                    LabeledContent("p95") { mono(LatencyStats.percentile(sorted, 0.95)) }
+                    LabeledContent("max") { mono(sorted.last ?? 0) }
                 }
+                .instrumentRow()
             }
         }
+        .instrumentScreen()
         .navigationTitle("Distribution")
+    }
+
+    private var distributionTitle: String {
+        series.failures > 0
+            ? "Distribution — \(samples.count)/\(sampleCount) calls · \(series.failures) failed"
+            : "Distribution — \(samples.count) calls"
     }
 
     private func mono(_ value: Double) -> some View {
@@ -64,7 +86,7 @@ struct DistributionView: View {
     private func measure() async {
         running = true
         defer { running = false }
-        samples = await model.pingSeries(count: sampleCount, on: model.transport)
+        series = await model.pingSeries(count: sampleCount, on: model.transport)
     }
 
     private var bins: [LatencyBin] { LatencyBin.make(from: samples, bucketCount: 24) }

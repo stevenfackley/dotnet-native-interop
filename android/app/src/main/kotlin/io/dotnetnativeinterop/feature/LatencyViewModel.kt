@@ -41,17 +41,30 @@ public class LatencyViewModel(
     public fun sample(count: Int = 30) {
         viewModelScope.launch {
             _state.update { it.copy(sampling = true, samplesMs = emptyList(), error = null) }
-            val ids = runCatching { service.descriptors().firstOrNull()?.id }.getOrNull()
-            if (ids == null) { _state.update { it.copy(sampling = false, error = "no features") }; return@launch }
+            val id = runCatching { service.descriptors().firstOrNull()?.id }.getOrNull()
+            if (id == null) { _state.update { it.copy(sampling = false, error = "no features") }; return@launch }
             val out = mutableListOf<Double>()
-            runCatching {
-                repeat(count) {
-                    val start = System.nanoTime()
-                    service.run(ids)
-                    out.add((System.nanoTime() - start) / 1_000_000.0)
+            var failed = 0
+            // Failure policy (user decision 2026-06-10, mirrored from the iOS LatencyViewModel):
+            // skip + disclose — a failed call never produces a sample, but is always shown.
+            // A dead transport would burn `count` sequential timeouts, so if the first few calls
+            // ALL fail, stop early and disclose.
+            for (i in 0 until count) {
+                val start = System.nanoTime()
+                runCatching { service.run(id) }
+                    .onSuccess { out.add((System.nanoTime() - start) / 1_000_000.0) }
+                    .onFailure { failed++ }
+                if (out.isEmpty() && failed >= 5) {
+                    failed = count
+                    break
                 }
-            }.onSuccess { _state.update { it.copy(sampling = false, samplesMs = out) } }
-             .onFailure { e -> _state.update { it.copy(sampling = false, samplesMs = out, error = e.message) } }
+            }
+            _state.update {
+                it.copy(
+                    sampling = false, samplesMs = out,
+                    error = if (failed > 0) "$failed of $count calls failed and are excluded" else null,
+                )
+            }
         }
     }
 }

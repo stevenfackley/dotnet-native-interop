@@ -8,23 +8,19 @@ struct DotnetNativeInteropUnifiedApp: App {
     @StateObject private var latency: LatencyViewModel
     private let telemetry = TelemetryService()
     private let search = SemanticSearchService()
-    private let engineRagServices: [TransportKind: EngineRagService] = [
-        .ffi: FFIRagService(),
-        .http: HTTPRagService(),
-        .sqlite: SQLiteRagService(),
-    ]
+    private let engineRagServices = TransportMap<EngineRagService>(
+        ffi: FFIRagService(),
+        http: HTTPRagService(),
+        sqlite: SQLiteRagService()
+    )
 
     init() {
-        let services: [TransportKind: FeatureService] = [
-            .ffi: FFIFeatureService(),
-            .http: HTTPFeatureService(),
-            .sqlite: SQLiteFeatureService(),
-        ]
-        let infos: [TransportKind: TransportInfo] = [
-            .ffi: .ffi,
-            .http: .http,
-            .sqlite: .sqlite,
-        ]
+        let services = TransportMap<FeatureService>(
+            ffi: FFIFeatureService(),
+            http: HTTPFeatureService(),
+            sqlite: SQLiteFeatureService()
+        )
+        let infos = TransportMap<TransportInfo>(ffi: .ffi, http: .http, sqlite: .sqlite)
         _features = StateObject(wrappedValue: FeaturesViewModel(services: services, infos: infos))
         _comparison = StateObject(wrappedValue: ComparisonViewModel(services: services))
         _lab = StateObject(wrappedValue: LabViewModel(services: services))

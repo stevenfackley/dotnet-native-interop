@@ -10,22 +10,29 @@ struct FeaturesView: View {
         NavigationStack {
             List {
                 Section { TransportPicker(viewModel: viewModel) }
+                    .instrumentRow()
 
                 if viewModel.isLoading && viewModel.descriptors.isEmpty {
                     Section {
                         HStack(spacing: 8) { ProgressView(); Text("Loading features…") }
                     }
+                    .instrumentRow()
                 } else if viewModel.descriptors.isEmpty {
                     Section {
                         Text(viewModel.errorMessage ?? "No features. Tap Refresh.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Instrument.textSecondary)
                     }
+                    .instrumentRow()
                 } else {
                     groups
                 }
 
                 if let errorMessage = viewModel.errorMessage, !viewModel.descriptors.isEmpty {
-                    Section("Error") { Text(errorMessage).foregroundStyle(.red) }
+                    Section {
+                        ErrorBanner(message: errorMessage, retry: { Task { await viewModel.load() } })
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
             }
             .navigationTitle("Features · \(viewModel.selected.displayName)")
@@ -44,6 +51,7 @@ struct FeaturesView: View {
                 }
             }
             .task { if viewModel.descriptors.isEmpty { await viewModel.load() } }
+            .instrumentScreen()
         }
     }
 
@@ -67,12 +75,13 @@ struct FeaturesView: View {
                     Spacer()
                     Text("\(items.count)")
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Instrument.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(.quaternary, in: Capsule())
                 }
             }
+            .instrumentRow()
         }
     }
 
@@ -100,7 +109,7 @@ struct FeatureRow: View {
                 Text(descriptor.title).font(.body)
                 Text(descriptor.id)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Instrument.textSecondary)
                     .monospaced()
             }
             Spacer()
@@ -109,7 +118,7 @@ struct FeatureRow: View {
             } else if let result {
                 Text(String(format: "%.2f ms", result.elapsedMs))
                     .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Instrument.textTertiary)
             }
         }
         .padding(.vertical, 2)

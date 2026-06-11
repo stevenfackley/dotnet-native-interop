@@ -34,10 +34,10 @@ enum RunStatus {
 
     var color: Color {
         switch self {
-        case .idle:    return .secondary
-        case .running: return .blue
-        case .ok:      return .green
-        case .failed:  return .red
+        case .idle:    return Instrument.textTertiary
+        case .running: return Instrument.accent
+        case .ok:      return Instrument.ok
+        case .failed:  return Instrument.fail
         }
     }
 }

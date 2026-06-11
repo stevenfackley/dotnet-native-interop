@@ -2,23 +2,24 @@ package io.dotnetnativeinterop.ui.tabs
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import io.dotnetnativeinterop.ui.Instrument
 import io.dotnetnativeinterop.ui.PatternInfo
 import io.dotnetnativeinterop.ui.PatternsJson
+import io.dotnetnativeinterop.ui.Spacing
+import io.dotnetnativeinterop.ui.components.InstrumentCard
+import io.dotnetnativeinterop.ui.components.PanelHeader
 import kotlinx.serialization.json.Json
 
 private val patternsJson = Json { ignoreUnknownKeys = true }
@@ -38,8 +39,8 @@ internal fun AboutScreen(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(Spacing.l),
+        verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
         Text(
             text = "About this demo",
@@ -52,56 +53,54 @@ internal fun AboutScreen(
                 "The same C#/.NET payload runs natively on-device; the transports differ only " +
                 "in how bytes cross the managed↔native boundary.",
             style = MaterialTheme.typography.bodyMedium,
+            color = Instrument.textSecondary,
         )
 
         if (patterns.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Transports",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            patterns.forEach { pattern ->
-                PatternCard(pattern = pattern)
+            InstrumentCard {
+                PanelHeader("Transports")
+                patterns.forEach { pattern ->
+                    PatternCard(pattern = pattern)
+                }
             }
         }
     }
 }
 
+private fun transportColorForString(transport: String): Color = when {
+    transport.contains("ffi", ignoreCase = true) -> Instrument.transportFfi
+    transport.contains("http", ignoreCase = true) -> Instrument.transportHttp
+    transport.contains("sqlite", ignoreCase = true) || transport.contains("sql", ignoreCase = true) -> Instrument.transportSqlite
+    else -> Instrument.textSecondary
+}
+
 @Composable
 private fun PatternCard(pattern: PatternInfo) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+    InstrumentCard {
+        PanelHeader(pattern.name)
+        Text(
+            text = pattern.transport,
+            style = MaterialTheme.typography.labelSmall,
+            color = transportColorForString(pattern.transport),
+        )
+        Text(
+            text = pattern.summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = Instrument.textSecondary,
+        )
+        if (pattern.limitations.isNotEmpty()) {
+            HorizontalDivider(color = Instrument.hairline)
             Text(
-                text = pattern.name,
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = pattern.transport,
+                text = "Limitations",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = Instrument.textTertiary,
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = pattern.summary,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (pattern.limitations.isNotEmpty()) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+            pattern.limitations.forEach { lim ->
                 Text(
-                    text = "Limitations",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = "• $lim",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Instrument.textSecondary,
                 )
-                pattern.limitations.forEach { lim ->
-                    Text(
-                        text = "• $lim",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
     }

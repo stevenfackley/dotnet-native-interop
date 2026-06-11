@@ -10,18 +10,18 @@ final class ComparisonViewModel: ObservableObject {
     @Published var running = false
     @Published var errorMessage: String?
 
-    private let services: [TransportKind: FeatureService]
+    private let services: TransportMap<FeatureService>
 
-    init(services: [TransportKind: FeatureService]) {
+    init(services: TransportMap<FeatureService>) {
         self.services = services
     }
 
     func loadDescriptorsIfNeeded() async {
-        guard descriptors.isEmpty, let ffi = services[.ffi] else { return }
+        guard descriptors.isEmpty else { return }
         do {
-            descriptors = try await ffi.descriptors()
+            descriptors = try await services.ffi.descriptors()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Loading the catalog over FFI failed: \(error.localizedDescription)"
         }
     }
 
@@ -29,20 +29,35 @@ final class ComparisonViewModel: ObservableObject {
         running = true
         defer { running = false }
         await loadDescriptorsIfNeeded()
-        timings = [:]
+        guard !descriptors.isEmpty else { return }   // keep the load error visible; nothing to run
+        var collected: [String: [TransportKind: Double]] = [:]
+        var failed: [String] = []
         for descriptor in descriptors {
             for kind in TransportKind.allCases {
-                guard let service = services[kind] else { continue }
-                let ms = await Self.measureMs { _ = try? await service.run(descriptor.id) }
-                timings[descriptor.id, default: [:]][kind] = ms
+                let service = services[kind]
+                var callFailed = false
+                let ms = await Self.measureMs {
+                    do { _ = try await service.run(descriptor.id) } catch { callFailed = true }
+                }
+                if callFailed {
+                    failed.append("\(descriptor.id) (\(kind.displayName))")
+                } else {
+                    collected[descriptor.id, default: [:]][kind] = ms
+                }
             }
         }
+        timings = collected
+        errorMessage = failed.isEmpty
+            ? nil
+            : "Skipped failed runs (excluded from totals): \(failed.joined(separator: ", "))"
     }
 
-    /// Total round-trip ms per transport across all measured features.
+    /// Total round-trip ms per transport — summed ONLY over features measured on every transport,
+    /// so the bars always compare the same feature set (a flaky transport must not look fast by
+    /// skipping its slow features).
     var totals: [TransportKind: Double] {
         var out: [TransportKind: Double] = [:]
-        for perFeature in timings.values {
+        for perFeature in timings.values where perFeature.count == TransportKind.allCases.count {
             for (kind, ms) in perFeature {
                 out[kind, default: 0] += ms
             }

@@ -40,8 +40,7 @@ final class EdgeSearchViewModel: ObservableObject {
 
     func run() async {
         guard let engine else { return }
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { hits = []; return }
+        guard let q = QueryInput.sanitize(query) else { hits = []; return }
         searching = true
         defer { searching = false }
         do {
@@ -52,7 +51,7 @@ final class EdgeSearchViewModel: ObservableObject {
             }
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Edge search failed: \(error.localizedDescription)"
         }
     }
 }

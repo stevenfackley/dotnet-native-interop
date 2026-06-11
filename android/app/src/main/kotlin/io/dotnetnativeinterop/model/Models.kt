@@ -39,9 +39,10 @@ public data class EngineStats(
 /** Per-feature UI state. */
 public enum class RunStatus { Idle, Running, Ok, Failed }
 
-/** The three interop transports the catalog can be reached through. */
-public enum class TransportKind(public val displayName: String) {
-    Ffi("FFI"),
-    Http("HTTP"),
-    Sqlite("SQLCipher"),
+/** The three interop transports the catalog can be reached through. Mechanism one-liners mirror
+ *  the iOS TransportInfo strings. */
+public enum class TransportKind(public val displayName: String, public val mechanism: String) {
+    Ffi("FFI", "In-process C ABI — structured JSON over UnmanagedCallersOnly exports."),
+    Http("HTTP", "Raw System.Net.Sockets server on 127.0.0.1 — REST + JSON over the loopback."),
+    Sqlite("SQLCipher", "Encrypted on-disk SQLite (SQLCipher, PRAGMA key) — data round-trips through ciphertext."),
 }

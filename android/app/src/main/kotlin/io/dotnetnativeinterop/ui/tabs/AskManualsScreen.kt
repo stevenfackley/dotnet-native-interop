@@ -10,23 +10,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontFamily
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.ai.RagViewModel
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
+import io.dotnetnativeinterop.ui.components.ErrorBanner
+import io.dotnetnativeinterop.ui.components.InstrumentCard
+import io.dotnetnativeinterop.ui.components.PanelHeader
 
 @Composable
 internal fun AskManualsScreen(vm: RagViewModel, modifier: Modifier = Modifier) {
     val s by vm.state.collectAsStateWithLifecycle()
 
-    Column(modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+    Column(modifier = modifier.verticalScroll(rememberScrollState()).padding(Spacing.l)) {
         OutlinedTextField(
             value = s.query,
             onValueChange = vm::setQuery,
@@ -34,55 +37,53 @@ internal fun AskManualsScreen(vm: RagViewModel, modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s))
 
         Button(onClick = { vm.ask() }) { Text("Ask") }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.m))
 
         if (s.sources.isNotEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Sources", style = MaterialTheme.typography.titleSmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    s.sources.forEach { src ->
-                        Text(
-                            "${"%.3f".format(src.score)}  ${src.text}",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+            InstrumentCard(modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs)) {
+                PanelHeader("Sources")
+                s.sources.forEach { src ->
+                    Text(
+                        "${"%.3f".format(src.score)}  ${src.text}",
+                        fontFamily = FontFamily.Monospace,
+                        color = Instrument.textSecondary,
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Spacing.s))
         }
 
-        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("Answer", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "grounded extraction (on-device generation is a future option)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(s.answer)
-                if (s.streaming) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    CircularProgressIndicator()
-                }
+        InstrumentCard(modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs)) {
+            PanelHeader("Answer")
+            Text(
+                "grounded extraction (on-device generation is a future option)",
+                color = Instrument.textTertiary,
+            )
+            Text(s.answer, color = Instrument.textPrimary)
+            if (s.streaming) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                CircularProgressIndicator()
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.s))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            s.firstTokenMs?.let { Text("first token $it ms", style = MaterialTheme.typography.labelSmall) }
-            s.totalMs?.let { Text("total $it ms", style = MaterialTheme.typography.labelSmall) }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+            s.firstTokenMs?.let {
+                Text("first token $it ms", fontFamily = FontFamily.Monospace, color = Instrument.textSecondary)
+            }
+            s.totalMs?.let {
+                Text("total $it ms", fontFamily = FontFamily.Monospace, color = Instrument.textSecondary)
+            }
         }
 
-        if (s.error != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(s.error!!, color = MaterialTheme.colorScheme.error)
+        s.error?.let {
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            ErrorBanner(it)
         }
     }
 }

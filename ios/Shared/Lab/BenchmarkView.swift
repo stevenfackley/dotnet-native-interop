@@ -47,27 +47,38 @@ struct BenchmarkDetailView: View {
                 LabTransportPicker(transport: $lab.transport)
                 Text("The benchmark executes inside the NativeAOT library and returns its series as JSON "
                      + "over the selected transport.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
+            .instrumentRow()
 
             if let payload {
                 Section(payload.title) { BenchmarkChart(series: payload.series) }
+                    .instrumentRow()
                 Section("Summary") {
                     ForEach(payload.summary) { stat in
                         LabeledContent(stat.label, value: stat.value)
                     }
                 }
+                .instrumentRow()
             } else if !running {
                 Section {
                     ContentUnavailableView("No run yet", systemImage: "chart.xyaxis.line",
                                            description: Text("Tap Run to execute the benchmark."))
                 }
+                .instrumentRow()
             }
 
             if let errorMessage {
-                Section("Error") { Text(errorMessage).foregroundStyle(.red) }
+                Section {
+                    ErrorBanner(message: errorMessage) {
+                        Task { await run() }
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             }
         }
+        .instrumentScreen()
         .navigationTitle(title)
     }
 
@@ -75,7 +86,8 @@ struct BenchmarkDetailView: View {
         running = true
         defer { running = false }
         guard let result = await lab.render(command) else {
-            errorMessage = "The native library returned no data."
+            // lab.lastError carries the command + transport context for this exact failure.
+            errorMessage = lab.lastError ?? "The native library returned no data."
             return
         }
         do {

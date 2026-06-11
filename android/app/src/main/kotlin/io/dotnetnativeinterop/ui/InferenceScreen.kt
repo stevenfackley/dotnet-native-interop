@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -36,6 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.dotnetnativeinterop.ui.components.InstrumentCard
+import io.dotnetnativeinterop.ui.components.PanelHeader
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
 
 @Composable
 public fun InferenceScreen(
@@ -53,8 +55,8 @@ public fun InferenceScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = Spacing.l, vertical = Spacing.m),
+            verticalArrangement = Arrangement.spacedBy(Spacing.m),
         ) {
             // Title
             Text(
@@ -87,7 +89,7 @@ public fun InferenceScreen(
             // Run / Stop
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             ) {
                 Button(
                     onClick = viewModel::startInference,
@@ -166,7 +168,7 @@ private fun TransportSelector(
 ) {
     Column {
         Text("Transport", style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
             TransportId.entries.forEach { transport ->
                 FilterChip(
                     selected = selected == transport,
@@ -193,29 +195,24 @@ private fun TokenStreamView(tokens: List<Token>, isRunning: Boolean) {
         }
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    ) {
+    InstrumentCard(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp)
-                .padding(12.dp),
+                .height(180.dp),
         ) {
             if (text.isEmpty() && !isRunning) {
                 Text(
                     "Token stream will appear here…",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    color = Instrument.textTertiary,
                 )
             } else {
                 Text(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
+                    color = Instrument.textPrimary,
                 )
             }
             if (isRunning) {
@@ -237,26 +234,16 @@ private fun TokenStreamView(tokens: List<Token>, isRunning: Boolean) {
 
 @Composable
 private fun MetricsRow(metrics: RunMetrics) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                "Run Metrics — ${metrics.transportId}",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                MetricCell(label = "TTFT", value = "${metrics.timeToFirstTokenMs} ms")
-                MetricCell(label = "tok/s", value = "%.1f".format(metrics.tokensPerSec))
-                MetricCell(label = "Total", value = "${metrics.totalTimeMs} ms")
-                MetricCell(label = "Tokens", value = "${metrics.tokenCount}")
-            }
+    InstrumentCard(modifier = Modifier.fillMaxWidth()) {
+        PanelHeader("Run Metrics — ${metrics.transportId}")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            MetricCell(label = "TTFT", value = "${metrics.timeToFirstTokenMs} ms")
+            MetricCell(label = "tok/s", value = "%.1f".format(metrics.tokensPerSec))
+            MetricCell(label = "Total", value = "${metrics.totalTimeMs} ms")
+            MetricCell(label = "Tokens", value = "${metrics.tokenCount}")
         }
     }
 }
@@ -264,9 +251,9 @@ private fun MetricsRow(metrics: RunMetrics) {
 @Composable
 private fun MetricCell(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.labelSmall,
-             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+             fontFamily = FontFamily.Monospace, color = Instrument.textPrimary)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Instrument.textTertiary)
     }
 }
 
@@ -276,60 +263,47 @@ private fun MetricCell(label: String, value: String) {
 
 @Composable
 public fun PatternInfoPanel(pattern: PatternInfo) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+    InstrumentCard(modifier = Modifier.fillMaxWidth()) {
+        PanelHeader(pattern.name)
 
-            // Header
-            Text(
-                text = pattern.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = pattern.transport,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+        // Header
+        Text(
+            text = pattern.transport,
+            style = MaterialTheme.typography.labelSmall,
+            color = Instrument.accent,
+        )
 
-            Spacer(modifier = Modifier.height(6.dp))
+        // Summary
+        Text(
+            text = pattern.summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = Instrument.textPrimary,
+        )
 
-            // Summary
-            Text(
-                text = pattern.summary,
-                style = MaterialTheme.typography.bodySmall,
-            )
+        Text(
+            text = "Best for: ${pattern.bestFor}",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = Instrument.textPrimary,
+        )
 
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Best for: ${pattern.bestFor}",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+        HorizontalDivider(color = Instrument.hairline)
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            // Features (checkmark prefix — contract requires ✓)
-            if (pattern.features.isNotEmpty()) {
-                Text("Features", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(4.dp))
-                pattern.features.forEach { feature ->
-                    BulletLine(prefix = "✓", text = feature, prefixColor = Color(0xFF2E7D32))
-                }
+        // Features (checkmark prefix — contract requires ✓)
+        if (pattern.features.isNotEmpty()) {
+            Text("Features", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                 color = Instrument.textSecondary)
+            pattern.features.forEach { feature ->
+                BulletLine(prefix = "✓", text = feature, prefixColor = Instrument.ok)
             }
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Limitations (warning prefix — contract requires ⚠)
-            if (pattern.limitations.isNotEmpty()) {
-                Text("Limitations", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(4.dp))
-                pattern.limitations.forEach { limitation ->
-                    BulletLine(prefix = "⚠", text = limitation, prefixColor = Color(0xFFE65100))
-                }
+        // Limitations (warning prefix — contract requires ⚠)
+        if (pattern.limitations.isNotEmpty()) {
+            Text("Limitations", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                 color = Instrument.textSecondary)
+            pattern.limitations.forEach { limitation ->
+                BulletLine(prefix = "⚠", text = limitation, prefixColor = Instrument.warn)
             }
         }
     }

@@ -3,25 +3,26 @@ package io.dotnetnativeinterop.ui.tabs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.feature.LatencyViewModel
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
+import io.dotnetnativeinterop.ui.components.ErrorBanner
+import io.dotnetnativeinterop.ui.components.InstrumentCard
+import io.dotnetnativeinterop.ui.components.PanelHeader
+import io.dotnetnativeinterop.ui.components.StatCell
 
 @Composable
 internal fun LatencyScreen(
@@ -35,33 +36,54 @@ internal fun LatencyScreen(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(Spacing.l),
+        verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
-        // Telemetry card
         s.stats?.let { stats ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+            InstrumentCard {
+                PanelHeader("Engine telemetry")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.l),
                 ) {
-                    Text("Engine telemetry", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Heap: ${"%.1f".format(stats.heapBytes / 1_048_576.0)} MB")
-                    Text("GC gen0 / gen1 / gen2: ${stats.gcGen0} / ${stats.gcGen1} / ${stats.gcGen2}")
-                    Text("Threads: ${stats.threadCount}  Processors: ${stats.processorCount}")
-                    Text("Uptime: ${"%.1f".format(stats.uptimeMs / 1000.0)} s")
+                    StatCell(
+                        label = "Heap",
+                        value = "${"%.1f".format(stats.heapBytes / 1_048_576.0)} MB",
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatCell(
+                        label = "Threads",
+                        value = "${stats.threadCount}",
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatCell(
+                        label = "CPUs",
+                        value = "${stats.processorCount}",
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatCell(
+                        label = "Uptime",
+                        value = "${"%.1f".format(stats.uptimeMs / 1000.0)} s",
+                        modifier = Modifier.weight(1f),
+                    )
                 }
+                StatCell(
+                    label = "GC gen0 / gen1 / gen2",
+                    value = "${stats.gcGen0} / ${stats.gcGen1} / ${stats.gcGen2}",
+                )
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
             Button(onClick = { vm.refreshStats() }) { Text("Refresh") }
             Button(onClick = { vm.sample() }) { Text("Sample latency") }
         }
 
         if (s.sampling) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                color = Instrument.accent,
+            )
         }
 
         if (s.samplesMs.isNotEmpty()) {
@@ -69,26 +91,33 @@ internal fun LatencyScreen(
             val min = xs.first()
             val max = xs.last()
             val median = xs[xs.size / 2]
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+            InstrumentCard {
+                PanelHeader("Latency samples (n=${xs.size})")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.l),
                 ) {
-                    Text("Latency samples (n=${xs.size})", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Min:    ${"%.2f ms".format(min)}")
-                    Text("Median: ${"%.2f ms".format(median)}")
-                    Text("Max:    ${"%.2f ms".format(max)}")
+                    StatCell(
+                        label = "Min",
+                        value = "%.2f ms".format(min),
+                        modifier = Modifier.weight(1f),
+                        tint = Instrument.ok,
+                    )
+                    StatCell(
+                        label = "Median",
+                        value = "%.2f ms".format(median),
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatCell(
+                        label = "Max",
+                        value = "%.2f ms".format(max),
+                        modifier = Modifier.weight(1f),
+                        tint = Instrument.warn,
+                    )
                 }
             }
         }
 
-        if (s.error != null) {
-            Text(
-                text = s.error!!,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+        s.error?.let { ErrorBanner(it) }
     }
 }

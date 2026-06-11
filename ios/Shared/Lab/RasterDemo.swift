@@ -34,6 +34,9 @@ extension RasterDemo {
                     frameMs = ms
                     fps = ms > 0 ? min(120.0, 1000 / ms) : 0
                     last = command
+                } else {
+                    // Failed render: back off instead of hammering a failing transport at full speed.
+                    try? await Task.sleep(nanoseconds: 250_000_000)
                 }
                 if animating { advance() }
             } else {
@@ -50,12 +53,20 @@ struct RasterCanvas: View {
     let frameMs: Double
     let dims: String
     let transport: String
+    var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Instrument.Space.m) {
             ZStack {
                 if let payload, let image = VisualFeature.image(from: payload) {
                     image.interpolation(.none).resizable().scaledToFit()
+                } else if let errorMessage {
+                    ContentUnavailableView {
+                        Label("Render failed", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(Instrument.fail)
+                    } description: {
+                        Text(errorMessage)
+                    }
                 } else {
                     ContentUnavailableView("Rendering…", systemImage: "cpu")
                 }
@@ -63,18 +74,29 @@ struct RasterCanvas: View {
             .frame(maxWidth: .infinity)
             .frame(height: 340)
             .background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Instrument.Radius.canvas))
+            .overlay(
+                RoundedRectangle(cornerRadius: Instrument.Radius.canvas)
+                    .strokeBorder(Instrument.hairline, lineWidth: 1)
+            )
 
             HStack {
                 Label(String(format: "%.1f fps", fps), systemImage: "speedometer")
+                    .foregroundStyle(Instrument.accent)
                 Spacer()
-                Text(String(format: "%.1f ms/frame", frameMs)).foregroundStyle(.secondary)
+                Text(String(format: "%.1f ms/frame", frameMs)).foregroundStyle(Instrument.textSecondary)
                 Spacer()
-                Text(dims).foregroundStyle(.secondary)
+                Text(dims).foregroundStyle(Instrument.textSecondary)
                 Spacer()
-                Text(transport).foregroundStyle(.secondary)
+                Text(transport).foregroundStyle(Instrument.textSecondary)
             }
             .font(.caption.monospacedDigit())
+
+            // Shown even while a stale frame is on screen — a failing transport must never
+            // masquerade as a merely frozen demo.
+            if let errorMessage {
+                ErrorBanner(message: errorMessage)
+            }
         }
     }
 }

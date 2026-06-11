@@ -18,9 +18,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import io.dotnetnativeinterop.lab.LabCommands
 import io.dotnetnativeinterop.lab.LabViewModel
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
 
 internal sealed interface LabRoute {
     data object List : LabRoute
@@ -54,8 +55,8 @@ private fun LabList(onOpen: (LabRoute) -> Unit, modifier: Modifier = Modifier) {
             Text(
                 "Visual — every pixel computed in C#",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                color = Instrument.accent,
+                modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.s),
             )
         }
         item {
@@ -76,8 +77,8 @@ private fun LabList(onOpen: (LabRoute) -> Unit, modifier: Modifier = Modifier) {
             Text(
                 "Benchmarks — NativeAOT throughput",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                color = Instrument.accent,
+                modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.s),
             )
         }
         item {

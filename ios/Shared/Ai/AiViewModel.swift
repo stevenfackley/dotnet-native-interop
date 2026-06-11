@@ -13,15 +13,14 @@ final class AiViewModel: ObservableObject {
     init(service: SemanticSearchService) { self.service = service }
 
     func run() async {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return }
+        guard let q = QueryInput.sanitize(query) else { return }
         searching = true
         defer { searching = false }
         do {
             results = try await service.search(q, corpus: corpus)
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Searching ‘\(corpus)’ failed: \(error.localizedDescription)"
         }
     }
 }

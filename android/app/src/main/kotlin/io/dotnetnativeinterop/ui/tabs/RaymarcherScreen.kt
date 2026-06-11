@@ -24,18 +24,23 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.lab.LabCommands
 import io.dotnetnativeinterop.lab.LabViewModel
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
+import io.dotnetnativeinterop.ui.components.InstrumentCard
+import io.dotnetnativeinterop.ui.components.PanelHeader
 import io.dotnetnativeinterop.ui.components.TransportPicker
 
 @Composable
 internal fun RaymarcherScreen(lab: LabViewModel, modifier: Modifier = Modifier) {
     val transport by lab.transport.collectAsStateWithLifecycle()
+    val lastError by lab.lastError.collectAsStateWithLifecycle()
     var angle by remember { mutableDoubleStateOf(0.0) }
     var spinning by remember { mutableStateOf(true) }
     val size = 220
 
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(Spacing.l),
+        verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
         RasterDemoHost(
             transportName = transport.displayName,
@@ -43,6 +48,7 @@ internal fun RaymarcherScreen(lab: LabViewModel, modifier: Modifier = Modifier) 
             currentCommand = { LabCommands.raymarch(angle, size) },
             advance = { angle += 0.03 },
             render = { lab.render(it) },
+            lastError = lastError,
             gestureModifier = Modifier.pointerInput(Unit) {
                 detectDragGestures { change, drag ->
                     change.consume()
@@ -51,16 +57,19 @@ internal fun RaymarcherScreen(lab: LabViewModel, modifier: Modifier = Modifier) 
                 }
             },
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Switch(checked = spinning, onCheckedChange = { spinning = it })
-            Text("Auto-rotate")
+        InstrumentCard {
+            PanelHeader("Controls")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                Switch(checked = spinning, onCheckedChange = { spinning = it })
+                Text("Auto-rotate")
+            }
         }
         TransportPicker(selected = transport, onSelect = lab::setTransport, modifier = Modifier.fillMaxWidth())
         Text(
             "A signed-distance-field raymarcher — sphere, ground plane, soft shadow — with every ray "
                 + "traced on the CPU in C#. No GPU, no shaders.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Instrument.textSecondary,
         )
     }
 }

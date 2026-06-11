@@ -32,6 +32,10 @@
     </dict>
     <key>UILaunchScreen</key>
     <dict/>
+    <!-- Dark-only design system: forces the whole process (launch screen, system sheets) dark,
+         not just the SwiftUI tree. -->
+    <key>UIUserInterfaceStyle</key>
+    <string>Dark</string>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>

@@ -27,10 +27,12 @@ struct AboutView: View {
                          + "and shows the runtime's behaviour live.")
                         .font(.callout)
                 }
+                .instrumentRow()
 
                 Section("Architecture") {
                     Text(architecture).font(.system(.caption, design: .monospaced))
                 }
+                .instrumentRow()
 
                 Section("Why NativeAOT") {
                     Text("The engine is compiled ahead-of-time straight to a native binary — no JIT, no "
@@ -38,6 +40,7 @@ struct AboutView: View {
                          + "FFI calls are in-memory and there's no JIT warmup (see the Latency jitter view).")
                         .font(.callout)
                 }
+                .instrumentRow()
 
                 Section("Why these transports") {
                     bullet("Raw-socket HTTP, not Kestrel — ASP.NET Core ships no NativeAOT runtime pack for "
@@ -46,6 +49,7 @@ struct AboutView: View {
                            + "e_sqlcipher is the only one with iOS static libs, so the store is encrypted at rest for free.")
                     bullet("gRPC is kept in the tree but excluded — no NativeAOT mobile runtime pack.")
                 }
+                .instrumentRow()
 
                 Section("Live runtime facts") {
                     if let s = stats {
@@ -55,28 +59,31 @@ struct AboutView: View {
                         LabeledContent("threads", value: "\(s.threadCount)")
                         LabeledContent("uptime", value: String(format: "%.0f s", s.uptimeMs / 1000))
                     } else {
-                        Text("Reading engine telemetry…").font(.caption).foregroundStyle(.secondary)
+                        Text("Reading engine telemetry…").font(.caption).foregroundStyle(Instrument.textSecondary)
                     }
                 }
+                .instrumentRow()
 
                 ForEach(infos, id: \.id) { info in
                     Section(info.displayName) {
                         Text(info.summary).font(.callout)
                         ForEach(info.features, id: \.self) { feature in
                             Label { Text(feature) } icon: {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Instrument.ok)
                             }
                         }
                         ForEach(info.limitations, id: \.self) { limitation in
                             Label { Text(limitation) } icon: {
-                                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Instrument.warn)
                             }
                         }
                     }
+                    .instrumentRow()
                 }
             }
             .navigationTitle("About")
             .task { stats = try? await telemetry.stats() }
+            .instrumentScreen()
         }
     }
 

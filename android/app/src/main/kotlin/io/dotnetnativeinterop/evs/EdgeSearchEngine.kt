@@ -45,8 +45,9 @@ public class EdgeSearchEngine(private val assetsDir: File) {
         tools: Set<String> = emptySet(),
     ): List<EdgeHit> = withContext(Dispatchers.Default) {
         ensureLoaded()
-        val enc = encoder ?: return@withContext emptyList()
-        val (ids, mask) = tokenizer!!.encode(query)
+        val enc = encoder ?: error("Edge search engine is not loaded (encoder missing)")
+        val tok = tokenizer ?: error("Edge search engine is not loaded (tokenizer missing)")
+        val (ids, mask) = tok.encode(query)
         val q = gate.withLock { enc.embed(ids, mask) }
         chunks.asSequence()
             .filter { c -> errorCodes.isEmpty() || c.errorCodes.any { it in errorCodes } }

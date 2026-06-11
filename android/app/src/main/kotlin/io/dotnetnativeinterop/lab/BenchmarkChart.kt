@@ -15,16 +15,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
 
 private val seriesColors = listOf(
-    Color(0xFF3B82F6), Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFF10B981),
+    Instrument.accent, Instrument.warn, Instrument.fail, Instrument.ok,
 )
 
 /** Multi-series line+point chart of benchmark series, drawn on a Canvas (no chart dependency). */
@@ -38,12 +39,12 @@ internal fun BenchmarkChart(series: List<BenchmarkSeries>, modifier: Modifier = 
     val minX = allPoints.minOf { it.x }
     val maxX = allPoints.maxOf { it.x }
     val maxY = allPoints.maxOf { it.y }.coerceAtLeast(1e-9)
-    val axisColor = MaterialTheme.colorScheme.outline
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val axisColor = Instrument.hairline
+    val labelColor = Instrument.textTertiary
     val measurer: TextMeasurer = rememberTextMeasurer()
     val labelStyle = TextStyle(color = labelColor, fontSize = 10.sp)
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
         Canvas(modifier = modifier.fillMaxWidth().height(240.dp)) {
             val padL = 52f
             val padB = 26f
@@ -78,9 +79,9 @@ internal fun BenchmarkChart(series: List<BenchmarkSeries>, modifier: Modifier = 
             drawText(measurer, maxX.toInt().toString(), Offset(padL + w - 28f, padT + h + 4f), labelStyle)
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
             series.forEachIndexed { i, s ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     Box(Modifier.size(10.dp).background(seriesColors[i % seriesColors.size]))
                     Text(s.name, style = MaterialTheme.typography.labelSmall)
                 }

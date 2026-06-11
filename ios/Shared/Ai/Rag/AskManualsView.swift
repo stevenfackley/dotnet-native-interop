@@ -3,7 +3,7 @@ import SwiftUI
 struct AskManualsView: View {
     @StateObject private var model: RagViewModel
 
-    init(search: SemanticSearchService, engineServices: [TransportKind: EngineRagService]) {
+    init(search: SemanticSearchService, engineServices: TransportMap<EngineRagService>) {
         _model = StateObject(wrappedValue: RagViewModel(search: search, engineServices: engineServices))
     }
 
@@ -29,11 +29,16 @@ struct AskManualsView: View {
                 Text("Retrieval runs in the .NET engine over the manuals corpus; the engine answer "
                      + "streams over the selected transport, shown beside Apple's on-device model "
                      + "answering the same retrieved context.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Instrument.textSecondary)
             }
+            .instrumentRow()
 
             if let error = model.errorMessage {
-                Section { Text(error).foregroundStyle(.red) }
+                Section {
+                    ErrorBanner(message: error, retry: { Task { await model.ask() } })
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             }
 
             if !model.sources.isEmpty {
@@ -42,28 +47,40 @@ struct AskManualsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(source.text).font(.callout)
                             Text(String(format: "similarity %.3f", source.score))
-                                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(Instrument.textSecondary)
+                                .contentTransition(.numericText())
                         }
                     }
                 }
+                .instrumentRow()
             }
 
             if !model.engineAnswer.isEmpty || model.engineRunning {
                 Section(engineHeader) {
                     Text(model.engineAnswer.isEmpty ? "…" : model.engineAnswer)
                 }
+                .instrumentRow()
             }
 
             Section("Apple Foundation Models") {
                 if let why = model.appleUnavailable {
                     ContentUnavailableView("Apple model unavailable",
                                            systemImage: "sparkles.slash", description: Text(why))
+                } else if model.appleAnswer.isEmpty && model.appleRunning {
+                    HStack(spacing: Instrument.Space.s) {
+                        ProgressView()
+                        Text("waiting…")
+                            .font(.caption)
+                            .foregroundStyle(Instrument.textTertiary)
+                    }
                 } else {
-                    Text(model.appleAnswer.isEmpty ? (model.appleRunning ? "…" : "Ask to compare.")
-                                                   : model.appleAnswer)
+                    Text(model.appleAnswer.isEmpty ? "Ask to compare." : model.appleAnswer)
                 }
             }
+            .instrumentRow()
         }
+        .instrumentScreen()
         .navigationTitle("Ask the Manuals")
     }
 
