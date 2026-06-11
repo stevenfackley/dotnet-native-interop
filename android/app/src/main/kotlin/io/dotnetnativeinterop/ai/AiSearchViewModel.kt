@@ -2,6 +2,7 @@ package io.dotnetnativeinterop.ai
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.dotnetnativeinterop.model.QueryInput
 import io.dotnetnativeinterop.model.SearchResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,12 +32,16 @@ public class AiSearchViewModel(
 
     public fun search() {
         val s = _state.value
-        if (s.query.isBlank()) return
+        val q = QueryInput.sanitize(s.query) ?: return
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            runCatching { service.search(s.query, s.corpus) }
+            runCatching { service.search(q, s.corpus) }
                 .onSuccess { r -> _state.update { it.copy(results = r, loading = false) } }
-                .onFailure { e -> _state.update { it.copy(loading = false, error = e.message) } }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(loading = false, error = "Searching ‘${s.corpus}’ failed: ${e.message}")
+                    }
+                }
         }
     }
 }

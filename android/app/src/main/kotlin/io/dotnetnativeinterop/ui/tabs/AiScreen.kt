@@ -13,8 +13,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.dotnetnativeinterop.ui.Spacing
 import io.dotnetnativeinterop.ai.AiSearchViewModel
 import io.dotnetnativeinterop.ai.RagViewModel
 
@@ -24,7 +24,7 @@ internal fun AiScreen(modifier: Modifier = Modifier) {
     val labels = listOf("Semantic Search", "Ask the Manuals")
     Column(modifier = modifier) {
         SingleChoiceSegmentedButtonRow(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.l, vertical = Spacing.s),
         ) {
             labels.forEachIndexed { i, label ->
                 SegmentedButton(

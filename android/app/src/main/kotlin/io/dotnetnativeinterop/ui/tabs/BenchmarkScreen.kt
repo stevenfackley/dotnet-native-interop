@@ -19,12 +19,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.lab.Benchmark
 import io.dotnetnativeinterop.lab.BenchmarkChart
 import io.dotnetnativeinterop.lab.BenchmarkPayload
 import io.dotnetnativeinterop.lab.LabViewModel
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
+import io.dotnetnativeinterop.ui.components.ErrorBanner
+import io.dotnetnativeinterop.ui.components.InstrumentCard
+import io.dotnetnativeinterop.ui.components.PanelHeader
 import io.dotnetnativeinterop.ui.components.TransportPicker
 import kotlinx.coroutines.launch
 
@@ -41,8 +47,8 @@ internal fun BenchmarkScreen(
     val scope = rememberCoroutineScope()
 
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(Spacing.l),
+        verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
         Button(
             onClick = {
@@ -63,7 +69,7 @@ internal fun BenchmarkScreen(
             enabled = !running,
         ) {
             if (running) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Text("Running…")
                 }
@@ -77,21 +83,30 @@ internal fun BenchmarkScreen(
             "The benchmark executes inside the NativeAOT library and returns its series as JSON over the "
                 + "selected transport.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Instrument.textSecondary,
         )
 
         payload?.let { p ->
-            Text(p.title, style = MaterialTheme.typography.titleMedium)
-            BenchmarkChart(p.series)
-            Text("Summary", style = MaterialTheme.typography.titleMedium)
-            p.summary.forEach { stat ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stat.label, style = MaterialTheme.typography.bodyMedium)
-                    Text(stat.value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            InstrumentCard {
+                PanelHeader(p.title)
+                BenchmarkChart(p.series)
+            }
+            InstrumentCard {
+                PanelHeader("Summary")
+                p.summary.forEach { stat ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stat.label, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stat.value,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = FontFamily.Monospace,
+                            color = Instrument.textSecondary,
+                        )
+                    }
                 }
             }
         }
 
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        error?.let { ErrorBanner(message = it) }
     }
 }

@@ -17,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.feature.FeaturesViewModel
 import io.dotnetnativeinterop.model.RunStatus
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
 import io.dotnetnativeinterop.ui.components.TransportPicker
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -54,9 +55,9 @@ internal fun FeaturesScreen(
             Surface(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = Spacing.l, vertical = Spacing.s)
                         .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.m),
                 ) {
                     TransportPicker(
                         selected = s.transport,
@@ -77,9 +78,9 @@ internal fun FeaturesScreen(
                 Surface(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = version,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                        color = Instrument.accent,
+                        modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.xs + 2.dp),
                     )
                 }
             }
@@ -103,17 +104,18 @@ private fun StatusIndicator(status: RunStatus, modifier: Modifier = Modifier) {
         RunStatus.Running -> CircularProgressIndicator(
             modifier = modifier.size(24.dp),
             strokeWidth = 2.dp,
+            color = Instrument.accent,
         )
         RunStatus.Ok -> Icon(
             imageVector = Icons.Filled.Check,
             contentDescription = "OK",
-            tint = MaterialTheme.colorScheme.primary,
+            tint = Instrument.ok,
             modifier = modifier,
         )
         RunStatus.Failed -> Icon(
             imageVector = Icons.Filled.Close,
             contentDescription = "Failed",
-            tint = MaterialTheme.colorScheme.error,
+            tint = Instrument.fail,
             modifier = modifier,
         )
     }

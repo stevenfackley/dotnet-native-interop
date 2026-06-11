@@ -2,6 +2,7 @@ package io.dotnetnativeinterop.ai
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.dotnetnativeinterop.model.QueryInput
 import io.dotnetnativeinterop.model.SearchResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,17 +31,25 @@ public class RagViewModel(
     public fun setQuery(q: String): Unit = _state.update { it.copy(query = q) }
 
     public fun ask() {
-        val q = _state.value.query
-        if (q.isBlank()) return
+        val q = QueryInput.sanitize(_state.value.query) ?: return
         viewModelScope.launch {
             _state.update {
                 it.copy(streaming = true, answer = "", sources = emptyList(),
                     firstTokenMs = null, totalMs = null, error = null)
             }
 
-            runCatching { search.search(q, "manuals") }
-                .onSuccess { s -> _state.update { it.copy(sources = s) } }
-                .onFailure { e -> _state.update { it.copy(error = e.message) } }
+            // Retrieval feeds the answer its context — if it fails there is nothing to ground
+            // the stream on, so stop here (mirrors the iOS RagViewModel).
+            val retrieval = runCatching { search.search(q, "manuals") }
+            retrieval.fold(
+                onSuccess = { s -> _state.update { it.copy(sources = s) } },
+                onFailure = { e ->
+                    _state.update {
+                        it.copy(streaming = false, error = "Retrieving sources failed: ${e.message}")
+                    }
+                    return@launch
+                },
+            )
 
             val start = System.nanoTime()
             runCatching {
@@ -55,7 +64,8 @@ public class RagViewModel(
                     it.copy(
                         streaming = false,
                         totalMs = (System.nanoTime() - start) / 1_000_000,
-                        error = res.exceptionOrNull()?.message ?: it.error,
+                        error = res.exceptionOrNull()?.let { e -> "Engine answer failed: ${e.message}" }
+                            ?: it.error,
                     )
                 }
             }

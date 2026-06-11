@@ -24,15 +24,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.lab.LabCommands
 import io.dotnetnativeinterop.lab.LabViewModel
+import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Spacing
+import io.dotnetnativeinterop.ui.components.InstrumentCard
+import io.dotnetnativeinterop.ui.components.PanelHeader
 import io.dotnetnativeinterop.ui.components.TransportPicker
 
 @Composable
 internal fun FractalExplorerScreen(lab: LabViewModel, modifier: Modifier = Modifier) {
     val transport by lab.transport.collectAsStateWithLifecycle()
+    val lastError by lab.lastError.collectAsStateWithLifecycle()
     var centerX by remember { mutableDoubleStateOf(-0.5) }
     var centerY by remember { mutableDoubleStateOf(0.0) }
     var zoom by remember { mutableDoubleStateOf(1.0) }
@@ -41,8 +47,8 @@ internal fun FractalExplorerScreen(lab: LabViewModel, modifier: Modifier = Modif
     val size = 256
 
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(Spacing.l),
+        verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
         RasterDemoHost(
             transportName = transport.displayName,
@@ -50,6 +56,7 @@ internal fun FractalExplorerScreen(lab: LabViewModel, modifier: Modifier = Modif
             currentCommand = { LabCommands.mandelbrot(centerX, centerY, zoom, iterations.toInt(), size) },
             advance = { zoom *= 1.03 },
             render = { lab.render(it) },
+            lastError = lastError,
             gestureModifier = Modifier.pointerInput(Unit) {
                 detectTransformGestures { _, pan, gestureZoom, _ ->
                     zoom = maxOf(0.2, zoom * gestureZoom)
@@ -60,29 +67,32 @@ internal fun FractalExplorerScreen(lab: LabViewModel, modifier: Modifier = Modif
             },
         )
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Switch(checked = diving, onCheckedChange = { diving = it })
-            Text("Dive (auto-zoom)")
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Iterations")
-            Slider(
-                value = iterations,
-                onValueChange = { iterations = it },
-                valueRange = 32f..1000f,
-                modifier = Modifier.weight(1f),
-            )
-            Text("${iterations.toInt()}", modifier = Modifier.width(44.dp))
-        }
-        Button(onClick = { centerX = -0.5; centerY = 0.0; zoom = 1.0; iterations = 220f }) {
-            Text("Reset view")
+        InstrumentCard {
+            PanelHeader("Controls")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                Switch(checked = diving, onCheckedChange = { diving = it })
+                Text("Dive (auto-zoom)")
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                Text("Iterations")
+                Slider(
+                    value = iterations,
+                    onValueChange = { iterations = it },
+                    valueRange = 32f..1000f,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("${iterations.toInt()}", fontFamily = FontFamily.Monospace, modifier = Modifier.width(44.dp))
+            }
+            Button(onClick = { centerX = -0.5; centerY = 0.0; zoom = 1.0; iterations = 220f }) {
+                Text("Reset view")
+            }
         }
         TransportPicker(selected = transport, onSelect = lab::setTransport, modifier = Modifier.fillMaxWidth())
         Text(
             "Every pixel of this Mandelbrot is computed in C# inside the NativeAOT library and sent as raw "
                 + "bytes — no GPU, no shader, no cloud. Switch transport to watch the frame rate change.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Instrument.textSecondary,
         )
     }
 }
