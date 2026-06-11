@@ -29,11 +29,18 @@ public static class EnumerableExtensions
 public static partial class LanguageFeatureCatalog
 {
     /// <summary>The executable features.</summary>
-    public static IReadOnlyList<LanguageFeature> Features { get; } = Build();
+    public static IReadOnlyList<LanguageFeature> Features => FeaturesLazy.Value;
 
-    /// <summary>UI descriptors, with the deterministic expected result captured once at startup.</summary>
-    public static IReadOnlyList<FeatureDescriptor> Descriptors { get; } =
-        Features.Select(f => new FeatureDescriptor(f.Id, f.Title, f.Version, f.Code, Safe(f.Execute))).ToList();
+    /// <summary>UI descriptors, with the deterministic expected result captured on first access.</summary>
+    public static IReadOnlyList<FeatureDescriptor> Descriptors => DescriptorsLazy.Value;
+
+    // Lazy instead of field initializers: initializers run inside the static constructor, and demos
+    // that spawn threads touching this type's statics (e.g. threading-lock) would deadlock — the CLR
+    // blocks cross-thread static access until the cctor completes. Lazy runs them after it.
+    private static readonly Lazy<IReadOnlyList<LanguageFeature>> FeaturesLazy = new(Build);
+
+    private static readonly Lazy<IReadOnlyList<FeatureDescriptor>> DescriptorsLazy = new(
+        () => Features.Select(f => new FeatureDescriptor(f.Id, f.Title, f.Version, f.Code, Safe(f.Execute))).ToList());
 
     /// <summary>Executes one feature by id and times it; Ok = output matches the expected result.</summary>
     public static FeatureRun Run(string id)
@@ -74,7 +81,16 @@ public static partial class LanguageFeatureCatalog
         catch (Exception ex) { return ex.Message; }
     }
 
-    private static List<LanguageFeature> Build() => [.. LanguageSyntaxDemos(), .. RuntimeDemos()];
+    private static List<LanguageFeature> Build() =>
+    [
+        // Concatenation order drives UI section order (first occurrence of each version string):
+        // C# 14 -> C# 1 timeline, then the runtime/BCL capability sections.
+        .. ModernSyntaxDemos(),
+        .. LanguageSyntaxDemos(),
+        .. ClassicSyntaxDemos(),
+        .. RuntimeDemos(),
+        .. BclDemos(),
+    ];
 
     private static List<LanguageFeature> LanguageSyntaxDemos() =>
     [
@@ -128,7 +144,7 @@ public static partial class LanguageFeatureCatalog
             "int Sum(params ReadOnlySpan<int> xs)",
             static () => $"Sum(1, 2, 3, 4) = {Sum(1, 2, 3, 4)}"),
 
-        new("generic-math", "Generic math (INumber<T>)", "C# 11 / .NET 7",
+        new("generic-math", "Generic math (INumber<T>)", "C# 11",
             "T Add<T>(T a, T b) where T : INumber<T> => a + b;",
             static () => $"Add(3, 4) = {Add(3, 4)}\nAdd(2.5, 1.5) = {Add(2.5, 1.5).ToString(CultureInfo.InvariantCulture)}"),
 
