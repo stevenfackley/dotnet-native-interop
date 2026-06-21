@@ -114,6 +114,31 @@ const char* dni_sqlite_rag(const char* query);
  *   GET /rag?q=<url-encoded query>  -> text/event-stream of  data: {index,text,final}
  *   (the same SSE frame as the legacy showcase stream).                       */
 
+/* ---- Pattern 3: boundary instrumentation (additive, FFI showcase) ------- */
+/* Diagnostics that make the interop boundary itself visible. The two getters
+ * return heap UTF-8 JSON (or NULL on failure); copy the text, then release it
+ * with dni_string_free. */
+const char* dni_ffi_echo(const char* utf8, int32_t len); /* {bytesHex,len,decoded,managedThreadId,executeUs,ptrIn} */
+const char* dni_ffi_throw(void);                          /* {caught,type,message,status} — managed exception contained */
+
+/*
+ * Extended per-token callback: like dni_token_cb, but also carries the managed
+ * thread id the callback runs on and elapsed microseconds since stream start, so
+ * the UI can visualize the off-UI-thread callback hop with real numbers. Fires on
+ * a .NET background thread; `text` is UTF-8, valid ONLY during the call (copy it).
+ */
+typedef void (*dni_trace_cb)(void* user_data,
+                                     int32_t index,
+                                     const char* text,
+                                     int32_t is_final,
+                                     int64_t managed_thread_id,
+                                     int64_t elapsed_us);
+
+/* Session id (>0) on success, or a negative DNI_* status. Stop with
+ * dni_session_cancel / dni_session_free (the production lifecycle exports). */
+int64_t dni_ffi_stream_start(const char* prompt, int32_t max_tokens,
+                             dni_trace_cb cb, void* user_data);
+
 #ifdef __cplusplus
 }
 #endif
