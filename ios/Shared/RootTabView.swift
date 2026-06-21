@@ -8,9 +8,13 @@ struct RootTabView: View {
     let telemetry: TelemetryService
     let search: SemanticSearchService
     let engineRagServices: TransportMap<EngineRagService>
+    @StateObject private var boundary = BoundaryViewModel(service: FFIBoundaryService())
 
     var body: some View {
         TabView {
+            BoundaryView(viewModel: boundary)
+                .tabItem { Label("Boundary", systemImage: "arrow.left.arrow.right") }
+
             DashboardView(viewModel: features)
                 .tabItem { Label("Dashboard", systemImage: "square.grid.2x2") }
 
