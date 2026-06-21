@@ -13,6 +13,8 @@ namespace DotnetNativeInterop.NativeBridge;
 [JsonSerializable(typeof(IReadOnlyList<FeatureDescriptor>))]
 [JsonSerializable(typeof(FeatureDescriptor))]
 [JsonSerializable(typeof(FeatureRun))]
+[JsonSerializable(typeof(BoundaryEcho))]
+[JsonSerializable(typeof(BoundaryThrow))]
 internal sealed partial class FeaturesJsonContext : JsonSerializerContext
 {
 }
