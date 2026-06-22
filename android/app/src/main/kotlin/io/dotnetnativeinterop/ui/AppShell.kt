@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Stream
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +57,7 @@ import io.dotnetnativeinterop.ui.tabs.LatencyScreen
 
 /** Tab order mirrors the iOS RootTabView; Stream is the Android-only extra and stays last. */
 internal enum class Tab(val title: String, val icon: ImageVector) {
+    Boundary("Boundary", Icons.Outlined.SwapHoriz),
     Dashboard("Dashboard", Icons.Outlined.GridView),
     Features("Features", Icons.Outlined.Verified),
     Lab("Lab", Icons.Outlined.Memory),
@@ -73,7 +75,7 @@ internal fun AppShell(
     inference: io.dotnetnativeinterop.ui.InferenceViewModel,
     modifier: Modifier = Modifier,
 ) {
-    var tab by remember { mutableStateOf(Tab.Dashboard) }
+    var tab by remember { mutableStateOf(Tab.Boundary) }
     var detailId by remember { mutableStateOf<String?>(null) }
 
     val features: FeaturesViewModel = viewModel()
@@ -130,6 +132,10 @@ internal fun AppShell(
                 HorizontalDivider(thickness = 1.dp, color = Instrument.hairline)
                 val content = Modifier.fillMaxWidth().weight(1f)
                 when (tab) {
+                    Tab.Boundary -> {
+                        val vm: io.dotnetnativeinterop.boundary.BoundaryViewModel = viewModel()
+                        io.dotnetnativeinterop.boundary.BoundaryScreen(vm, content)
+                    }
                     Tab.Dashboard -> DashboardScreen(features, content)
                     Tab.Features -> {
                         val id = detailId
