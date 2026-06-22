@@ -12,6 +12,7 @@
 #include <jni.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <android/log.h>
 #include <pthread.h>
 
@@ -182,6 +183,59 @@ static jstring j_llama_probe(JNIEnv* e, jobject o, jstring path) {
     return take_native_string(e, r);
 }
 
+/* ---- Boundary instrumentation: echo / throw (sync) + traced streaming ---- */
+static jstring j_ffi_echo(JNIEnv* e, jobject o, jstring text) {
+    (void)o; if (text == NULL) return NULL;
+    const char* ctext = (*e)->GetStringUTFChars(e, text, NULL);
+    if (ctext == NULL) return NULL;
+    const char* r = dni_ffi_echo(ctext, (int32_t)strlen(ctext)); /* len is REQUIRED by the ABI */
+    (*e)->ReleaseStringUTFChars(e, text, ctext);
+    return take_native_string(e, r);
+}
+
+static jstring j_ffi_throw(JNIEnv* e, jobject o) {
+    (void)o;
+    return take_native_string(e, dni_ffi_throw());
+}
+
+/* Param order MUST match dni_trace_cb: (ud, index, text, is_final, managed_thread_id, elapsed_us). */
+typedef struct { jobject listener_ref; jmethodID on_trace; } TraceCallbackState;
+
+static void ffi_trace_callback(void* user_data, int32_t index, const char* text,
+                               int32_t is_final, int64_t managed_thread_id, int64_t elapsed_us) {
+    TraceCallbackState* st = (TraceCallbackState*)user_data;
+    if (st == NULL) return;
+    JNIEnv* env = attach_current_thread();
+    if (env == NULL) return;
+    jstring jtext = (*env)->NewStringUTF(env, text != NULL ? text : "");
+    if (jtext == NULL) return;
+    /* Kotlin onTrace(index, text, managedThreadId, elapsedUs, isFinal) — reorder to that signature. */
+    (*env)->CallVoidMethod(env, st->listener_ref, st->on_trace,
+        (jint)index, jtext, (jlong)managed_thread_id, (jlong)elapsed_us, (jboolean)(is_final != 0));
+    (*env)->DeleteLocalRef(env, jtext);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionDescribe(env); (*env)->ExceptionClear(env); }
+    if (is_final) { (*env)->DeleteGlobalRef(env, st->listener_ref); free(st); }
+}
+
+static jlong j_ffi_stream_start(JNIEnv* e, jobject o, jstring prompt, jint max_tokens, jobject listener) {
+    (void)o;
+    if (prompt == NULL || listener == NULL) return (jlong)DNI_INVALID_ARGUMENT;
+    jclass lc = (*e)->GetObjectClass(e, listener);
+    jmethodID on_trace = (*e)->GetMethodID(e, lc, "onTrace", "(ILjava/lang/String;JJZ)V");
+    (*e)->DeleteLocalRef(e, lc);
+    if (on_trace == NULL) { LOGE("onTrace not found"); return (jlong)DNI_INVALID_ARGUMENT; }
+    TraceCallbackState* st = (TraceCallbackState*)malloc(sizeof(TraceCallbackState));
+    if (st == NULL) return (jlong)DNI_INTERNAL;
+    st->listener_ref = (*e)->NewGlobalRef(e, listener);
+    st->on_trace = on_trace;
+    const char* c_prompt = (*e)->GetStringUTFChars(e, prompt, NULL);
+    if (c_prompt == NULL) { (*e)->DeleteGlobalRef(e, st->listener_ref); free(st); return (jlong)DNI_INTERNAL; }
+    int64_t sid = dni_ffi_stream_start(c_prompt, (int32_t)max_tokens, ffi_trace_callback, st);
+    (*e)->ReleaseStringUTFChars(e, prompt, c_prompt);
+    if (sid <= 0) { (*e)->DeleteGlobalRef(e, st->listener_ref); free(st); }
+    return (jlong)sid;
+}
+
 /* ---- RegisterNatives table --------------------------------------------- */
 static const JNINativeMethod kMethods[] = {
     {"nativeInitialize",     "()I",                                                                      (void*)j_initialize},
@@ -204,6 +258,9 @@ static const JNINativeMethod kMethods[] = {
     {"nativeSqliteRag",      "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_rag},
     {"nativeSqliteProbe",    "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_sqlite_probe},
     {"nativeLlamaProbe",     "(Ljava/lang/String;)Ljava/lang/String;",                                   (void*)j_llama_probe},
+    {"nativeFfiEcho",        "(Ljava/lang/String;)Ljava/lang/String;",                                    (void*)j_ffi_echo},
+    {"nativeFfiThrow",       "()Ljava/lang/String;",                                                      (void*)j_ffi_throw},
+    {"nativeFfiStreamStart", "(Ljava/lang/String;ILio/dotnetnativeinterop/transport/FfiTraceListener;)J", (void*)j_ffi_stream_start},
 };
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {

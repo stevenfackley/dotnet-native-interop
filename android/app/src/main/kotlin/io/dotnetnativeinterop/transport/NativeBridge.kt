@@ -50,6 +50,12 @@ public object NativeBridge {
     // path: writable temp for SQLCipher, the pushed GGUF model for llama.
     public external fun nativeSqliteProbe(path: String): String?
     public external fun nativeLlamaProbe(path: String): String?
+
+    // Pattern 3 — Boundary instrumentation (additive). Mirrors dni_ffi_echo / dni_ffi_throw /
+    // dni_ffi_stream_start. The JNI shim computes the byte length for echo and passes maxTokens to stream.
+    public external fun nativeFfiEcho(text: String): String?
+    public external fun nativeFfiThrow(): String?
+    public external fun nativeFfiStreamStart(prompt: String, maxTokens: Int, listener: FfiTraceListener): Long
 }
 
 /**
@@ -58,4 +64,12 @@ public object NativeBridge {
  */
 public interface FfiTokenListener {
     public fun onToken(index: Int, text: String, isFinal: Boolean)
+}
+
+/**
+ * Extended per-token callback for Boundary tracing: adds managedThreadId + elapsedUs to the base token
+ * callback. Fires on a .NET background thread already attached to the JVM by the shim; MUST NOT block.
+ */
+public interface FfiTraceListener {
+    public fun onTrace(index: Int, text: String, managedThreadId: Long, elapsedUs: Long, isFinal: Boolean)
 }
