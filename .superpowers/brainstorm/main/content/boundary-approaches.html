@@ -1,0 +1,93 @@
+<style>
+  .wf { background:#0B0E11; border:1px solid #2A323B; border-radius:12px; padding:10px; font-family:'SF Mono',ui-monospace,Menlo,monospace; }
+  .wf .bar { color:#22D3EE; font-size:10px; letter-spacing:2px; text-transform:uppercase; border-bottom:1px solid #2A323B; padding-bottom:6px; margin-bottom:8px; }
+  .wf .chips { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px; }
+  .wf .chip { font-size:9px; color:#8B98A5; border:1px solid #2A323B; border-radius:999px; padding:2px 7px; }
+  .wf .chip.on { color:#0B0E11; background:#22D3EE; border-color:#22D3EE; }
+  .lanes { display:flex; flex-direction:column; gap:3px; margin:6px 0; }
+  .lane { display:flex; align-items:center; gap:6px; font-size:9px; color:#8B98A5; }
+  .lane .ln { width:54px; text-align:right; color:#5C6873; }
+  .lane .track { flex:1; height:14px; border:1px solid #2A323B; border-radius:3px; position:relative; background:#12161B; }
+  .lane .dot { position:absolute; top:2px; height:8px; width:8px; border-radius:50%; }
+  .lane.hot .track { border-color:#22D3EE; box-shadow:0 0 0 1px #22D3EE inset; }
+  .lane.ui .ln{color:#22D3EE} .lane.net .ln{color:#34D399}
+  .panel { border:1px solid #2A323B; border-radius:6px; padding:5px 7px; margin-top:5px; font-size:9px; color:#8B98A5; }
+  .panel b{ color:#E8EDF2; font-weight:600 }
+  .grn{color:#34D399} .amb{color:#FBBF24} .red{color:#F87171} .cyn{color:#22D3EE} .mut{color:#5C6873}
+  .runbtn { margin-top:8px; text-align:center; font-size:10px; color:#0B0E11; background:#22D3EE; border-radius:6px; padding:6px; font-weight:700; }
+  .subtabs{ display:flex; gap:4px; border-bottom:1px solid #2A323B; padding-bottom:5px; margin-bottom:7px; font-size:9px;}
+  .subtabs span{ color:#5C6873 } .subtabs .sel{ color:#22D3EE; border-bottom:2px solid #22D3EE; padding-bottom:4px;}
+  .stepper{ display:flex; align-items:center; justify-content:space-between; font-size:9px; color:#5C6873; margin-bottom:6px;}
+  .stepper .now{ color:#22D3EE }
+  .prosline{ font-size:11px; color:#8B98A5; margin-top:8px; line-height:1.45 }
+  .prosline .g{ color:#34D399 } .prosline .r{ color:#F87171 }
+  .opt-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+  .option .content h3 small{ display:block; font-weight:400; color:#5C6873; font-size:11px; margin-top:2px;}
+</style>
+
+<h2>Boundary screen — pick the structure</h2>
+<p class="subtitle">Same ingredients (swimlane, byte inspector, ownership ledger, ABI map, error containment, µs strip) — three ways to arrange them. Wireframes only; visual polish comes later. Click the one you want.</p>
+
+<div class="options opt-grid">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Trace Canvas + Step mode <small>Recommended — hybrid of one-screen + guided</small></h3>
+      <div class="wf">
+        <div class="bar">Boundary · trace one call</div>
+        <div class="chips"><span class="chip on">echo</span><span class="chip">feature</span><span class="chip">pixels</span><span class="chip">stream</span><span class="chip">throw</span></div>
+        <div class="lanes">
+          <div class="lane ui"><span class="ln">UI</span><div class="track"><div class="dot" style="left:4px;background:#22D3EE"></div></div></div>
+          <div class="lane"><span class="ln">binding</span><div class="track"><div class="dot" style="left:30%;background:#8B98A5"></div></div></div>
+          <div class="lane hot"><span class="ln">C ABI</span><div class="track"><div class="dot" style="left:50%;background:#22D3EE"></div></div></div>
+          <div class="lane net"><span class="ln">.NET AOT</span><div class="track"><div class="dot" style="left:70%;background:#34D399"></div></div></div>
+          <div class="lane"><span class="ln">worker</span><div class="track"><div class="dot" style="left:88%;background:#34D399"></div></div></div>
+        </div>
+        <div class="panel"><b>bytes</b> 48 65 6C… → <span class="cyn">"Hel…"</span> · ptr 0x16d…</div>
+        <div class="panel"><b>own</b> req <span class="mut">host→host</span> · result <span class="grn">.NET→free ✓</span></div>
+        <div class="panel"><b>µs</b> marshal 4 · cross 2 · exec 105 · cb 3 · <b>total 118</b></div>
+        <div class="runbtn">▶ Run &nbsp;·&nbsp; ⏯ Auto-step</div>
+      </div>
+      <p class="prosline">One screen, the swimlane is the hero. <b>Run</b> fills every panel instantly; <b>Auto-step</b> walks the 6 phases, animating each lane + spotlighting that phase's panel. Full ABI table + bench one tap down.<br><span class="g">+ at-a-glance AND teachable</span> · <span class="g">+ best for "engineer gets it instantly"</span> · <span class="r">– densest single screen</span></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Sectioned Hub <small>each concept its own focused screen</small></h3>
+      <div class="wf">
+        <div class="bar">Boundary</div>
+        <div class="subtabs"><span class="sel">Trace</span><span>Threads</span><span>Memory</span><span>ABI</span><span>Fail</span></div>
+        <div class="lanes">
+          <div class="lane ui"><span class="ln">UI</span><div class="track"><div class="dot" style="left:6px;background:#22D3EE"></div></div></div>
+          <div class="lane hot"><span class="ln">C ABI</span><div class="track"><div class="dot" style="left:48%;background:#22D3EE"></div></div></div>
+          <div class="lane net"><span class="ln">.NET AOT</span><div class="track"><div class="dot" style="left:78%;background:#34D399"></div></div></div>
+        </div>
+        <div class="panel"><b>this screen = Trace only.</b> Memory, ABI map, failures live behind their own sub-tabs.</div>
+        <div class="runbtn">▶ Run trace</div>
+      </div>
+      <p class="prosline">Boundary is a hub; Trace / Threading / Memory / ABI / Failures are separate sub-screens.<br><span class="g">+ each concept gets full room</span> · <span class="g">+ least dense</span> · <span class="r">– fragments the "one call, see everything" story</span> · <span class="r">– more taps</span></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Pure Guided Walkthrough <small>linear, phase-by-phase tour</small></h3>
+      <div class="wf">
+        <div class="bar">Boundary · lifecycle</div>
+        <div class="stepper"><span>1 marshal</span><span>2 cross</span><span class="now">3 callback ●</span><span>4 free</span><span>5 done</span></div>
+        <div class="lanes">
+          <div class="lane net hot"><span class="ln">.NET AOT</span><div class="track"><div class="dot" style="left:60%;background:#34D399"></div></div></div>
+          <div class="lane ui"><span class="ln">UI hop</span><div class="track"><div class="dot" style="left:90%;background:#22D3EE"></div></div></div>
+        </div>
+        <div class="panel amb">⚠ callback fired on a .NET worker thread → hopping to MainActor/Dispatchers.Main</div>
+        <div class="runbtn">‹ Back &nbsp;·&nbsp; Next ›</div>
+      </div>
+      <p class="prosline">A wizard: advance one phase at a time, each step animates its lane + detail.<br><span class="g">+ strongest pure teaching</span> · <span class="r">– linear, no free-explore dashboard feel</span> · <span class="r">– slower to re-run / compare</span></p>
+    </div>
+  </div>
+
+</div>

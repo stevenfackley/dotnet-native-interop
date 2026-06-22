@@ -60,3 +60,4 @@ native/llama-shim/build/
 
 ## AI model assets staged into APK (sourced from LFS; never commit the copy)
 android/app/src/main/assets/dni-assets/
+/android/app/.cxx

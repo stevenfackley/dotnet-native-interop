@@ -1,0 +1,89 @@
+<style>
+  .phone { background:#0B0E11; border:1px solid #2A323B; border-radius:14px; padding:12px; font-family:'SF Mono',ui-monospace,Menlo,monospace; }
+  .hd { color:#22D3EE; font-size:10px; letter-spacing:2px; text-transform:uppercase; border-bottom:1px solid #2A323B; padding-bottom:7px; margin-bottom:9px; display:flex; justify-content:space-between;}
+  .hd .ffi{ color:#34D399 }
+  .chips { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; }
+  .chip { font-size:9px; color:#8B98A5; border:1px solid #2A323B; border-radius:999px; padding:3px 9px; }
+  .chip.on { color:#0B0E11; background:#22D3EE; border-color:#22D3EE; font-weight:700;}
+  .seclabel{ font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:#5C6873; margin:9px 0 4px;}
+  .lanes { display:flex; flex-direction:column; gap:4px; }
+  .lane { display:flex; align-items:center; gap:7px; font-size:9px; }
+  .lane .ln { width:60px; text-align:right; color:#5C6873; }
+  .lane .track { flex:1; height:15px; border:1px solid #2A323B; border-radius:3px; position:relative; background:#12161B; }
+  .lane .dot { position:absolute; top:3px; height:9px; width:9px; border-radius:50%; }
+  .lane.hot .track { border-color:#22D3EE; box-shadow:0 0 6px #22D3EE33, 0 0 0 1px #22D3EE inset; }
+  .lane.ui .ln{color:#22D3EE} .lane.net .ln{color:#34D399} .lane.jni .ln{color:#FB7185}
+  .hop{ font-size:8px; color:#FBBF24; border:1px solid #FBBF2455; border-radius:4px; padding:2px 6px; margin-top:5px; display:inline-block;}
+  .ctrls{ display:flex; gap:6px; margin-top:9px; }
+  .btn{ flex:1; text-align:center; font-size:10px; border-radius:6px; padding:7px; font-weight:700;}
+  .btn.pri{ color:#0B0E11; background:#22D3EE;} .btn.sec{ color:#22D3EE; border:1px solid #22D3EE55;}
+  .seg{ display:flex; gap:3px; background:#12161B; border:1px solid #2A323B; border-radius:7px; padding:3px; margin-top:4px;}
+  .seg span{ flex:1; text-align:center; font-size:8px; color:#5C6873; padding:4px 2px; border-radius:5px;}
+  .seg span.sel{ color:#0B0E11; background:#22D3EE; font-weight:700;}
+  .panel { border:1px solid #2A323B; border-radius:6px; padding:6px 8px; margin-top:6px; font-size:9px; color:#8B98A5; line-height:1.5;}
+  .panel b{ color:#E8EDF2; font-weight:600 } .panel .h{ color:#5C6873; font-size:8px; letter-spacing:1px; text-transform:uppercase; display:block; margin-bottom:3px;}
+  .grn{color:#34D399} .amb{color:#FBBF24} .red{color:#F87171} .cyn{color:#22D3EE} .mut{color:#5C6873}
+  .scrollhint{ text-align:center; color:#5C6873; font-size:14px; margin-top:2px;}
+  .twocol{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media(max-width:760px){ .twocol{ grid-template-columns:1fr; } }
+  .vlabel{ font-size:13px; color:#E8EDF2; font-weight:700; margin-bottom:2px;}
+  .vsub{ font-size:11px; color:#8B98A5; margin-bottom:8px;}
+  .option.pick{ cursor:pointer; }
+  . down{ font-size:8px; color:#5C6873; text-align:center; margin-top:8px; border-top:1px dashed #2A323B; padding-top:6px;}
+</style>
+
+<h2>Boundary screen — detailed layout (Approach A)</h2>
+<p class="subtitle">Top half is identical in both: header · preset row · the swimlane hero · Run/Auto-step. The fork is the <b>inspector below the canvas</b>. Click the variant you want. (The version-gated-comment rule shows up in the ABI panel.)</p>
+
+<div class="twocol">
+
+  <!-- A1 segmented -->
+  <div class="option pick" data-choice="segmented" onclick="toggleSelect(this)">
+    <div class="vlabel">A1 · Segmented inspector &nbsp;<span class="cyn">(recommended)</span></div>
+    <div class="vsub">One detail panel below the canvas; a segmented bar swaps it. In Auto-step it auto-follows the live phase. Swimlane stays in view.</div>
+    <div class="phone">
+      <div class="hd"><span>Boundary · trace one call</span><span class="ffi">● FFI</span></div>
+      <div class="chips"><span class="chip on">echo</span><span class="chip">feature</span><span class="chip">pixels</span><span class="chip">stream</span><span class="chip">throw</span></div>
+      <div class="seclabel">lifecycle — swimlane</div>
+      <div class="lanes">
+        <div class="lane ui"><span class="ln">UI thread</span><div class="track"><div class="dot" style="left:5px;background:#22D3EE"></div></div></div>
+        <div class="lane"><span class="ln">binding</span><div class="track"><div class="dot" style="left:26%;background:#8B98A5"></div></div></div>
+        <div class="lane jni"><span class="ln">JNI shim*</span><div class="track"><div class="dot" style="left:40%;background:#FB7185"></div></div></div>
+        <div class="lane hot"><span class="ln">C ABI</span><div class="track"><div class="dot" style="left:54%;background:#22D3EE"></div></div></div>
+        <div class="lane net"><span class="ln">.NET AOT</span><div class="track"><div class="dot" style="left:74%;background:#34D399"></div></div></div>
+        <div class="lane net"><span class="ln">worker</span><div class="track"><div class="dot" style="left:90%;background:#34D399"></div></div></div>
+      </div>
+      <span class="hop">⚠ callback fires off-UI-thread → hops to MainActor / Dispatchers.Main</span>
+      <div class="ctrls"><div class="btn pri">▶ Run</div><div class="btn sec">⏯ Auto-step</div></div>
+      <div class="seg"><span>bytes</span><span class="sel">µs</span><span>memory</span><span>threads</span><span>ABI</span><span>err</span></div>
+      <div class="panel"><span class="h">µs · this call</span>marshal <b>4</b> · cross <b>2</b> · exec <b>105</b> · callback <b>3</b> · free <b>1</b> · <b class="cyn">total 118µs</b></div>
+      <div class="down">↓ one tap down: full 16-export ABI table · FFI-vs-HTTP-vs-SQLite overhead bench</div>
+    </div>
+  </div>
+
+  <!-- A2 scroll stack -->
+  <div class="option pick" data-choice="scroll" onclick="toggleSelect(this)">
+    <div class="vlabel">A2 · Scroll stack</div>
+    <div class="vsub">After Run, every panel is populated and stacked below the canvas — scroll to see all of one call at once. No switching.</div>
+    <div class="phone">
+      <div class="hd"><span>Boundary · trace one call</span><span class="ffi">● FFI</span></div>
+      <div class="chips"><span class="chip on">echo</span><span class="chip">feature</span><span class="chip">pixels</span><span class="chip">stream</span><span class="chip">throw</span></div>
+      <div class="seclabel">lifecycle — swimlane</div>
+      <div class="lanes">
+        <div class="lane ui"><span class="ln">UI thread</span><div class="track"><div class="dot" style="left:5px;background:#22D3EE"></div></div></div>
+        <div class="lane hot"><span class="ln">C ABI</span><div class="track"><div class="dot" style="left:54%;background:#22D3EE"></div></div></div>
+        <div class="lane net"><span class="ln">.NET AOT</span><div class="track"><div class="dot" style="left:80%;background:#34D399"></div></div></div>
+      </div>
+      <span class="hop">⚠ callback off-UI-thread → MainActor / Dispatchers.Main</span>
+      <div class="ctrls"><div class="btn pri">▶ Run</div><div class="btn sec">⏯ Auto-step</div></div>
+      <div class="panel"><span class="h">bytes · marshalling</span>48 65 6C 6C 6F → <span class="cyn">"Hello"</span> · ptr 0x16d4e08 · len 5</div>
+      <div class="panel"><span class="h">µs</span>marshal 4 · exec 105 · cb 3 · <b class="cyn">total 118</b></div>
+      <div class="panel"><span class="h">ownership ledger</span>req <span class="mut">host→host</span> · result <span class="grn">.NET → dni_string_free ✓</span> · outstanding <b class="grn">0 B</b></div>
+      <div class="panel"><span class="h">ABI map · echo</span><span class="mut">C</span> dni_ffi_echo(const char*) · <span class="mut">Swift</span> @_silgen_name <span class="amb">// iOS: stable; older toolchains → use bridging header decl</span></div>
+      <div class="scrollhint">⌄ threads · error · more</div>
+      <div class="down">↓ one tap down: full ABI table · overhead bench</div>
+    </div>
+  </div>
+
+</div>
+<p class="subtitle" style="margin-top:14px">* <b>JNI shim</b> lane appears on Android only (the extra hop .NET can't avoid talking to Kotlin) — on iOS that lane is absent. Same screen, honest per-platform difference.</p>
