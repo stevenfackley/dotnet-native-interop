@@ -39,7 +39,7 @@ public class EdgeSearchEngine(private val assetsDir: File) {
 
     public suspend fun search(
         query: String,
-        minScore: Float = 0.70f,
+        minScore: Float = 0.15f, // low NOISE FLOOR, not a relevance gate: show top-K, the score shows confidence (mirrors iOS + dni_search)
         topK: Int = 20,
         errorCodes: Set<String> = emptySet(),
         tools: Set<String> = emptySet(),

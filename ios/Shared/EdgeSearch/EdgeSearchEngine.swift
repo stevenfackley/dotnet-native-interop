@@ -36,8 +36,10 @@ final class EdgeSearchEngine: @unchecked Sendable {
     }
 
     /// Embeds `query`, returns chunks with cosine (== dot, vectors are normalized) ≥ `minScore`,
-    /// sorted desc, capped at `topK`.
-    func search(_ query: String, minScore: Float = 0.70, topK: Int = 20) throws -> [EdgeSearchHit] {
+    /// sorted desc, capped at `topK`. `minScore` is a low NOISE FLOOR (0.15), not a relevance gate:
+    /// all-MiniLM cosines for genuine matches run well below the old 0.70, so we surface the top-K ranked
+    /// hits and let each hit's score communicate confidence (mirrors the engine's top-K `dni_search`).
+    func search(_ query: String, minScore: Float = 0.15, topK: Int = 20) throws -> [EdgeSearchHit] {
         let (ids, mask) = tokenizer.encode(query)
         var q = [Float](repeating: 0, count: 384)
         try ort.embed(inputIds: ids, attentionMask: mask, length: ids.count, out: &q)
