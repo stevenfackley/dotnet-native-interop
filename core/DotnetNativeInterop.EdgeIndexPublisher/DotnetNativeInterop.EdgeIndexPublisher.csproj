@@ -18,4 +18,16 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
   </ItemGroup>
 
+  <!-- CVE-2025-6965 (NU1903): SQLite < 3.50.2 memory corruption, flagged in the transitive
+       SQLitePCLRaw.lib.e_sqlite3 2.1.11 pulled by Microsoft.Data.Sqlite. Upstream has NO patched
+       release — the advisory (GHSA-2m69-gcr7-jv3q) lists "Patched: None", 2.1.11 is the newest
+       lib.e_sqlite3, and the fixed SQLite only ships in the major-version bundle_e_sqlite3 3.0.x line,
+       which is not validated against Microsoft.Data.Sqlite 10.x. EdgeIndexPublisher is a BUILD-TIME
+       desktop tool that indexes the project's own bundled manuals corpus offline — no untrusted or
+       network input — so CVE-2025-6965 is not reachable here. We suppress this one advisory (NuGet audit
+       stays on for everything else). Revisit when a patched 2.1.x ships or we validate SQLitePCLRaw 3.0.x. -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
 </Project>
