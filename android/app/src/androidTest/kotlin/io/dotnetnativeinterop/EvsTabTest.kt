@@ -13,10 +13,11 @@ import org.junit.runner.RunWith
  * On-device proof that the Kotlin EVS pipeline (WordPiece tokenizer -> onnxruntime-android encoder ->
  * SQLite index -> cosine) reproduces the .NET EdgeIndexPublisher ranking for the fixture query.
  *
- * The production threshold is 0.70 to mirror iOS. all-MiniLM cosines for genuine matches run below
- * that: the fixture's top hit (hvac-001#2) scores ~0.565 against the published query vector, so the
- * 0.70 default deliberately returns nothing for this query (iOS-parity behavior, asserted below).
- * The ranking proof therefore queries unthresholded (minScore = 0f) and checks the order, not a floor.
+ * The production default is a 0.15 NOISE FLOOR to mirror iOS (show top-K, let each hit's score
+ * communicate confidence — like the engine's top-K dni_search). all-MiniLM cosines for genuine matches
+ * run well below the old 0.70: the fixture's top hit (hvac-001#2) scores ~0.565 against the published
+ * query vector, so the default now SURFACES it (asserted below). The ranking proof queries unthresholded
+ * (minScore = 0f) and checks order; the production-default proof checks the top match is surfaced.
  */
 @RunWith(AndroidJUnit4::class)
 public class EvsTabTest {
@@ -35,9 +36,10 @@ public class EvsTabTest {
         // Ground truth vs the C#-published query vector is ~0.565; >0.5 guards against encoder regression.
         assertTrue("encoder sane (top ~0.565, was $top)", top > 0.5f)
 
-        // iOS-parity: the production 0.70 threshold filters this query to nothing (top < 0.70).
+        // iOS-parity: the production default (0.15 noise floor) now SURFACES the genuine top match (top ~0.565 >= 0.15).
         val atProd = engine.search("compressor won't start")
-        assertTrue("0.70 parity filters this query (top $top < 0.70)", atProd.isEmpty())
+        assertTrue("production default surfaces matches (top $top >= 0.15)", atProd.isNotEmpty())
+        assertEquals("production top == fixture top", "hvac-001#2", atProd.first().chunk.chunkId)
 
         android.util.Log.i(
             "EvsTab",

@@ -66,7 +66,7 @@ struct EdgeSearchView: View {
                     }
                     .instrumentRow()
                 } else if !model.query.isEmpty && !model.searching {
-                    Section { Text("No matches \u{2265} 70% similarity.").foregroundStyle(Instrument.textSecondary) }
+                    Section { Text("No matches found.").foregroundStyle(Instrument.textSecondary) }
                     .listRowBackground(Instrument.bg1)
                 }
             }

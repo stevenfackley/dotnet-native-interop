@@ -46,4 +46,14 @@ final class EdgeSearchAgreementTests: XCTestCase {
         print("EVS vector max abs delta (Swift/CoreML vs .NET/CPU) = \(maxDelta)")
         XCTAssertLessThan(maxDelta, 0.05, "Core ML embedding should closely match the publisher's")
     }
+
+    /// The production default is now a 0.15 noise floor (was 0.70, which hid the ~0.565 top match and made
+    /// EVS look broken). The default must now surface the genuine top hit, mirroring the Android EvsTabTest.
+    func testDefaultThresholdSurfacesTopMatch() throws {
+        let fx = try loadFixtures()
+        let engine = try EdgeSearchEngine()
+        let hits = try engine.search(fx.query)
+        XCTAssertFalse(hits.isEmpty, "default threshold must surface genuine matches (top ~0.565 >= 0.15)")
+        XCTAssertEqual(hits.first?.chunk.id, fx.expectedTopChunkId, "default-threshold top must match the publisher")
+    }
 }
