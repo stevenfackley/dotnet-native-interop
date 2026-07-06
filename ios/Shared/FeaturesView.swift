@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// Catalog: table-of-contents over all features for the SELECTED transport — a transport picker, a
-/// search field, version/status filter chips, a sort order, collapsible version sections, and rows that
-/// drill into a per-feature FeatureDetailView. Search/filter/sort is the Catalog's one net-new behavior
-/// from the IA collapse spec (2026-06-21) — 57 items is past scan-only.
+/// search field, version/status filter chips, a sort order, and rows that drill into a per-feature
+/// FeatureDetailView. Version sort (the default) shows collapsible version sections; name/elapsed
+/// sorts show one flat, globally ordered list. Search/filter/sort is the Catalog's one net-new
+/// behavior from the IA collapse spec (2026-06-21) — 57 items is past scan-only.
 struct FeaturesView: View {
     @ObservedObject var viewModel: FeaturesViewModel
     @State private var collapsed: Set<String> = []
@@ -29,14 +30,18 @@ struct FeaturesView: View {
                             .foregroundStyle(Instrument.textSecondary)
                     }
                     .instrumentRow()
-                } else if viewModel.grouped.isEmpty {
+                } else if viewModel.filteredAndSorted.isEmpty {
                     Section {
                         Text("No features match your search or filters.")
                             .foregroundStyle(Instrument.textSecondary)
                     }
                     .instrumentRow()
-                } else {
+                } else if viewModel.sort == .version {
                     groups
+                } else {
+                    // Name/elapsed sorts render ONE flat list — keeping the always-on version
+                    // sections would silently defeat the global ordering the user just asked for.
+                    flatRows
                 }
 
                 if let errorMessage = viewModel.errorMessage, !viewModel.descriptors.isEmpty {
@@ -98,13 +103,37 @@ struct FeaturesView: View {
         }
     }
 
+    /// A real Button (not Text + tap gesture) so VoiceOver gets the button trait and can activate it;
+    /// .isSelected exposes the active-filter state the capsule tint shows visually.
     private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Text(title)
-            .font(Instrument.panelLabel)
-            .padding(.horizontal, Instrument.Space.m).padding(.vertical, Instrument.Space.s)
-            .background(selected ? Instrument.accent : Instrument.bg2, in: Capsule())
-            .foregroundStyle(selected ? Instrument.bg0 : Instrument.textSecondary)
-            .onTapGesture(perform: action)
+        Button(action: action) {
+            Text(title)
+                .font(Instrument.panelLabel)
+                .padding(.horizontal, Instrument.Space.m).padding(.vertical, Instrument.Space.s)
+                .background(selected ? Instrument.accent : Instrument.bg2, in: Capsule())
+                .foregroundStyle(selected ? Instrument.bg0 : Instrument.textSecondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// Flat, globally ordered rows for the name/elapsed sorts. Reuses the exact grouped-row shape
+    /// (NavigationLink + FeatureRow) — no sections, no new visual language.
+    private var flatRows: some View {
+        Section {
+            ForEach(viewModel.filteredAndSorted) { descriptor in
+                NavigationLink {
+                    FeatureDetailView(descriptor: descriptor, viewModel: viewModel)
+                } label: {
+                    FeatureRow(
+                        descriptor: descriptor,
+                        status: viewModel.status(descriptor.id),
+                        result: viewModel.results[descriptor.id]
+                    )
+                }
+            }
+        }
+        .instrumentRow()
     }
 
     private var groups: some View {

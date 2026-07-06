@@ -31,8 +31,8 @@ final class FeaturesViewModel: ObservableObject {
     var orderedInfos: [TransportInfo] { TransportKind.allCases.map { infos[$0] } }
 
     /// Descriptors grouped into ordered (version, items) sections, after search text + the version/status
-    /// filter chips, with items ordered per the active sort (57 items is past scan-only — the catalog's
-    /// one net-new behavior from the IA collapse spec).
+    /// filter chips. Used by the catalog's version-sort mode only — the name/elapsed sorts render the
+    /// flat `filteredAndSorted` directly, since version sections would defeat a global ordering.
     var grouped: [(String, [FeatureDescriptor])] {
         let shown = filteredAndSorted
         return shown.map(\.version).uniqued().map { version in
@@ -40,7 +40,10 @@ final class FeaturesViewModel: ObservableObject {
         }
     }
 
-    private var filteredAndSorted: [FeatureDescriptor] {
+    /// Descriptors after search text + the version/status filter chips, ordered per the active sort
+    /// (57 items is past scan-only — the catalog's one net-new behavior from the IA collapse spec).
+    /// Rendered flat by the catalog for the name/elapsed sorts, and via `grouped` for version sort.
+    var filteredAndSorted: [FeatureDescriptor] {
         var shown = descriptors
 
         if let statusFilter {
