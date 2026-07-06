@@ -114,4 +114,6 @@ feature is re-scoped to a portable, non-OS-backed PQC library (e.g. a managed or
 BoringSSL-style implementation) — which would then need its **own** NativeAOT-mobile spike, since
 it wouldn't reuse this gate's win-x64 result at all.
 
+**Update (same day):** option (b) is now gated and **passes** — BouncyCastle's pure managed ML-KEM/ML-DSA survive NativeAOT cleanly; see `bouncycastle-pqc-findings.md`.
+
 [xplat-crypto]: https://learn.microsoft.com/dotnet/standard/security/cross-platform-cryptography#post-quantum-cryptography
