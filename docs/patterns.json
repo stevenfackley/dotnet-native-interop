@@ -24,6 +24,27 @@
       ]
     },
     {
+      "id": "binary",
+      "name": "Framed Protobuf",
+      "transport": "Length-prefixed Google.Protobuf over 127.0.0.1 (raw System.Net.Sockets)",
+      "summary": "The library starts a raw-socket server on a dynamic 127.0.0.1 port that speaks length-prefixed Google.Protobuf frames ([u32 LE length][Envelope]); the UI sends typed request Envelopes and reads typed responses — structured binary RPC with no ASP.NET or gRPC runtime. An opt-in ML-KEM-768 / ML-DSA-65 handshake then AES-256-GCM-encrypts every frame.",
+      "bestFor": "A strongly-typed binary boundary the gRPC dead-end wanted to be — schema-driven, AOT-clean, shippable on mobile; and the place to demonstrate a post-quantum secure channel.",
+      "features": [
+        "Strongly-typed protobuf contract (the schema gRPC uses) with none of the Kestrel/ASP.NET stack — ships under NativeAOT",
+        "Compact binary framing instead of HTTP/1.1 text + JSON: smaller on the wire than the HTTP transport",
+        "Server-streaming maps naturally onto the token stream via a sequence of chunk frames",
+        "Opt-in post-quantum channel: ML-KEM-768 key exchange + ML-DSA-65 handshake signature, AES-256-GCM per frame",
+        "Typed ErrorFrame payloads — failures surface as data, never a silent socket close"
+      ],
+      "limitations": [
+        "Still a socket to talk to yourself in-process: TCP + framing + protobuf (de)serialization overhead vs FFI",
+        "Dynamic port handshake: the UI must read back the OS-assigned port",
+        "Backgrounding kills the listener (same as HTTP) — the socket must be restarted on foreground",
+        "PQ mode is fixed at server start (per-boot keys); switching plaintext<->PQ restarts the server",
+        "The handshake authenticates transcript integrity, not server identity (trust-on-first-use) — loopback only"
+      ]
+    },
+    {
       "id": "http",
       "name": "HTTP Loopback",
       "transport": "Raw System.Net.Sockets on 127.0.0.1, REST + SSE",

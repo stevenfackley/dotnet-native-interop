@@ -72,6 +72,7 @@ public class FeaturesViewModel(
 
 internal fun defaultServiceFor(t: TransportKind): FeatureCatalogService = when (t) {
     TransportKind.Ffi -> FfiFeatureService()
+    TransportKind.Binary -> PbFeatureService()
     TransportKind.Http -> HttpFeatureService()
     TransportKind.Sqlite -> SqliteFeatureService()
 }
