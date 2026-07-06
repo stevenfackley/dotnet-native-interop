@@ -74,6 +74,14 @@ Check("turn ended Answered with 1 tool step", res6.StopReason == ForemanStopReas
 Check("emitted agent.turn span", seen.Contains("agent.turn"));
 Check("emitted agent.tool.engine_stats span", seen.Contains("agent.tool.engine_stats"));
 
+// Task 7: runaway tool-calling stops at the cap with an honest StopReason
+int stats7 = 0;
+var tools7 = new[] { new ToolDefinition("engine_stats","d",Array.Empty<ToolParam>(),(_,_)=>{stats7++;return Task.FromResult("{}");}) };
+var greedy = new ScriptedBrain(_ => AgentDecision.Tool(new ToolCall("engine_stats","{}")));
+var res7 = await new ForemanAgent(tools7, greedy).RunTurnAsync("q", _=>{}, default);
+Check("stops at MaxToolSteps", stats7 == ForemanAgent.MaxToolSteps);
+Check("reports StepCapReached", res7.StopReason == ForemanStopReason.StepCapReached);
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 
