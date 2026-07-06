@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Numerics.Tensors;
 using System.Text.Json;
 using DotnetNativeInterop.Engine;
 using DotnetNativeInterop.Engine.Ai.Agent;
@@ -193,14 +194,30 @@ Check("run_feature JSON round-trips via ForemanJsonContext.FeatureRun",
     pingJson.Contains("\"result\":\"pong\"") && pingJson.Contains("\"ok\":true"));
 
 // Task 14: DeterministicRouter calibrated against REAL MiniLM embeddings (SemanticSearch.Default.Embed)
-// instead of the fake one-hot vectors Task 8 uses — proves ForemanHost's 0.3f threshold (see
-// core/DotnetNativeInterop.Engine/Ai/Agent/ForemanHost.cs) actually separates real tool descriptions
-// from real queries, for all three tools (not just two).
+// instead of the fake one-hot vectors Task 8 uses — proves ForemanHost's SHIPPED threshold
+// (ForemanHost.RouterThreshold) actually separates real tool descriptions from real queries: all three
+// positives route AND a genuinely off-topic query routes to NOTHING. calibrationRouter mirrors
+// ForemanHost's own router construction exactly (same tools, same encoder, same threshold constant).
 var calibrationTools = ForemanTools.Build(
     q => Task.FromResult(AiJson.Serialize(SemanticSearch.Default.Search(q, "manuals", 3))),
     id => Task.FromResult(JsonSerializer.Serialize(LanguageFeatureCatalog.Run(id), ForemanJsonContext.Default.FeatureRun)),
     EngineTelemetry.SnapshotJson);
-var calibrationRouter = new DeterministicRouter(calibrationTools, SemanticSearch.Default.Embed, threshold: 0.3f);
+var calibrationRouter = new DeterministicRouter(calibrationTools, SemanticSearch.Default.Embed, ForemanHost.RouterThreshold);
+
+// Diagnostic: the max cosine any tool description scores against each query — the exact quantity the
+// router thresholds on — printed so the shipped ForemanHost.RouterThreshold is evidence-based, not a
+// magic number. Uses the REAL encoder end-to-end.
+var toolDescVecs = calibrationTools.Select(t => (t.Name, Vec: SemanticSearch.Default.Embed(t.Description))).ToArray();
+(string Tool, float Sim) BestTool(string q)
+{
+    var qv = SemanticSearch.Default.Embed(q);
+    return toolDescVecs
+        .Select(t => (t.Name, Sim: TensorPrimitives.CosineSimilarity(qv, t.Vec)))
+        .OrderByDescending(x => x.Sim)
+        .First();
+}
+
+Console.WriteLine($"[calibration] shipped RouterThreshold = {ForemanHost.RouterThreshold:0.###}");
 (string Query, string ExpectTool)[] calibrationCases =
 [
     ("the compressor is overheating and keeps tripping the rooftop unit, what should I check?", "search_manuals"),
@@ -209,9 +226,27 @@ var calibrationRouter = new DeterministicRouter(calibrationTools, SemanticSearch
 ];
 foreach (var (query, expectTool) in calibrationCases)
 {
+    var (bestTool, bestSim) = BestTool(query);
     var pick = calibrationRouter.Route(query);
-    Console.WriteLine($"[calibration] \"{query}\" -> {pick?.Tool ?? "(none)"}");
+    Console.WriteLine($"[calibration] +  best={bestTool} sim={bestSim:0.###} route={pick?.Tool ?? "(none)"}  <- \"{query}\"");
     Check($"real router routes '{expectTool}'-style query to {expectTool}", pick?.Tool == expectTool);
+}
+
+// The NEGATIVE case (the half Task 8 only proved with fake one-hot vectors): a genuinely off-topic
+// query, embedded with the REAL encoder, must fall below the shipped threshold and route to NO tool —
+// else the router would false-route unrelated questions into HVAC search. Two independent off-topic
+// probes so the guarantee isn't a single lucky sample.
+string[] offTopicQueries =
+[
+    "what's the weather in Tokyo tomorrow afternoon",
+    "who won the world cup in 1998 and what was the final score",
+];
+foreach (var offTopic in offTopicQueries)
+{
+    var (bestTool, bestSim) = BestTool(offTopic);
+    var pick = calibrationRouter.Route(offTopic);
+    Console.WriteLine($"[calibration] -  best={bestTool} sim={bestSim:0.###} route={pick?.Tool ?? "(none)"}  <- \"{offTopic}\"");
+    Check("real router rejects an off-topic query (no tool at shipped threshold)", pick is null);
 }
 
 // Task 15: ForemanHost end-to-end — the fully-wired agent the host hands out. No GGUF is bundled on

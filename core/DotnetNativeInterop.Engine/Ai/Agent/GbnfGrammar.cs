@@ -6,6 +6,8 @@ namespace DotnetNativeInterop.Engine.Ai.Agent;
 /// Builds a llama.cpp GBNF grammar restricting a turn to a valid tool call or a final answer.
 /// The llama path samples under this grammar so the model cannot emit malformed tool syntax.
 /// (Older llama.cpp without grammar sampling: fall back to RouterBrain — see spec.)
+/// NOTE: as currently wired the grammar is *prompted*, not sampler-enforced — see
+/// <c>ForemanHost.BuildGrammarBrain</c> — until the dni_llama shim gains grammar sampling.
 /// </summary>
 public static class GbnfGrammar
 {

@@ -52,7 +52,7 @@ public sealed class SemanticSearch(ITextEncoder encoder)
     private static SemanticSearch? _default;
     private static readonly object Gate = new();
 
-    /// <summary>Process-wide search over two corpora ("features", "facts"), built once from bundled assets.</summary>
+    /// <summary>Process-wide search over three corpora ("features", "facts", "manuals"), built once from bundled assets.</summary>
     public static SemanticSearch Default
     {
         get

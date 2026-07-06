@@ -89,26 +89,81 @@ public static class ForemanHost
     }
 
     // No-LLM fallback: DeterministicRouter over real MiniLM embeddings (SemanticSearch.Default.Embed —
-    // the same encoder/session "manuals" search uses, no second ONNX session) + ExtractiveLanguageModel's
-    // synchronous Compose(...) as the prose step. RouterBrain's StreamAnswerAsync re-searches the manuals
-    // with "query + tool results" as the retrieval query (the same thing ExtractiveLanguageModel.
-    // GenerateAsync would do internally) rather than piping the tool's raw JSON straight to the user —
-    // Compose is used directly instead of the full async GenerateAsync because RouterBrain's `prose` seam
-    // is a synchronous Func<string,string> (StreamAnswerAsync sinks one composed string, not a token
-    // stream); GenerateAsync's per-word delay is a UX affectation for the model-streaming path and buys
-    // nothing here.
+    // the same encoder/session "manuals" search uses, no second ONNX session). RouterBrain's
+    // StreamAnswerAsync composes the answer from the tool result(s) the turn actually produced (see
+    // ComposeProse) — NOT a fresh manuals search — so the streamed prose reflects whatever tool ran.
     private static RouterBrain BuildRouterBrain(IReadOnlyList<ToolDefinition> tools)
     {
-        // 0.3f: calibrated against the harness's real-encoder run (see ForemanHarness Task R2) — MiniLM
-        // cosine similarity between a short user query and a one-sentence tool description clusters
-        // lower than the fake one-hot vectors the unit tests use, so the 0.5 test threshold would starve
-        // the router. A tunable product value, not a derived constant.
-        var router = new DeterministicRouter(tools, SemanticSearch.Default.Embed, threshold: 0.3f);
+        // RouterThreshold: calibrated against the harness's real-encoder run (ForemanHarness "calibration"
+        // block) so all three positive routes clear it AND a genuinely off-topic query (embedded with the
+        // real MiniLM encoder) falls below it — a tunable product value, not a derived constant.
+        var router = new DeterministicRouter(tools, SemanticSearch.Default.Embed, RouterThreshold);
         return new RouterBrain(router, ComposeProse);
     }
 
-    private static string ComposeProse(string prompt) =>
-        ExtractiveLanguageModel.Compose(SemanticSearch.Default.Search(prompt, "manuals", topK: 3));
+    /// <summary>The shipped router cosine cut-off. See <see cref="BuildRouterBrain"/> for calibration.</summary>
+    public const float RouterThreshold = 0.3f;
+
+    // Composes the router's fallback prose from the tool result(s) the turn produced. RouterBrain hands
+    // this func "<query>\n<joined tool-result JSON>"; we answer from the RESULT, not a fresh manuals
+    // search — so an engine_stats/run_feature route streams prose about the stats/feature result, not an
+    // off-topic HVAC passage, while a search_manuals route still reads as grounded manual prose. Also
+    // drops the redundant second manuals search the earlier binding did on every turn.
+    private static string ComposeProse(string prompt)
+    {
+        var newline = prompt.IndexOf('\n');
+        var results = (newline >= 0 ? prompt[(newline + 1)..] : prompt).Trim();
+        if (results.Length == 0)
+        {
+            return "I couldn't find anything in the tools to answer that.";
+        }
+
+        // search_manuals returns a SearchResult[]; present it as grounded prose the way the extractive
+        // generator does. Any other tool (engine_stats / run_feature) returns its own JSON object —
+        // surface that directly rather than dressing it up as a manual excerpt.
+        return TryReadSnippets(results, out var hits)
+            ? ExtractiveLanguageModel.Compose(hits)
+            : $"Based on the tools: {results}";
+    }
+
+    // Parses a search_manuals tool result (a SearchResult[] JSON array) back into typed hits without
+    // reflection — JsonDocument only, so it stays AOT-clean. Returns false for any non-array/other-tool
+    // result, which ComposeProse then surfaces verbatim.
+    private static bool TryReadSnippets(string json, out SearchResult[] hits)
+    {
+        hits = [];
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            var list = new List<SearchResult>();
+            foreach (var element in doc.RootElement.EnumerateArray())
+            {
+                if (element.ValueKind != JsonValueKind.Object
+                    || !element.TryGetProperty("text", out var text)
+                    || text.ValueKind != JsonValueKind.String)
+                {
+                    return false;
+                }
+
+                var score = element.TryGetProperty("score", out var s) && s.ValueKind == JsonValueKind.Number
+                    ? s.GetDouble()
+                    : 0d;
+                list.Add(new SearchResult(text.GetString() ?? string.Empty, score));
+            }
+
+            hits = list.ToArray();
+            return hits.Length > 0;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
     // GrammarBrain seam: a real DniChatClient wrapping a real on-device LlamaLanguageModel.
     //
