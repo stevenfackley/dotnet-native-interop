@@ -26,12 +26,9 @@ public object NativeBridge {
     public external fun nativeBrokerStop(): Int
 
     // Pattern 2 — gRPC over UDS: EXCLUDED transport. The engine exports no dni_grpc_* (gRPC has no
-    // NativeAOT mobile runtime pack), so these are deliberately NOT registered in the JNI table — they
-    // exist only so the legacy GrpcUdsClient still compiles. Invoking them throws UnsatisfiedLinkError
-    // (no regression: the pre-rename shim referenced a non-existent dni_grpc_start, so gRPC never worked
-    // on Android). TODO(SP1): remove GrpcUdsClient + these two declarations together.
-    public external fun nativeGrpcStart(socketPath: String): Int
-    public external fun nativeGrpcStop(): Int
+    // NativeAOT mobile runtime pack). The Kotlin client (GrpcUdsClient) and its nativeGrpcStart/Stop
+    // declarations were removed together (SP1 hygiene) — see patterns.json's "grpc" entry and
+    // jni_bridge.c for the documented reason gRPC stays excluded from the build.
 
     // Structured feature catalog (string-returning; null on failure)
     public external fun nativeFeaturesJson(): String?
