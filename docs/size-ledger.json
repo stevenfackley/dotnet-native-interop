@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Binary-size cost ledger for the .NET 10 NativeAOT mobile-interop POC. Regenerate with tools/size-ledger/generate-manifest.ps1 -Publish. See docs/binary-size-ledger-findings.md for the narrative.",
+  "generatedAt": "2026-07-06T09:58:43.3472563-04:00",
+  "generator": "tools/size-ledger/generate-manifest.ps1",
+  "schemaNotes": "category: native-lib | model | framework | gguf. status: measured (this run measured real bytes) | documented (hand-entered from a findings doc, not reproducible here) | pending (needs Mac/CI or an LFS pull; bytes is null). source labels the origin precisely -- measured-win-x64, lfs (real Git LFS bytes on disk), measured-local-regen/measured-local-disk (a local build-time artifact), or documented-from-<file>.md.",
+  "components": [
+    {
+      "id": "dni-dll-win-x64",
+      "component": "dni.dll (win-x64 NativeAOT)",
+      "category": "native-lib",
+      "platform": "win-x64",
+      "bytes": 8324608,
+      "humanSize": "7.94 MiB",
+      "status": "measured",
+      "source": "measured-win-x64",
+      "asOf": "2026-07-06",
+      "note": "From dotnet publish core/DotnetNativeInterop.NativeBridge -r win-x64 -c Release /p:PublishAot=true /p:IlcUseEnvironmentalTools=true. Windows links ONNX/SQLCipher as side-by-side DLLs (dynamic), NOT statically into dni.dll — unlike iOS/Android, which bake them into one dylib/so. See findings doc for why this is not apples-to-apples with the mobile RIDs."
+    },
+    {
+      "id": "onnxruntime-dll-win-x64",
+      "component": "onnxruntime.dll (win-x64 side-by-side)",
+      "category": "framework",
+      "platform": "win-x64",
+      "bytes": 11569696,
+      "humanSize": "11.03 MiB",
+      "status": "measured",
+      "source": "measured-win-x64",
+      "asOf": "2026-07-06",
+      "note": "From dotnet publish core/DotnetNativeInterop.NativeBridge -r win-x64 -c Release /p:PublishAot=true /p:IlcUseEnvironmentalTools=true. Windows links ONNX/SQLCipher as side-by-side DLLs (dynamic), NOT statically into dni.dll — unlike iOS/Android, which bake them into one dylib/so. See findings doc for why this is not apples-to-apples with the mobile RIDs."
+    },
+    {
+      "id": "onnxruntime-providers-shared-win-x64",
+      "component": "onnxruntime_providers_shared.dll (win-x64)",
+      "category": "framework",
+      "platform": "win-x64",
+      "bytes": 22048,
+      "humanSize": "0.02 MiB",
+      "status": "measured",
+      "source": "measured-win-x64",
+      "asOf": "2026-07-06",
+      "note": "From dotnet publish core/DotnetNativeInterop.NativeBridge -r win-x64 -c Release /p:PublishAot=true /p:IlcUseEnvironmentalTools=true. Windows links ONNX/SQLCipher as side-by-side DLLs (dynamic), NOT statically into dni.dll — unlike iOS/Android, which bake them into one dylib/so. See findings doc for why this is not apples-to-apples with the mobile RIDs."
+    },
+    {
+      "id": "e-sqlcipher-dll-win-x64",
+      "component": "e_sqlcipher.dll (win-x64 side-by-side)",
+      "category": "framework",
+      "platform": "win-x64",
+      "bytes": 1852928,
+      "humanSize": "1.77 MiB",
+      "status": "measured",
+      "source": "measured-win-x64",
+      "asOf": "2026-07-06",
+      "note": "From dotnet publish core/DotnetNativeInterop.NativeBridge -r win-x64 -c Release /p:PublishAot=true /p:IlcUseEnvironmentalTools=true. Windows links ONNX/SQLCipher as side-by-side DLLs (dynamic), NOT statically into dni.dll — unlike iOS/Android, which bake them into one dylib/so. See findings doc for why this is not apples-to-apples with the mobile RIDs."
+    },
+    {
+      "id": "model-onnx-fp32",
+      "component": "model.onnx (all-MiniLM-L6-v2, FP32)",
+      "category": "model",
+      "platform": "n/a",
+      "bytes": 90405214,
+      "humanSize": "86.22 MiB",
+      "status": "measured",
+      "source": "lfs",
+      "asOf": "2026-07-06",
+      "note": "Real Git LFS bytes checked out at core/DotnetNativeInterop.Engine/Ai/assets/model.onnx. Embedded at launch by the in-engine NativeAOT AI tab and used as the EVS publisher's source model."
+    },
+    {
+      "id": "model-onnx-int8",
+      "component": "model.int8.onnx (all-MiniLM-L6-v2, INT8 dynamic quant)",
+      "category": "model",
+      "platform": "n/a",
+      "bytes": 22903734,
+      "humanSize": "21.84 MiB",
+      "status": "documented",
+      "source": "documented-from-int8-minilm-quant-findings.md",
+      "asOf": "2026-07-06",
+      "note": "Not regenerated for this run (gitignored, build-time artifact — see tools/int8-quant/quantize.py to reproduce). Exact value from docs/int8-minilm-quant-findings.md: 90,405,214 -> 22,903,734 bytes, 3.95x smaller. NOT yet wired into either shipping path (EVS publisher or the in-engine AI tab) as of this ledger."
+    },
+    {
+      "id": "onnxruntime-xcframework-ios-arm64",
+      "component": "onnxruntime.xcframework/ios-arm64 slice (Swift-side EVS Core ML path)",
+      "category": "framework",
+      "platform": "ios-arm64",
+      "bytes": 34248432,
+      "humanSize": "32.66 MiB",
+      "status": "measured",
+      "source": "lfs",
+      "asOf": "2026-07-06",
+      "note": "Real Git LFS bytes checked out. This is the Swift-side ONNX Runtime + Core ML EP framework used by the EVS (Manuals) tab, vendored under ios/Frameworks — a SEPARATE copy from the ONNX Runtime NuGet package the .NET engine statically links into dni.dylib (Phase 3 AI tab). Both ship in the same app."
+    },
+    {
+      "id": "onnxruntime-xcframework-iossimulator-arm64-x86_64",
+      "component": "onnxruntime.xcframework/ios-arm64_x86_64-simulator slice (Swift-side EVS Core ML path)",
+      "category": "framework",
+      "platform": "ios-arm64_x86_64-simulator",
+      "bytes": 74234152,
+      "humanSize": "70.80 MiB",
+      "status": "measured",
+      "source": "lfs",
+      "asOf": "2026-07-06",
+      "note": "Real Git LFS bytes checked out. This is the Swift-side ONNX Runtime + Core ML EP framework used by the EVS (Manuals) tab, vendored under ios/Frameworks — a SEPARATE copy from the ONNX Runtime NuGet package the .NET engine statically links into dni.dylib (Phase 3 AI tab). Both ship in the same app."
+    },
+    {
+      "id": "gguf-llama-3.2-1b-instruct-q4",
+      "component": "Llama-3.2-1B-Instruct, Q4_K_M GGUF",
+      "category": "gguf",
+      "platform": "n/a",
+      "bytes": null,
+      "humanSize": null,
+      "status": "documented",
+      "source": "documented-from-llama-nativeaot-ios-findings.md",
+      "asOf": "2026-06-06",
+      "note": "No GGUF present in this checkout or committed to Git (the *.gguf LFS pattern exists in .gitattributes but no file is tracked -- it is fetched at build time onto the build host and bundled into Ai/assets/, never committed; see docs/llama-nativeaot-ios-findings.md \"Asset shipping note\" analog). Doc states \"~0.77 GB\" for Llama-3.2-1B-Instruct Q4_K_M -- approximate, never independently byte-measured in this repo. Powers on-device RAG generation on iOS; Android RAG is still extractive (GGUF bundling pending per README)."
+    },
+    {
+      "id": "dni-dylib-ios-arm64-pre-onnx",
+      "component": "dni.dylib (ios-arm64, before ONNX static-link)",
+      "category": "native-lib",
+      "platform": "ios-arm64",
+      "bytes": null,
+      "humanSize": null,
+      "status": "documented",
+      "source": "documented-from-onnx-nativeaot-ios-findings.md",
+      "asOf": "2026-06-05",
+      "note": "Approx. 6.9 MB per docs/onnx-nativeaot-ios-findings.md -- the doc gives only a rounded figure, no exact byte count, so bytes is left null here rather than fabricating precision. SQLCipher was ALREADY statically linked at this point; only ONNX was added next. STALE: predates llama.cpp (added the next day, 2026-06-06), BouncyCastle + Google.Protobuf (added 2026-07-05). Needs a fresh ios-arm64 build to reflect the current dylib."
+    },
+    {
+      "id": "dni-dylib-ios-arm64-with-onnx-historical",
+      "component": "dni.dylib (ios-arm64, with ONNX static-linked)",
+      "category": "native-lib",
+      "platform": "ios-arm64",
+      "bytes": null,
+      "humanSize": null,
+      "status": "documented",
+      "source": "documented-from-onnx-nativeaot-ios-findings.md",
+      "asOf": "2026-06-05",
+      "note": "Approx. 23 MB (+17 MB __TEXT for the statically-linked onnxruntime.xcframework archive) per docs/onnx-nativeaot-ios-findings.md -- rounded figure only, no exact byte count given, so bytes is left null rather than fabricating precision. STALE, same caveat as the row above: this is the LAST KNOWN real ios-arm64 dylib size, from BEFORE llama.cpp/ggml static libs, BouncyCastle, and Google.Protobuf were added to the same dylib. The current ios-arm64 dni.dylib is unmeasured and almost certainly larger. PENDING a fresh Mac build to get a current, exact number."
+    },
+    {
+      "id": "libdni-so-android-arm64",
+      "component": "libdni.so (linux-bionic-arm64, full native gate: NativeAOT + SQLCipher client + llama.cpp statically linked)",
+      "category": "native-lib",
+      "platform": "linux-bionic-arm64",
+      "bytes": null,
+      "humanSize": null,
+      "status": "pending",
+      "source": "pending-mac-ci",
+      "asOf": null,
+      "note": "NEVER MEASURED. docs/nativeaot-android-gate-findings.md proves the SP0 native gate links and runs on-device (NativeAOT + SQLCipher + llama.cpp -> libdni.so) but records no byte size anywhere. Unlike iOS, Android links llama.cpp/ggml statically into libdni.so but ships ONNX Runtime and SQLCipher as SEPARATE dynamic .so files in jniLibs/ (extracted from their .aar packages by build-android-so.sh) -- so libdni.so's composition differs from the iOS dylib's (which bakes in ONNX+SQLCipher+llama all together). Needs the NDK + a build-android-so.sh run (Mac mini or macos-latest CI runner) to measure. This Windows box has no C/C++ toolchain (no cmake, no clang) -- confirmed absent, see docs/llama-nativeaot-ios-findings.md."
+    }
+  ]
+}
