@@ -5,9 +5,14 @@ import dni.frame.v1.FeatureRunPb
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.EOFException
+import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * Length-prefixed framing ([u32 little-endian length][payload]) and Envelope round-tripping — the wire
@@ -46,6 +51,33 @@ public class FrameChannelTest {
         val reader = FrameChannel(ByteArrayInputStream(ByteArray(0)), ByteArrayOutputStream())
         assertNull(reader.readFrame())
     }
+
+    // ---- hostile-input controls (the 16 MB frame cap is the one adversarial guard) ----------------
+
+    @Test
+    public fun lengthPrefixOverTheCapIsRejected() {
+        // A length prefix claiming > MAX_FRAME_BYTES must be refused BEFORE any allocation.
+        val prefix = leU32(FrameChannel.MAX_FRAME_BYTES.toLong() + 1)
+        val reader = FrameChannel(ByteArrayInputStream(prefix), ByteArrayOutputStream())
+        assertThrows(IOException::class.java) { reader.readFrame() }
+    }
+
+    @Test
+    public fun zeroLengthPrefixIsRejected() {
+        val reader = FrameChannel(ByteArrayInputStream(leU32(0)), ByteArrayOutputStream())
+        assertThrows(IOException::class.java) { reader.readFrame() }
+    }
+
+    @Test
+    public fun truncatedPayloadThrowsEof() {
+        // Prefix promises 10 bytes but only 3 follow before EOF — a truncated frame, not a clean boundary.
+        val truncated = leU32(10) + byteArrayOf(1, 2, 3)
+        val reader = FrameChannel(ByteArrayInputStream(truncated), ByteArrayOutputStream())
+        assertThrows(EOFException::class.java) { reader.readFrame() }
+    }
+
+    private fun leU32(value: Long): ByteArray =
+        ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(value.toInt()).array()
 
     @Test
     public fun encryptedFrameDecodesOnMirrorCipherReader() {
