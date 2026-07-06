@@ -3,6 +3,7 @@ package io.dotnetnativeinterop.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.dotnetnativeinterop.model.TransportKind
 import io.dotnetnativeinterop.transport.FfiClient
 import io.dotnetnativeinterop.transport.HttpClient
 import io.dotnetnativeinterop.transport.InferRequest
@@ -19,14 +20,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
-/** Transport identifier matching the contract spec. gRPC/UDS was removed (SP1 hygiene): the engine
- *  never registered nativeGrpcStart/Stop in the JNI table, so selecting it threw UnsatisfiedLinkError. */
-public enum class TransportId(public val id: String, public val label: String) {
-    FFI("ffi", "FFI"),
-    HTTP("http", "HTTP"),
-    SQLITE("sqlite", "SQLite"),
-}
-
 /** Metrics captured per inference run. */
 public data class RunMetrics(
     val transportId: String = "",
@@ -39,7 +32,7 @@ public data class RunMetrics(
 /** Immutable snapshot of the full UI state. */
 public data class InferenceUiState(
     val prompt: String = "",
-    val selectedTransport: TransportId = TransportId.FFI,
+    val selectedTransport: TransportKind = TransportKind.Ffi,
     val tokens: List<Token> = emptyList(),
     val isRunning: Boolean = false,
     val error: String? = null,
@@ -113,7 +106,7 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(prompt = prompt, error = null) }
     }
 
-    public fun onTransportSelected(transport: TransportId) {
+    public fun onTransportSelected(transport: TransportKind) {
         _uiState.update { it.copy(selectedTransport = transport, error = null) }
     }
 
@@ -174,7 +167,7 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
                 s.copy(
                     isRunning = false,
                     metrics = RunMetrics(
-                        transportId = state.selectedTransport.id,
+                        transportId = state.selectedTransport.name.lowercase(),
                         timeToFirstTokenMs = ttft,
                         tokensPerSec = tps,
                         totalTimeMs = totalMs,
@@ -195,18 +188,18 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
     // Client resolution — starts the server-side if needed
     // -----------------------------------------------------------------------
 
-    private suspend fun resolveClient(transport: TransportId): InferenceClient {
+    private suspend fun resolveClient(transport: TransportKind): InferenceClient {
         return when (transport) {
-            TransportId.FFI -> ffiClient
+            TransportKind.Ffi -> ffiClient
 
-            TransportId.HTTP -> httpClient.also { client ->
+            TransportKind.Http -> httpClient.also { client ->
                 // Idempotent: if already running, nativeHttpStart is a no-op.
                 // The contract says the caller must restart on foreground, so
                 // this launch-time start is sufficient for the POC.
                 runCatching { client.start() }
             }
 
-            TransportId.SQLITE -> sqliteClient.also { client ->
+            TransportKind.Sqlite -> sqliteClient.also { client ->
                 runCatching { client.start() }
             }
         }
