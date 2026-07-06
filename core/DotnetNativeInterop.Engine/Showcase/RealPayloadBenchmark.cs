@@ -67,7 +67,11 @@ public static class RealPayloadBenchmark
                 new SummaryStat("total bytes", totalBytes.ToString(CultureInfo.InvariantCulture)),
                 new SummaryStat("avg bytes/rep", (totalBytes / reps).ToString(CultureInfo.InvariantCulture)),
                 new SummaryStat("total serialize", (totalMicros / 1000.0).ToString("F2", CultureInfo.InvariantCulture) + " ms"),
-                new SummaryStat("avg serialize/rep", (totalMicros / reps).ToString("F1", CultureInfo.InvariantCulture) + " µs"),
+                new SummaryStat(
+                    // ragctx/mixed rep 1 can carry SemanticSearch's one-time model-load/embed cost
+                    // (see RagCtxBytes) — say so in the label instead of letting the avg mislead.
+                    kind is "ragctx" or "mixed" ? "avg serialize/rep (incl. cold start)" : "avg serialize/rep",
+                    (totalMicros / reps).ToString("F1", CultureInfo.InvariantCulture) + " µs"),
             ]);
     }
 

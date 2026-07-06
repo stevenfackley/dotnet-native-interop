@@ -15,10 +15,33 @@ public static class GcLab
 {
     private const int SampleIntervalMs = 100; // ~10 samples/sec.
 
+    // Reentrancy gate: 1 while a storm is running. The storm deliberately distorts process-wide GC
+    // behavior (and loh/pinned force blocking collections), so two overlapping storms would corrupt
+    // each other's before/after deltas AND double the memory/pause pressure on the host app.
+    private static int _running;
+
     /// <summary>Runs the <paramref name="preset"/> storm for <paramref name="secs"/> seconds, sized by
     /// <paramref name="mb"/>. <paramref name="clamped"/> reports whether the caller's raw mb/secs values
-    /// were clamped to the safety caps (mb ≤ 256, secs ≤ 30) before reaching this method.</summary>
-    public static BenchmarkPayload Run(string preset, int mb, int secs, bool clamped)
+    /// were clamped to the safety caps (mb ≤ 256, secs ≤ 30) before reaching this method. Returns
+    /// <c>null</c> when a storm is already in flight (the caller reports the graceful error).</summary>
+    public static BenchmarkPayload? Run(string preset, int mb, int secs, bool clamped)
+    {
+        if (Interlocked.CompareExchange(ref _running, 1, 0) != 0)
+        {
+            return null; // another storm is in flight — never stack two GC labs in one process
+        }
+
+        try
+        {
+            return RunCore(preset, mb, secs, clamped);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _running, 0);
+        }
+    }
+
+    private static BenchmarkPayload RunCore(string preset, int mb, int secs, bool clamped)
     {
         var before = EngineTelemetry.Snapshot();
         var heapSamples = new List<BenchmarkPoint>();
@@ -74,8 +97,10 @@ public static class GcLab
     // per second, ballooning committed memory by ~2GB in ONE second — unacceptable for code that runs
     // inside a real mobile app's process. Pacing allocations to a wall-clock rate keeps memory growth
     // predictable and keeps mb/secs the two knobs that actually bound worst-case footprint, per the
-    // clamp caps above. Returns a checksum folded from every buffer touched, so the storm can't be
-    // optimized away as dead code (mirrors Benchmarks.RenderMandelbrotParallel).
+    // clamp caps above. Elision-proofing note: the checksum return is best-effort belt-and-braces (the
+    // caller discards it) — what actually anchors the allocations is that every buffer escapes into a
+    // live collection (gen0Recent/lohPool/pinnedHandles), and the effect being measured is the GC
+    // counters/heap sizes observed and reported by Run, which no optimizer can fake.
     private static long Storm(
         string preset, int mb, TimeSpan duration, List<BenchmarkPoint> heapSamples, List<BenchmarkPoint> committedSamples)
     {
@@ -136,7 +161,11 @@ public static class GcLab
                         // would never be freed and heap would grow by mb*secs instead of converging to
                         // ~mb MB. Forcing one here bounds memory AND surfaces the real signal: committed
                         // staying above heap after a full collection IS the pin fragmentation this preset
-                        // exists to demonstrate.
+                        // exists to demonstrate. CAVEAT: each forced blocking Gen2 is a process-wide
+                        // stop-the-world pause — any concurrent engine work (e.g. a streaming inference
+                        // session) stalls at every sample tick for the storm window. Acceptable for an
+                        // explicit foreground demo (and disclosed in the payload's "collection mode"
+                        // stat); the reentrancy gate in Run keeps at least two storms from stacking.
                         GC.Collect(2, GCCollectionMode.Forced, blocking: true);
                     }
 

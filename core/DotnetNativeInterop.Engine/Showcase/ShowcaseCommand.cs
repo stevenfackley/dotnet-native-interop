@@ -85,7 +85,13 @@ public static class ShowcaseCommand
         var rawSecs = GetIRaw(p, "secs", 5);
         var mb = Math.Clamp(rawMb, 1, 256);
         var secs = Math.Clamp(rawSecs, 1, 30);
-        return ShowcaseJson.Serialize(GcLab.Run(preset, mb, secs, mb != rawMb || secs != rawSecs));
+        var payload = GcLab.Run(preset, mb, secs, mb != rawMb || secs != rawSecs);
+
+        // null = the reentrancy gate refused a second concurrent storm; reuse the standard graceful-error
+        // sentinel (its prefix is what flips FeatureRun.Ok to false in Run above).
+        return payload is null
+            ? "Unknown showcase command: gclab (already running — one storm per process at a time)"
+            : ShowcaseJson.Serialize(payload);
     }
 
     private static Dictionary<string, string> ParseParams(string[] parts)
