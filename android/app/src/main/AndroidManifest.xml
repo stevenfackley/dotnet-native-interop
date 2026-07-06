@@ -2,10 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-        INTERNET is required for:
-          - HTTP transport (OkHttp to 127.0.0.1)
-          - gRPC transport (grpc-java client setup, even over UDS, uses network stack)
-        Loopback (127.0.0.1) and UDS do NOT require LOCAL_NETWORK permission on Android.
+        INTERNET is required for the HTTP transport (OkHttp to 127.0.0.1). Loopback (127.0.0.1)
+        does NOT require LOCAL_NETWORK permission on Android.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
 

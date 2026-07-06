@@ -12,11 +12,6 @@
 # Room — keep entity classes and DAOs
 -keep class io.dotnetnativeinterop.data.** { *; }
 
-# gRPC generated code
--keep class io.grpc.** { *; }
--keep class dni.v1.** { *; }
--dontwarn io.grpc.**
-
 # OkHttp SSE
 -dontwarn okhttp3.internal.**
 -keep class okhttp3.internal.ws.** { *; }

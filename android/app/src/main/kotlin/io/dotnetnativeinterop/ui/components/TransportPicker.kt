@@ -14,6 +14,7 @@ internal fun TransportPicker(
     selected: TransportKind,
     onSelect: (TransportKind) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
         val all = TransportKind.entries
@@ -21,6 +22,7 @@ internal fun TransportPicker(
             SegmentedButton(
                 selected = t == selected,
                 onClick = { onSelect(t) },
+                enabled = enabled,
                 shape = SegmentedButtonDefaults.itemShape(index = i, count = all.size),
             ) { Text(t.displayName) }
         }

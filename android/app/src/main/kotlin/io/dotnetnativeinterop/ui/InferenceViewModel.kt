@@ -3,8 +3,8 @@ package io.dotnetnativeinterop.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.dotnetnativeinterop.model.TransportKind
 import io.dotnetnativeinterop.transport.FfiClient
-import io.dotnetnativeinterop.transport.GrpcUdsClient
 import io.dotnetnativeinterop.transport.HttpClient
 import io.dotnetnativeinterop.transport.InferRequest
 import io.dotnetnativeinterop.transport.InferenceClient
@@ -20,14 +20,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
-/** Transport identifier matching the contract spec. */
-public enum class TransportId(public val id: String, public val label: String) {
-    FFI("ffi", "FFI"),
-    HTTP("http", "HTTP"),
-    GRPC("grpc", "gRPC/UDS"),
-    SQLITE("sqlite", "SQLite"),
-}
-
 /** Metrics captured per inference run. */
 public data class RunMetrics(
     val transportId: String = "",
@@ -40,7 +32,7 @@ public data class RunMetrics(
 /** Immutable snapshot of the full UI state. */
 public data class InferenceUiState(
     val prompt: String = "",
-    val selectedTransport: TransportId = TransportId.FFI,
+    val selectedTransport: TransportKind = TransportKind.Ffi,
     val tokens: List<Token> = emptyList(),
     val isRunning: Boolean = false,
     val error: String? = null,
@@ -54,11 +46,10 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(InferenceUiState())
     public val uiState: StateFlow<InferenceUiState> = _uiState.asStateFlow()
 
-    // Lazy-initialized clients — only created when first needed so the HTTP/gRPC
-    // servers don't bind until the user actually selects that transport.
+    // Lazy-initialized clients — only created when first needed so the HTTP
+    // server doesn't bind until the user actually selects that transport.
     private val ffiClient: FfiClient by lazy { FfiClient() }
     private val httpClient: HttpClient by lazy { HttpClient() }
-    private val grpcClient: GrpcUdsClient by lazy { GrpcUdsClient(app.cacheDir) }
     private val sqliteClient: SqliteClient by lazy { SqliteClient(app.applicationContext) }
 
     private var inferJob: Job? = null
@@ -115,7 +106,7 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(prompt = prompt, error = null) }
     }
 
-    public fun onTransportSelected(transport: TransportId) {
+    public fun onTransportSelected(transport: TransportKind) {
         _uiState.update { it.copy(selectedTransport = transport, error = null) }
     }
 
@@ -176,7 +167,7 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
                 s.copy(
                     isRunning = false,
                     metrics = RunMetrics(
-                        transportId = state.selectedTransport.id,
+                        transportId = state.selectedTransport.patternId,
                         timeToFirstTokenMs = ttft,
                         tokensPerSec = tps,
                         totalTimeMs = totalMs,
@@ -197,22 +188,18 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
     // Client resolution — starts the server-side if needed
     // -----------------------------------------------------------------------
 
-    private suspend fun resolveClient(transport: TransportId): InferenceClient {
+    private suspend fun resolveClient(transport: TransportKind): InferenceClient {
         return when (transport) {
-            TransportId.FFI -> ffiClient
+            TransportKind.Ffi -> ffiClient
 
-            TransportId.HTTP -> httpClient.also { client ->
+            TransportKind.Http -> httpClient.also { client ->
                 // Idempotent: if already running, nativeHttpStart is a no-op.
                 // The contract says the caller must restart on foreground, so
                 // this launch-time start is sufficient for the POC.
                 runCatching { client.start() }
             }
 
-            TransportId.GRPC -> grpcClient.also { client ->
-                runCatching { client.start() }
-            }
-
-            TransportId.SQLITE -> sqliteClient.also { client ->
+            TransportKind.Sqlite -> sqliteClient.also { client ->
                 runCatching { client.start() }
             }
         }
@@ -226,7 +213,6 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
         viewModelScope.launch {
             runCatching { httpClient.stop() }
-            runCatching { grpcClient.stop() }
             runCatching { sqliteClient.stop() }
         }
     }

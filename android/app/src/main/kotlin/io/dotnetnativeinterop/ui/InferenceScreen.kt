@@ -16,7 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -32,10 +31,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.ui.components.InstrumentCard
 import io.dotnetnativeinterop.ui.components.PanelHeader
+import io.dotnetnativeinterop.ui.components.TransportPicker
 import io.dotnetnativeinterop.ui.Instrument
 import io.dotnetnativeinterop.ui.Spacing
 
@@ -69,10 +68,11 @@ public fun InferenceScreen(
             EngineStatusBadge(ready = state.engineReady)
 
             // Transport selector
-            TransportSelector(
+            TransportPicker(
                 selected = state.selectedTransport,
                 onSelect = viewModel::onTransportSelected,
                 enabled = !state.isRunning,
+                modifier = Modifier.fillMaxWidth(),
             )
 
             // Prompt input
@@ -126,7 +126,7 @@ public fun InferenceScreen(
             // Pattern info panel (required by contract)
             state.patterns?.let { patternsJson ->
                 val pattern = remember(state.selectedTransport, patternsJson) {
-                    patternsJson.patterns.find { it.id == state.selectedTransport.id }
+                    patternsJson.patterns.find { it.id == state.selectedTransport.patternId }
                 }
                 pattern?.let { PatternInfoPanel(pattern = it) }
             }
@@ -153,31 +153,6 @@ private fun EngineStatusBadge(ready: Boolean) {
             Spacer(modifier = Modifier.width(6.dp))
         }
         Text(text = label, style = MaterialTheme.typography.labelMedium, color = color)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Transport selector
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun TransportSelector(
-    selected: TransportId,
-    onSelect: (TransportId) -> Unit,
-    enabled: Boolean,
-) {
-    Column {
-        Text("Transport", style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-            TransportId.entries.forEach { transport ->
-                FilterChip(
-                    selected = selected == transport,
-                    onClick = { if (enabled) onSelect(transport) },
-                    label = { Text(transport.label, fontSize = 13.sp) },
-                    enabled = enabled,
-                )
-            }
-        }
     }
 }
 
