@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="EfGate/EfGate.csproj" />
+  <Project Path="MeaiGate/MeaiGate.csproj" />
+  <Project Path="MlnetGate/MlnetGate.csproj" />
+  <Project Path="PqcGate/PqcGate.csproj" />
+  <Project Path="ProtobufGate/ProtobufGate.csproj" />
+</Solution>

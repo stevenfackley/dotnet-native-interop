@@ -1,0 +1,17 @@
+<Project>
+
+  <!--
+    Isolates the spike/ probes from the repo-root Directory.Build.props (TreatWarningsAsErrors=true,
+    EnforceCodeStyleInBuild=true, AnalysisLevel=latest-recommended). MSBuild imports only the *nearest*
+    Directory.Build.props walking up from a project, so this file being present here means the root one
+    is NOT auto-imported — deliberate. These are throwaway gate probes: the AOT/trim warnings ARE the
+    signal we want to capture in the findings docs, not build errors to silence.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

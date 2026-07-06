@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <PublishAot>true</PublishAot>
+    <!-- MLDsa/SlhDsa/CompositeMLDsa are [Experimental("SYSLIB5006")] in .NET 10 -->
+    <NoWarn>$(NoWarn);SYSLIB5006</NoWarn>
+  </PropertyGroup>
+
+</Project>
