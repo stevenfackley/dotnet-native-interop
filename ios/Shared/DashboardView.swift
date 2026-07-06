@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// Overview tab, styled as the instrument's front panel: the active transport (switchable),
-/// a "Run all" action, and live aggregate results.
+/// The Analysis section's "Overview" segment, styled as the instrument's front panel: the active
+/// transport (switchable), a "Run all" action, and live aggregate results (IA collapse spec, 2026-06-21 —
+/// was the standalone "Dashboard" tab).
 struct DashboardView: View {
     @ObservedObject var viewModel: FeaturesViewModel
+    let telemetry: TelemetryService
     @State private var revealed = false
 
     var body: some View {
@@ -30,6 +32,12 @@ struct DashboardView: View {
             }
             .background(Instrument.bg0)
             .navigationTitle("Dashboard")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    // IA collapse spec: About is reachable from Analysis as well as Boundary.
+                    AboutToolbarButton(infos: viewModel.orderedInfos, telemetry: telemetry)
+                }
+            }
             .onAppear { revealed = true }
             .task { if viewModel.descriptors.isEmpty { await viewModel.load() } }
         }

@@ -18,50 +18,68 @@ final class ScreenshotTests: XCTestCase {
         sleep(3)
     }
 
+    /// 5 top-level sections per the 2026-06-21 IA collapse (was 9 tabs): Boundary, Catalog, Lab, Search
+    /// (segmented AI/Manuals), Analysis (segmented Dashboard/Compare/Latency). About is demoted to a
+    /// toolbar ⓘ, present on Boundary AND each Analysis child screen.
     func testCaptureEveryScreen() {
-        // --- Top-level tabs ---
-        capture(tab: "Dashboard", as: "01-dashboard", settle: 2)
-        capture(tab: "Features", as: "02-features", settle: 2)
+        // --- Boundary (hero/default landing tab; FFI lifecycle trace) ---
+        tapTab("Boundary")
+        sleep(2)
+        shot("01-boundary")
+        tapIfExists(button: "Run")
+        sleep(3)
+        shot("02-boundary-run")
+
+        // --- About (demoted to a toolbar ⓘ / sheet; on Boundary and each Analysis child) ---
+        // Only Boundary has been visited at this point, so exactly one "About" button is in the
+        // hierarchy — but scope to firstMatch anyway so the duplicates on the Analysis children can
+        // never make this query ambiguous.
+        let about = app.buttons["About"].firstMatch
+        if about.waitForExistence(timeout: 8) { about.tap() }
+        sleep(2)
+        shot("03-about")
+        tapIfExists(button: "Done") // dismiss the About sheet
+
+        // --- Catalog (was "Features") ---
+        capture(tab: "Catalog", as: "04-catalog", settle: 2)
 
         // --- Lab ---
         tapTab("Lab")
-        shot("03-lab")
-        drill("Fractal Explorer", settle: 5, as: "04-fractal-explorer")
-        drill("Raymarched 3D", settle: 5, as: "05-raymarcher")
-        drillAndRun("SIMD Matrix Multiply", run: "Run benchmark", settle: 12, as: "06-bench-matmul")
-        drillAndRun("Parallel Scaling", run: "Run benchmark", settle: 12, as: "07-bench-parallel")
+        shot("05-lab")
+        drill("Fractal Explorer", settle: 5, as: "06-fractal-explorer")
+        drill("Raymarched 3D", settle: 5, as: "07-raymarcher")
+        drillAndRun("SIMD Matrix Multiply", run: "Run benchmark", settle: 12, as: "08-bench-matmul")
+        drillAndRun("Parallel Scaling", run: "Run benchmark", settle: 12, as: "09-bench-parallel")
 
-        // --- Compare (runs every feature over all three transports) ---
-        tapTab("Compare")
+        // --- Search: segmented Engine (FFI) vs On-device (was the "AI" and "Manuals" tabs) ---
+        tapTab("Search")
+        sleep(2)
+        shot("10-search-engine") // defaults to the "Engine (FFI)" segment == AI hub
+        captureSemanticSearch(as: "11-semantic-search")
+        drill("Apple chat", settle: 3, as: "12-apple-chat")
+
+        tapIfExists(button: "On-device")
+        sleep(2)
+        captureEdgeSearch(as: "13-edge-search")
+
+        // --- Analysis: segmented Overview / Compare / Latency (was "Dashboard"/"Compare"/"Latency") ---
+        tapTab("Analysis")
+        sleep(2)
+        shot("14-analysis-overview") // defaults to the "Overview" segment == Dashboard
+
+        tapIfExists(button: "Compare")
         tapIfExists(button: "Run comparison (all transports)")
         sleep(30)
-        shot("08-compare")
+        shot("15-analysis-compare")
 
-        // --- Latency hub ---
-        tapTab("Latency")
-        shot("09-latency-hub")
-        drillAndRun("Distribution", run: "Measure 300 pings", settle: 14, as: "10-distribution")
-        drillAndRun("Transport comparison", run: "Compare all transports", settle: 22, as: "11-transport-comparison")
-        drillAndRun("Jitter over time", run: "Sample 400 sequential pings", settle: 16, as: "12-jitter")
-        drillAndRun("Payload scaling", run: "Sweep payload sizes", settle: 35, as: "13-payload-scaling")
-        captureTelemetry(as: "14-telemetry")
-
-        // --- About ---
-        tapTab("About")
-        sleep(2)
-        shot("15-about")
-
-        // --- AI (on-device semantic search embedded by the .NET engine + Apple's model for contrast) ---
-        tapTab("AI")
-        sleep(2)
-        shot("16-ai-hub")
-        captureSemanticSearch(as: "17-semantic-search")
-        drill("Apple chat", settle: 3, as: "18-apple-chat")
-
-        // --- Manuals (EVS: Swift-side ONNX + Core ML, prebuilt SQLite index) ---
-        tapTab("Manuals")
-        sleep(2)
-        captureEdgeSearch(as: "19-edge-search")
+        tapIfExists(button: "Latency")
+        sleep(1)
+        shot("16-analysis-latency")
+        drillAndRun("Distribution", run: "Measure 300 pings", settle: 14, as: "17-distribution")
+        drillAndRun("Transport comparison", run: "Compare all transports", settle: 22, as: "18-transport-comparison")
+        drillAndRun("Jitter over time", run: "Sample 400 sequential pings", settle: 16, as: "19-jitter")
+        drillAndRun("Payload scaling", run: "Sweep payload sizes", settle: 35, as: "20-payload-scaling")
+        captureTelemetry(as: "21-telemetry")
     }
 
     // MARK: - Capture
@@ -180,8 +198,8 @@ final class ScreenshotTests: XCTestCase {
         goBack()
     }
 
-    /// Enter Manuals, type a maintenance query, submit (loads the ONNX model + index, embeds via Core ML,
-    /// ranks), wait for results, screenshot.
+    /// In the Search tab's "On-device" segment, type a maintenance query, submit (loads the ONNX model +
+    /// index, embeds via Core ML, ranks), wait for results, screenshot.
     private func captureEdgeSearch(as name: String) {
         let field = app.textFields.firstMatch
         if field.waitForExistence(timeout: 6) {

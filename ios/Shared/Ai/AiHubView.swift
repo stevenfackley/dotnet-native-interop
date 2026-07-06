@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The AI tab: on-device semantic search driven by the .NET engine, plus Apple's model for contrast.
+/// The Search section's "Engine (FFI)" segment: on-device semantic search driven by the .NET engine over
+/// FFI, plus Apple's model for contrast (IA collapse spec, 2026-06-21 — was the standalone "AI" tab).
 struct AiHubView: View {
     let search: SemanticSearchService
     let engineRagServices: TransportMap<EngineRagService>

@@ -11,7 +11,12 @@ final class FeaturesViewModel: ObservableObject {
     @Published var running: Set<String> = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var onlyFailed = false
+
+    // Catalog search/filter/sort (IA collapse spec, 2026-06-21).
+    @Published var searchText = ""
+    @Published var versionFilter: VersionBucket?
+    @Published var statusFilter: StatusChip?
+    @Published var sort: CatalogSort = .version
 
     private let services: TransportMap<FeatureService>
     let infos: TransportMap<TransportInfo>
@@ -25,11 +30,59 @@ final class FeaturesViewModel: ObservableObject {
     var transport: TransportInfo { infos[selected] }
     var orderedInfos: [TransportInfo] { TransportKind.allCases.map { infos[$0] } }
 
-    /// Descriptors grouped into ordered (version, items) sections, after the optional failed filter.
+    /// Descriptors grouped into ordered (version, items) sections, after search text + the version/status
+    /// filter chips. Used by the catalog's version-sort mode only — the name/elapsed sorts render the
+    /// flat `filteredAndSorted` directly, since version sections would defeat a global ordering.
     var grouped: [(String, [FeatureDescriptor])] {
-        let shown = onlyFailed ? descriptors.filter { results[$0.id]?.ok == false } : descriptors
+        let shown = filteredAndSorted
         return shown.map(\.version).uniqued().map { version in
             (version, shown.filter { $0.version == version })
+        }
+    }
+
+    /// Descriptors after search text + the version/status filter chips, ordered per the active sort
+    /// (57 items is past scan-only — the catalog's one net-new behavior from the IA collapse spec).
+    /// Rendered flat by the catalog for the name/elapsed sorts, and via `grouped` for version sort.
+    var filteredAndSorted: [FeatureDescriptor] {
+        var shown = descriptors
+
+        if let statusFilter {
+            shown = shown.filter { descriptor in
+                let ok = results[descriptor.id]?.ok
+                return statusFilter == .pass ? ok == true : ok == false
+            }
+        }
+        if let versionFilter {
+            shown = shown.filter { versionFilter.matches($0) }
+        }
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            shown = shown.filter {
+                $0.title.lowercased().contains(query) || $0.id.lowercased().contains(query)
+            }
+        }
+
+        // All three sorts are made stable explicitly (enumerated offset as tiebreak): Swift's
+        // sorted(by:) does not guarantee stability, and ties are common (equal elapsed for un-run
+        // items, equal version numbers). Ties keep the engine's catalog order.
+        switch sort {
+        case .name:
+            return shown.enumerated().sorted { a, b in
+                let cmp = a.element.title.localizedStandardCompare(b.element.title)
+                return cmp == .orderedSame ? a.offset < b.offset : cmp == .orderedAscending
+            }.map(\.element)
+        case .version:
+            // Explicit sort, newest C# version first — the engine's catalog concatenates its Modern
+            // and Classic blocks (LanguageFeatures*.cs), so load order is NOT version-ordered.
+            return shown.enumerated().sorted { a, b in
+                let (va, vb) = (a.element.versionNumber, b.element.versionNumber)
+                return va == vb ? a.offset < b.offset : va > vb
+            }.map(\.element)
+        case .elapsed:
+            return shown.enumerated().sorted { a, b in
+                let (ea, eb) = (results[a.element.id]?.elapsedMs ?? -1, results[b.element.id]?.elapsedMs ?? -1)
+                return ea == eb ? a.offset < b.offset : ea > eb
+            }.map(\.element)
         }
     }
 
