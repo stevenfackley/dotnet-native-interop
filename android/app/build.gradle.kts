@@ -29,6 +29,18 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // Neural RAG (download-on-first-run): the canonical public GGUF for byte-identical parity
+        // with iOS's bundled copy (both should trace back to this exact HF repo/file — see
+        // core/DotnetNativeInterop.Engine's own bundling notes for the "reputable GGUF repo" this
+        // was sourced from). GGUF_SHA256 empty = skip the optional strict-hash check; the GGUF-magic
+        // header check always runs, and the engine's own LlamaLanguageModel load is the ultimate gate.
+        buildConfigField(
+            "String",
+            "GGUF_URL",
+            "\"https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf\"",
+        )
+        buildConfigField("String", "GGUF_SHA256", "\"\"")
+
         ndk {
             // Build only arm64-v8a; add x86_64 for emulator if desired
             abiFilters += setOf("arm64-v8a")
@@ -97,6 +109,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -191,6 +204,8 @@ dependencies {
     // Test
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    // Fake HTTP server for GgufDownloader tests (resume/Range, truncation, cancel) — no device needed.
+    testImplementation(libs.okhttp.mockwebserver)
 
     // Instrumented test (SP0 native gate) — runs on the arm64 emulator
     androidTestImplementation(libs.junit)
