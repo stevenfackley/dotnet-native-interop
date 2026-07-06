@@ -16,14 +16,16 @@ import androidx.compose.ui.Modifier
 import io.dotnetnativeinterop.feature.ComparisonViewModel
 import io.dotnetnativeinterop.feature.FeaturesViewModel
 import io.dotnetnativeinterop.feature.LatencyViewModel
+import io.dotnetnativeinterop.trace.TraceScreen
 import io.dotnetnativeinterop.ui.Spacing
 
 /**
  * Analysis hub (IA collapse spec 2 of 3): the neutral performance-evidence area. Merges the former
  * Dashboard (aggregate run/pass stats), Compare (transport comparison), and Latency tabs behind one
- * segmented control. Live engine telemetry already lives inside the Latency hub's "Runtime" section
- * (see LatencyScreen's TelemetryAnalysis), so it needs no separate destination here. Existing view
- * bodies are reused unchanged.
+ * segmented control, plus the Wave B Trace waterfall (per-request engine spans, drained from the span
+ * ring). Live engine telemetry already lives inside the Latency hub's "Runtime" section (see
+ * LatencyScreen's TelemetryAnalysis), so it needs no separate destination here. Existing view bodies
+ * are reused unchanged.
  */
 @Composable
 internal fun AnalysisScreen(
@@ -33,7 +35,7 @@ internal fun AnalysisScreen(
     modifier: Modifier = Modifier,
 ) {
     var section by remember { mutableIntStateOf(0) }
-    val labels = listOf("Dashboard", "Compare", "Latency")
+    val labels = listOf("Dashboard", "Compare", "Latency", "Trace")
 
     Column(modifier = modifier) {
         SingleChoiceSegmentedButtonRow(
@@ -52,7 +54,8 @@ internal fun AnalysisScreen(
         when (section) {
             0 -> DashboardScreen(features, inner)
             1 -> CompareScreen(comparison, inner)
-            else -> LatencyScreen(latency, inner)
+            2 -> LatencyScreen(latency, inner)
+            else -> TraceScreen(modifier = inner)
         }
     }
 }

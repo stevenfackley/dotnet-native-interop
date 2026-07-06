@@ -32,6 +32,7 @@ public object Instrument {
     public val warn: Color = Color(0xFFFBBF24)
 
     public val transportFfi: Color = Color(0xFF34D399)
+    public val transportBinary: Color = Color(0xFFA78BFA)  // violet — the framed-protobuf (4th) transport
     public val transportHttp: Color = Color(0xFFFBBF24)
     public val transportSqlite: Color = Color(0xFFFB7185)
 }

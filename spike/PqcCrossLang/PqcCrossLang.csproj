@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    THROWAWAY cross-language proof (Wave B Plan C wire-compat audit residual).
+    Closes the one PQ seam the audit could not cross-run: the ML-KEM-768 / ML-DSA-65 PRIMITIVES.
+    .NET (BouncyCastle.Cryptography 2.6.2 — the engine's provider) signs + generates the KEM key;
+    a tiny Java util (bcprov-jdk18on 1.84 — the Android client's provider) verifies the signature and
+    encapsulates; .NET decapsulates and asserts the shared secret matches. Runtime evidence that the two
+    BouncyCastle builds are byte-compatible on the exact algorithms/params the handshake uses.
+    Not AOT (this is a run-once host tool, not the shipped library). See run.ps1.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+  </ItemGroup>
+
+  <!-- CrossVerify.java is compiled + run by run.ps1, not by the .NET build. -->
+  <ItemGroup>
+    <None Include="CrossVerify.java" />
+    <None Include="run.ps1" />
+  </ItemGroup>
+
+</Project>

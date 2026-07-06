@@ -39,15 +39,17 @@ public data class EngineStats(
 /** Per-feature UI state. */
 public enum class RunStatus { Idle, Running, Ok, Failed }
 
-/** The three interop transports the catalog can be reached through. Mechanism one-liners mirror
- *  the iOS TransportInfo strings. */
+/** The four interop transports the catalog can be reached through. Mechanism one-liners mirror
+ *  the iOS TransportInfo strings. Enum order is the honest latency spectrum: FFI << Binary < HTTP <
+ *  SQLCipher, so `entries`-driven loops (Compare series, Latency lanes) render in that order. */
 public enum class TransportKind(public val displayName: String, public val mechanism: String) {
     Ffi("FFI", "In-process C ABI — structured JSON over UnmanagedCallersOnly exports."),
+    Binary("Binary", "Framed Google.Protobuf over a 127.0.0.1 loopback socket — length-prefixed binary RPC (no ASP.NET/gRPC), optional ML-KEM/ML-DSA + AES-256-GCM channel."),
     Http("HTTP", "Raw System.Net.Sockets server on 127.0.0.1 — REST + JSON over the loopback."),
     Sqlite("SQLCipher", "Encrypted on-disk SQLite (SQLCipher, PRAGMA key) — data round-trips through ciphertext."),
     ;
 
-    /** Contract id — must equal the pattern ids in patterns.json ("ffi" / "http" / "sqlite"). */
+    /** Contract id — must equal the pattern ids in patterns.json ("ffi" / "binary" / "http" / "sqlite"). */
     public val patternId: String get() = name.lowercase()
 }
 

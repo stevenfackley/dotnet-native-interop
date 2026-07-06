@@ -3,6 +3,7 @@ package io.dotnetnativeinterop.feature
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.dotnetnativeinterop.model.EngineStats
+import io.dotnetnativeinterop.model.FeatureResult
 import io.dotnetnativeinterop.model.TransportKind
 import io.dotnetnativeinterop.transport.NativeBridge
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,23 @@ public class LatencyViewModel(
         val samples: List<Double> = emptyList(),
         val failures: Int = 0,
     )
+
+    /** The engine result of a command plus the client-side round-trip that produced it. */
+    public data class TimedResult(val result: FeatureResult, val roundTripMs: Double)
+
+    /**
+     * Runs [command] over [t], returning the engine's [FeatureResult] (its `result` string carries the
+     * structured BenchmarkPayload JSON for bench-real/gclab) plus the client round-trip in ms. Null only
+     * when the transport itself throws (a dead transport); an engine-level failure comes back as a
+     * FeatureResult with `ok == false` and the error text in `result`, so the caller surfaces it honestly.
+     */
+    public suspend fun runResult(command: String, t: TransportKind): TimedResult? =
+        withContext(Dispatchers.IO) {
+            val start = System.nanoTime()
+            runCatching { service(t).run(command) }.getOrNull()?.let { result ->
+                TimedResult(result, (System.nanoTime() - start) / 1_000_000.0)
+            }
+        }
 
     /** One client-side round-trip of [command] over [t], in milliseconds (null on failure). */
     public suspend fun roundTripMs(command: String, t: TransportKind): Double? =

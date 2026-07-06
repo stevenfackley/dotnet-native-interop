@@ -21,6 +21,18 @@ public object NativeBridge {
     public external fun nativeHttpStart(): Int
     public external fun nativeHttpStop(): Int
 
+    // Wave B — framed-protobuf loopback transport (the 4th transport). start(flags) returns the bound
+    // 127.0.0.1 port (> 0) or a negative DNI_* status; flags bit 0 (flags and 1) requires an
+    // ML-KEM-768 / ML-DSA-65 handshake per connection, after which every frame is AES-256-GCM.
+    // stop() is idempotent. Mirrors dni_pb_start / dni_pb_stop.
+    public external fun nativePbStart(flags: Int): Int
+    public external fun nativePbStop()
+
+    // Wave B — in-process tracing. Drains the engine's bounded span ring (512 spans, drop-oldest) as
+    // heap UTF-8 JSON (null on failure). Overflow is disclosed in the payload's "dropped" field.
+    // Mirrors dni_trace_drain.
+    public external fun nativeTraceDrain(): String?
+
     // Pattern 4 — SQLite WAL broker
     public external fun nativeBrokerStart(dbPath: String): Int
     public external fun nativeBrokerStop(): Int

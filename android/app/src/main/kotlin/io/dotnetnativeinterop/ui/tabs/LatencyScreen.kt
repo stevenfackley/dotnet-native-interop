@@ -1,27 +1,34 @@
 package io.dotnetnativeinterop.ui.tabs
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -30,14 +37,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dotnetnativeinterop.feature.LatencyStats
 import io.dotnetnativeinterop.feature.LatencyViewModel
+import io.dotnetnativeinterop.lab.Benchmark
 import io.dotnetnativeinterop.lab.BenchmarkChart
+import io.dotnetnativeinterop.lab.BenchmarkPayload
 import io.dotnetnativeinterop.lab.BenchmarkPoint
 import io.dotnetnativeinterop.lab.BenchmarkSeries
 import io.dotnetnativeinterop.model.TransportKind
 import io.dotnetnativeinterop.ui.Instrument
+import io.dotnetnativeinterop.ui.Radii
 import io.dotnetnativeinterop.ui.Spacing
 import io.dotnetnativeinterop.ui.components.ErrorBanner
 import io.dotnetnativeinterop.ui.components.InstrumentCard
@@ -46,14 +57,17 @@ import io.dotnetnativeinterop.ui.components.StatCell
 import io.dotnetnativeinterop.ui.components.TransportDot
 import io.dotnetnativeinterop.ui.components.TransportPicker
 import io.dotnetnativeinterop.ui.components.transportColor
+import kotlin.math.log10
 import kotlinx.coroutines.launch
 
 /** One drill-down analysis under the Latency hub. Order + grouping mirror the iOS LatencyHubView. */
 private enum class LatencyAnalysis(val title: String, val blurb: String) {
     Distribution("Distribution", "Fire N pings over one transport and chart the round-trip histogram."),
-    TransportComparison("Transport comparison", "Ping all three transports; compare percentiles + CDF."),
+    TransportComparison("Transport comparison", "Ping every transport; compare percentiles + CDF."),
     Jitter("Jitter over time", "Latency vs call index — cold→warm steady state and GC blips."),
     PayloadScaling("Payload scaling", "Round-trip an N-byte bench-echo over increasing N."),
+    RealPayload("Real payload", "bench-real (catalog / RAG context) across every transport, log-scale toggle."),
+    GcLab("GC Lab", "Drive a bounded allocation storm and watch .NET's GC actually work."),
     Telemetry("Engine telemetry", "Live NativeAOT runtime stats plus a quick latency sample."),
 }
 
@@ -77,6 +91,8 @@ internal fun LatencyScreen(
                 LatencyAnalysis.TransportComparison -> TransportComparisonAnalysis(vm, inner)
                 LatencyAnalysis.Jitter -> JitterAnalysis(vm, inner)
                 LatencyAnalysis.PayloadScaling -> PayloadScalingAnalysis(vm, inner)
+                LatencyAnalysis.RealPayload -> RealPayloadAnalysis(vm, inner)
+                LatencyAnalysis.GcLab -> GcLabAnalysis(vm, inner)
                 LatencyAnalysis.Telemetry -> TelemetryAnalysis(vm, inner)
             }
         }
@@ -95,9 +111,11 @@ private fun LatencyHub(onOpen: (LatencyAnalysis) -> Unit, modifier: Modifier = M
             LatencyAnalysis.TransportComparison,
             LatencyAnalysis.Jitter,
             LatencyAnalysis.PayloadScaling,
+            LatencyAnalysis.RealPayload,
         ).forEach { HubCard(it, onOpen) }
 
         PanelHeader("Runtime")
+        HubCard(LatencyAnalysis.GcLab, onOpen)
         HubCard(LatencyAnalysis.Telemetry, onOpen)
     }
 }
@@ -207,7 +225,7 @@ private fun TransportComparisonAnalysis(vm: LatencyViewModel, modifier: Modifier
     val count = 200
 
     AnalysisColumn(modifier) {
-        Caption("Fires $count pings over FFI, HTTP, and SQLCipher and compares the distributions.")
+        Caption("Fires $count pings over every transport (FFI · Binary · HTTP · SQLCipher) and compares the distributions.")
         Button(
             onClick = {
                 scope.launch {
@@ -412,7 +430,212 @@ private fun TelemetryAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifie
     }
 }
 
+// --- Real payload (bench-real) ----------------------------------------------
+
+private data class RealPayloadRow(
+    val transport: TransportKind,
+    val roundTripMs: Double,
+    val avgBytes: String?,
+    val avgSerialize: String?,
+)
+
+@Composable
+private fun RealPayloadAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifier) {
+    val kinds = listOf("catalog", "ragctx", "mixed")
+    var kind by remember { mutableStateOf("catalog") }
+    var reps by remember { mutableIntStateOf(5) }
+    var logScale by remember { mutableStateOf(false) }
+    var rows by remember { mutableStateOf<List<RealPayloadRow>>(emptyList()) }
+    var failed by remember { mutableStateOf<List<String>>(emptyList()) }
+    var clampNote by remember { mutableStateOf<String?>(null) }
+    var running by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AnalysisColumn(modifier) {
+        Caption(
+            "Round-trips a REAL structured payload (catalog JSON / RAG context / both) over every " +
+                "transport, $reps reps each. Transport cost is measured client-side — toggle log scale " +
+                "to keep sub-millisecond FFI visible next to SQLCipher.",
+        )
+        ChipRow("Payload", kinds, kind) { kind = it }
+        ChipRow("Reps", listOf("5", "10", "25"), reps.toString()) { reps = it.toInt() }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Log scale", style = MaterialTheme.typography.bodyMedium, color = Instrument.textPrimary)
+            Spacer(Modifier.weight(1f))
+            Switch(checked = logScale, onCheckedChange = { logScale = it })
+        }
+        Button(
+            onClick = {
+                scope.launch {
+                    running = true
+                    val collected = ArrayList<RealPayloadRow>()
+                    val fails = ArrayList<String>()
+                    var clamp: String? = null
+                    for (t in TransportKind.entries) {
+                        val timed = vm.runResult("bench-real~kind_${kind}~reps_$reps", t)
+                        val payload = timed?.result?.takeIf { it.ok }?.let { Benchmark.decode(it.result) }
+                        if (timed == null || payload == null) { fails.add(t.displayName); continue }
+                        summaryValue(payload, "clamped")?.takeIf { it.startsWith("yes") }?.let { clamp = it }
+                        collected.add(
+                            RealPayloadRow(
+                                transport = t,
+                                roundTripMs = timed.roundTripMs,
+                                avgBytes = summaryValue(payload, "avg bytes/rep"),
+                                avgSerialize = summaryValue(payload, "avg serialize/rep"),
+                            ),
+                        )
+                    }
+                    rows = collected; failed = fails; clampNote = clamp; running = false
+                }
+            },
+            enabled = !running,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(if (running) "Running bench-real…" else "Run over all transports") }
+        Spinner(running)
+
+        if (failed.isNotEmpty()) {
+            ErrorBanner("bench-real failed over ${failed.joinToString()} — excluded (needs that transport's engine support).")
+        }
+        clampNote?.let { Text("⚠ reps clamped by the engine: $it", color = Instrument.warn, fontSize = 11.sp) }
+
+        if (rows.isNotEmpty()) {
+            InstrumentCard {
+                PanelHeader(if (logScale) "Client round-trip · log₁₀(ms+1)" else "Client round-trip (ms)")
+                CategoryBarChart(
+                    rows.map { it.transport.displayName to if (logScale) log10(it.roundTripMs + 1.0) else it.roundTripMs },
+                    Instrument.transportBinary,
+                )
+                Caption(
+                    if (logScale) "Bars are log₁₀(ms+1) — a monotonic transform so sub-ms FFI stays visible; not raw ms."
+                    else "Linear ms; FFI can look flat next to SQLCipher — toggle log scale to see it.",
+                )
+            }
+            InstrumentCard {
+                PanelHeader("Per-transport · $kind, $reps reps")
+                rows.forEach { row ->
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        TransportDot(row.transport)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
+                            StatCell("round-trip", "%.3f ms".format(row.roundTripMs), Modifier.weight(1f))
+                            StatCell("avg bytes/rep", row.avgBytes ?: "—", Modifier.weight(1f))
+                            StatCell("avg serialize", row.avgSerialize ?: "—", Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- GC Lab (gclab) ---------------------------------------------------------
+
+@Composable
+private fun GcLabAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifier) {
+    val presets = listOf("gen0", "loh", "pinned")
+    var preset by remember { mutableStateOf("gen0") }
+    var secs by remember { mutableIntStateOf(5) }
+    val mb = 64
+    var payload by remember { mutableStateOf<BenchmarkPayload?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var running by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AnalysisColumn(modifier) {
+        Caption(
+            "Runs a bounded allocation storm in the engine (gen0 churn / LOH / GCHandle-pinned) and " +
+                "plots .NET's GC working. mb=$mb, over FFI — the GC is engine-global, so the transport " +
+                "is immaterial to what's measured.",
+        )
+        ChipRow("Preset", presets, preset) { preset = it }
+        ChipRow("Seconds", listOf("3", "5", "10"), secs.toString()) { secs = it.toInt() }
+        Button(
+            onClick = {
+                scope.launch {
+                    running = true; error = null; payload = null
+                    val timed = vm.runResult("gclab~preset_${preset}~mb_${mb}~secs_$secs", TransportKind.Ffi)
+                    val result = timed?.result
+                    when {
+                        result == null -> error = "GC Lab call failed — the transport returned no result."
+                        !result.ok -> error = result.result // e.g. "…gclab (already running…)" or unknown-command
+                        else -> Benchmark.decode(result.result)
+                            ?.let { payload = it }
+                            ?: run { error = "Could not decode the GC Lab payload." }
+                    }
+                    running = false
+                }
+            },
+            enabled = !running,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(if (running) "Running storm ($secs s)…" else "Run GC storm") }
+        Spinner(running)
+        error?.let { ErrorBanner(it) }
+
+        payload?.let { p ->
+            val mode = summaryValue(p, "collection mode") ?: "unknown"
+            CollectionModeChip(forced = mode.startsWith("forced"), text = mode)
+            summaryValue(p, "clamped")?.takeIf { it.startsWith("yes") }
+                ?.let { Text("⚠ clamped by the engine: $it", color = Instrument.warn, fontSize = 11.sp) }
+
+            InstrumentCard {
+                PanelHeader("Heap / committed over time (MB)")
+                BenchmarkChart(p.series)
+                Caption("X = seconds, Y = MB. Committed staying above heap after a collection is the pin/LOH fragmentation.")
+            }
+            InstrumentCard {
+                PanelHeader("Collections + pause")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
+                    StatCell("gen0", summaryValue(p, "gen0 collections") ?: "—", Modifier.weight(1f))
+                    StatCell("gen1", summaryValue(p, "gen1 collections") ?: "—", Modifier.weight(1f))
+                    StatCell("gen2", summaryValue(p, "gen2 collections") ?: "—", Modifier.weight(1f))
+                    StatCell("pause Δ", summaryValue(p, "GC pause Δ") ?: "—", Modifier.weight(1f), tint = Instrument.warn)
+                }
+                summaryValue(p, "heap before → after")?.let { StatCell("heap MB", it) }
+                summaryValue(p, "committed before → after")?.let { StatCell("committed MB", it) }
+                summaryValue(p, "allocated Δ")?.let { StatCell("allocated Δ", it) }
+            }
+        }
+    }
+}
+
+/** The engine's forced-vs-organic disclosure as a first-class chip — never present forced GC as organic. */
+@Composable
+private fun CollectionModeChip(forced: Boolean, text: String) {
+    val tint = if (forced) Instrument.warn else Instrument.ok
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(
+            if (forced) "COLLECTION MODE · FORCED" else "COLLECTION MODE · ORGANIC",
+            modifier = Modifier
+                .background(tint.copy(alpha = 0.14f), RoundedCornerShape(Radii.chip))
+                .padding(horizontal = Spacing.s, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+        )
+        Text(text, style = MaterialTheme.typography.bodySmall, color = Instrument.textSecondary)
+    }
+}
+
+/** First summary stat whose label starts with [labelPrefix] (labels carry "(incl. forced)"/"(cold start)" suffixes). */
+private fun summaryValue(payload: BenchmarkPayload, labelPrefix: String): String? =
+    payload.summary.firstOrNull { it.label.startsWith(labelPrefix) }?.value
+
 // --- Small shared building blocks -------------------------------------------
+
+/** A labelled row of single-choice filter chips (payload kind, reps, preset, seconds). */
+@Composable
+private fun ChipRow(label: String, options: List<String>, selected: String, onSelect: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Instrument.textTertiary)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+            options.forEach { option ->
+                FilterChip(
+                    selected = selected == option,
+                    onClick = { onSelect(option) },
+                    label = { Text(option) },
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun AnalysisColumn(modifier: Modifier, content: @Composable () -> Unit) {

@@ -15,6 +15,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.channels.Channel
 
@@ -64,6 +65,8 @@ public class HttpClient : InferenceClient {
             .post(body)
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
+            // Correlation id for the Trace waterfall (read + span-tagged by the raw-HTTP server).
+            .header("X-Dni-Request-Id", UUID.randomUUID().toString())
             .build()
 
         // Channel bridges the OkHttp callback thread to the Flow collector.

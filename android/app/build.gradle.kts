@@ -1,3 +1,5 @@
+import com.google.protobuf.gradle.id
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     // Room KSP — add KSP plugin here if upgrading; for now use kapt-free Room via annotationProcessor
     id("kotlin-kapt")
+    // Wave B Plan C: framed-protobuf (4th transport) client codegen. Re-introduces JUST the message
+    // half (java + kotlin lite builtins, NO grpc/grpckt plugins — those stay excised per PR #40). The
+    // live consumer this time is PbFeatureService/PbInferenceClient (the gRPC-era proto/dni.proto stays
+    // the documented exclusion; this schema is src/main/proto/dni_frame.proto). Recipe proven in the
+    // B0 gate (spike/android-client-deps).
+    alias(libs.plugins.protobuf)
 }
 
 android {
@@ -92,10 +100,29 @@ android {
     }
 }
 
-// NOTE: gRPC/UDS is an EXCLUDED transport (no NativeAOT mobile runtime pack). With the Kotlin
-// client (GrpcUdsClient) removed, the protobuf codegen chain (protobuf plugin + grpc/grpckt protoc
-// plugins + stub deps) was removed too — nothing imported the generated dni.v1 classes. The contract
-// stays documented at the repo root: proto/dni.proto + patterns.json's "grpc" entry.
+// NOTE: gRPC/UDS remains an EXCLUDED transport (no NativeAOT mobile runtime pack). Its Kotlin client
+// (GrpcUdsClient) and the grpc/grpckt protoc plugins stay removed; proto/dni.proto + patterns.json's
+// "grpc" entry keep documenting that dead-end. Wave B re-adds ONLY the message-codegen half below for
+// the NEW framed-protobuf transport (dni_frame.proto) — structured binary RPC with no gRPC runtime.
+
+// ---------------------------------------------------------------------------
+// Framed-protobuf client codegen (Wave B Plan C). protobuf-kotlin-lite: java + kotlin lite builtins
+// only (no grpc/grpckt). The Kotlin DSL wraps the Java lite message classes, so BOTH builtins must be
+// present in lite mode or the generated Kotlin fails to resolve its message types.
+// ---------------------------------------------------------------------------
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.get()}"
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                id("java") { option("lite") }
+                id("kotlin") { option("lite") }
+            }
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Copy patterns.json into assets at build time
@@ -151,6 +178,15 @@ dependencies {
 
     // JSON (patterns.json parsing)
     implementation(libs.kotlinx.serialization.json)
+
+    // Wave B Plan C — framed-protobuf transport client + PQ handshake.
+    //  - protobuf-kotlin-lite: the generated dni_frame.proto messages + Kotlin builder DSL.
+    //  - bcprov: ML-KEM-768 / ML-DSA-65 via the LIGHTWEIGHT org.bouncycastle.crypto.* API ONLY. The
+    //    JCA "BC" provider is deliberately never registered — Android ships a crippled legacy BC under
+    //    that same name whose PQC classes don't exist; the lightweight classes sidestep it entirely
+    //    (mirrors the .NET provider's Org.BouncyCastle.Crypto.* calls and the B0 gate's probe).
+    implementation(libs.protobuf.kotlin.lite)
+    implementation(libs.bouncycastle.bcprov)
 
     // Test
     testImplementation(libs.junit)

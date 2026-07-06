@@ -19,19 +19,49 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
 import io.dotnetnativeinterop.model.BoundaryInspector
 import io.dotnetnativeinterop.model.BoundaryPreset
+import io.dotnetnativeinterop.model.TransportKind
 import io.dotnetnativeinterop.ui.Instrument
 import io.dotnetnativeinterop.ui.Spacing
 import io.dotnetnativeinterop.ui.components.ErrorBanner
 import io.dotnetnativeinterop.ui.components.InstrumentCard
 import io.dotnetnativeinterop.ui.components.PanelHeader
+import io.dotnetnativeinterop.ui.components.TransportPicker
 
-/** Approach A · A1: swimlane hero + segmented inspector that auto-follows the phase in Auto-step. */
+/**
+ * Approach A · A1: swimlane hero + segmented inspector that auto-follows the phase in Auto-step.
+ *
+ * Wave B: a transport picker joins the top. FFI keeps this full phase-trace screen (JNI genuinely on the
+ * path); HTTP / SQLCipher / Binary hand off to [TransportBoundaryScreen] — each transport's honest hop
+ * swimlane with a real client round-trip + engine-side spans (or an "awaiting engine" state).
+ */
 @Composable
 internal fun BoundaryScreen(vm: BoundaryViewModel, modifier: Modifier = Modifier) {
+    var transport by remember { mutableStateOf(TransportKind.Ffi) }
+
+    Column(modifier.fillMaxSize().background(Instrument.bg0)) {
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.l, vertical = Spacing.s),
+        ) {
+            TransportPicker(selected = transport, onSelect = { transport = it })
+        }
+        if (transport == TransportKind.Ffi) {
+            FfiBoundaryBody(vm, Modifier.weight(1f))
+        } else {
+            TransportBoundaryScreen(transport, Modifier.weight(1f))
+        }
+    }
+}
+
+/** The original FFI phase-trace body (unchanged): presets, lifecycle swimlane, run/auto-step, inspectors. */
+@Composable
+private fun FfiBoundaryBody(vm: BoundaryViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsState()
     Column(
         modifier

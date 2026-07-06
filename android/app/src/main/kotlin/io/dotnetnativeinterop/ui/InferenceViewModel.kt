@@ -8,6 +8,7 @@ import io.dotnetnativeinterop.transport.FfiClient
 import io.dotnetnativeinterop.transport.HttpClient
 import io.dotnetnativeinterop.transport.InferRequest
 import io.dotnetnativeinterop.transport.InferenceClient
+import io.dotnetnativeinterop.transport.PbInferenceClient
 import io.dotnetnativeinterop.transport.SqliteClient
 import io.dotnetnativeinterop.transport.Token
 import kotlinx.coroutines.CancellationException
@@ -51,6 +52,8 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
     private val ffiClient: FfiClient by lazy { FfiClient() }
     private val httpClient: HttpClient by lazy { HttpClient() }
     private val sqliteClient: SqliteClient by lazy { SqliteClient(app.applicationContext) }
+    // Binary transport streams via grounded RAG (the pb server's only streaming endpoint).
+    private val pbClient: PbInferenceClient by lazy { PbInferenceClient() }
 
     private var inferJob: Job? = null
 
@@ -191,6 +194,10 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun resolveClient(transport: TransportKind): InferenceClient {
         return when (transport) {
             TransportKind.Ffi -> ffiClient
+
+            // Framed-protobuf: the server is started on demand inside PbTransport; the stream maps the
+            // prompt to a grounded RAG request (the pb transport's streaming endpoint).
+            TransportKind.Binary -> pbClient
 
             TransportKind.Http -> httpClient.also { client ->
                 // Idempotent: if already running, nativeHttpStart is a no-op.

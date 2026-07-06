@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import io.dotnetnativeinterop.trust.TrustInspector
 import io.dotnetnativeinterop.ui.Instrument
 import io.dotnetnativeinterop.ui.PatternInfo
 import io.dotnetnativeinterop.ui.PatternsJson
@@ -48,10 +49,10 @@ internal fun AboutScreen(
         )
 
         Text(
-            text = "One .NET 10 NativeAOT engine, embedded in this app and reached three ways — " +
-                "in-process FFI, loopback HTTP, and an encrypted SQLCipher store. " +
-                "The same C#/.NET payload runs natively on-device; the transports differ only " +
-                "in how bytes cross the managed↔native boundary.",
+            text = "One .NET 10 NativeAOT engine, embedded in this app and reached four ways — " +
+                "in-process FFI, framed Google.Protobuf over a loopback socket, loopback HTTP, and an " +
+                "encrypted SQLCipher store. The same C#/.NET payload runs natively on-device; the " +
+                "transports differ only in how bytes cross the managed↔native boundary.",
             style = MaterialTheme.typography.bodyMedium,
             color = Instrument.textSecondary,
         )
@@ -64,11 +65,16 @@ internal fun AboutScreen(
                 }
             }
         }
+
+        // Live security posture — told honestly (read-only here; the interactive PQ toggle lives in
+        // the Boundary hub's Trust segment). Embedded without its own scroll (About already scrolls).
+        TrustInspector(interactive = false, scrollable = false)
     }
 }
 
 private fun transportColorForString(transport: String): Color = when {
     transport.contains("ffi", ignoreCase = true) -> Instrument.transportFfi
+    transport.contains("protobuf", ignoreCase = true) -> Instrument.transportBinary
     transport.contains("http", ignoreCase = true) -> Instrument.transportHttp
     transport.contains("sqlite", ignoreCase = true) || transport.contains("sql", ignoreCase = true) -> Instrument.transportSqlite
     else -> Instrument.textSecondary

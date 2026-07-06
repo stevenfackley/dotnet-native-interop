@@ -31,6 +31,7 @@ import io.dotnetnativeinterop.ui.Spacing
 /** Canonical transport color, mirrored on iOS (`Instrument.transport(_:)`). */
 internal fun transportColor(kind: TransportKind): Color = when (kind) {
     TransportKind.Ffi -> Instrument.transportFfi
+    TransportKind.Binary -> Instrument.transportBinary
     TransportKind.Http -> Instrument.transportHttp
     TransportKind.Sqlite -> Instrument.transportSqlite
 }
