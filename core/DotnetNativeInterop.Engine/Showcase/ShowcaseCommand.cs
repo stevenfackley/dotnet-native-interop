@@ -37,6 +37,8 @@ public static class ShowcaseCommand
                 "bench-echo" => Echo(GetI(p, "bytes", 1024, 1, 1_048_576)),
                 "bench-real" => RunBenchReal(p),
                 "gclab" => RunGcLab(p),
+                "trust" => RunTrust(parts),
+                "trace" => RunTrace(parts),
                 _ => $"Unknown showcase command: {name}",
             };
 
@@ -92,6 +94,25 @@ public static class ShowcaseCommand
         return payload is null
             ? "Unknown showcase command: gclab (already running — one storm per process at a time)"
             : ShowcaseJson.Serialize(payload);
+    }
+
+    // trust~posture -> per-transport security posture JSON (incl. live PQ params when the binary channel is
+    // up). The subcommand is the bare token after '~' (no key_value pair), so it is read from parts directly.
+    private static string RunTrust(string[] parts)
+    {
+        var sub = parts.Length > 1 ? parts[1] : string.Empty;
+        return sub == "posture"
+            ? TrustPosture.ReportJson()
+            : $"Unknown showcase command: trust (sub={sub})";
+    }
+
+    // trace~stats -> the span ring's occupancy and drop/record counters (a non-draining snapshot).
+    private static string RunTrace(string[] parts)
+    {
+        var sub = parts.Length > 1 ? parts[1] : string.Empty;
+        return sub == "stats"
+            ? EngineTrace.StatsJson()
+            : $"Unknown showcase command: trace (sub={sub})";
     }
 
     private static Dictionary<string, string> ParseParams(string[] parts)

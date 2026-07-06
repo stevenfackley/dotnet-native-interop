@@ -139,6 +139,36 @@ typedef void (*dni_trace_cb)(void* user_data,
 int64_t dni_ffi_stream_start(const char* prompt, int32_t max_tokens,
                              dni_trace_cb cb, void* user_data);
 
+/* ---- Wave B — boundary legibility (additive) --------------------------- */
+/* Three new exports; the frozen production surface above is unchanged. */
+
+/* In-process tracing. Drains the engine's bounded span ring (512 spans,
+ * drop-oldest) as heap UTF-8 JSON, or NULL on failure; copy then release with
+ * dni_string_free. Shape:
+ *   { "nowUs": <double>,           // engine µs-since-boot at drain time
+ *     "dropped": <int>,            // spans lost to ring overflow since last drain (disclosed)
+ *     "capacity": 512,
+ *     "spans": [ { "name": "pb.execute", "startUs": <double>, "durUs": <double>,
+ *                  "requestId": <string|null>, "status": <string|null> }, ... ] }
+ * Engine spans carry µs offsets from engine boot; align to a client clock using
+ * one offset per drain (nowUs) — cross-side accuracy is ±(drain round-trip). */
+const char* dni_trace_drain(void);
+
+/* Framed-protobuf transport (the 4th transport): length-prefixed Google.Protobuf
+ * frames over a 127.0.0.1 loopback socket ([u32 little-endian length][Envelope];
+ * see proto/dni_frame.proto). start() returns the bound port (> 0) or a negative
+ * DNI_* status. flags bit 0 (flags & 1) requires an ML-KEM-768 / ML-DSA-65
+ * handshake per connection, after which every frame is AES-256-GCM encrypted. */
+int32_t dni_pb_start(int32_t flags);
+void    dni_pb_stop(void);
+
+/* Command-grammar additions (no ABI change) served by dni_feature_run:
+ *   "trust~posture" -> per-transport security posture JSON (HTTP is reported as
+ *                      plaintext; the binary transport reports live negotiated PQ
+ *                      params { kem, sig, cipher, key sizes, handshakeUs } when up).
+ *   "trace~stats"   -> span-ring snapshot { capacity, occupancy, droppedSinceDrain,
+ *                      recordedTotal, droppedTotal }.                          */
+
 #ifdef __cplusplus
 }
 #endif
