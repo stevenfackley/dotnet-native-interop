@@ -18,9 +18,15 @@ public sealed record SummaryStat(string Label, string Value);
 /// </summary>
 public sealed record BenchmarkPayload(string Kind, string Title, BenchmarkSeries[] Series, SummaryStat[] Summary);
 
-/// <summary>Source-generated JSON metadata for <see cref="BenchmarkPayload"/> (AOT-safe, no reflection).</summary>
+/// <summary>
+/// Source-generated JSON metadata for <see cref="BenchmarkPayload"/> (AOT-safe, no reflection). Also
+/// registers <see cref="FeatureDescriptor"/>/its list shape so <see cref="RealPayloadBenchmark"/> can
+/// serialize the language-feature catalog without a reflection fallback.
+/// </summary>
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(BenchmarkPayload))]
+[JsonSerializable(typeof(IReadOnlyList<FeatureDescriptor>))]
+[JsonSerializable(typeof(FeatureDescriptor))]
 internal sealed partial class ShowcaseJsonContext : JsonSerializerContext;
 
 /// <summary>Serializes a <see cref="BenchmarkPayload"/> to camelCase JSON via the source-gen context.</summary>
