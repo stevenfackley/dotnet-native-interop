@@ -1,7 +1,10 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using Google.Protobuf;
 using DotnetNativeInterop.Engine;
+using DotnetNativeInterop.NativeBridge.Pqc;
 
 namespace DotnetNativeInterop.NativeBridge.Pb;
 
@@ -19,7 +22,7 @@ internal static class PbFrameServer
 {
     /// <summary>ErrorFrame codes surfaced to the client as a typed payload (never a silent close).</summary>
     internal const int ErrorUnknownRequest = 1;
-    internal const int ErrorHandshakeRequired = 2;
+    internal const int ErrorHandshakeFailed = 2;
     internal const int ErrorTamper = 3;
     internal const int ErrorInternal = 4;
 
@@ -27,8 +30,17 @@ internal static class PbFrameServer
     private static TcpListener? _listener;
     private static CancellationTokenSource? _cts;
 
-    // Whether this server instance requires the post-quantum handshake before serving requests.
+    // Whether this server instance requires the post-quantum handshake before serving requests, plus the
+    // per-boot PQ provider + server identity (KEM + DSA keypairs), created once when PQ is required.
     private static bool _requirePq;
+
+    // Deliberately typed as the interface, not the concrete BouncyCastle type: this IS the provider seam
+    // the OS MLKem/MLDsa backend is meant to drop into. CA1859 (prefer the concrete type) is the wrong
+    // call here — the indirection is the feature.
+#pragma warning disable CA1859
+    private static IPqcProvider? _pqcProvider;
+#pragma warning restore CA1859
+    private static IPqcServerIdentity? _pqcIdentity;
 
     /// <summary>
     /// Starts the loopback framed-protobuf server. Idempotent: a second call returns the live port.
@@ -46,6 +58,14 @@ internal static class PbFrameServer
 
             EngineHost.Initialize();
             _requirePq = (flags & 1) != 0;
+
+            if (_requirePq)
+            {
+                // Per-boot ML-KEM + ML-DSA identity (the KEM keypair is reused across connections this boot;
+                // an ephemeral-per-connection KEM key would be stronger but the spec fixes it per boot).
+                _pqcProvider = new BouncyCastlePqcProvider();
+                _pqcIdentity = _pqcProvider.CreateServerIdentity();
+            }
 
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -70,6 +90,11 @@ internal static class PbFrameServer
             _cts?.Dispose();
             _listener = null;
             _cts = null;
+            _pqcProvider = null;
+            _pqcIdentity = null;
+
+            // The secure channel is gone with the server — the Trust inspector must stop reporting live params.
+            TrustPosture.SetBinaryPqChannel(null);
         }
     }
 
@@ -98,12 +123,30 @@ internal static class PbFrameServer
                 var stream = client.GetStream();
                 var connection = new FrameConnection(stream);
 
-                // The PQ handshake (when required) is performed here in the secure-channel slice; on the
-                // plain channel there is nothing to negotiate and we go straight to serving frames.
+                // Opt-in PQ handshake over the still-plaintext connection; on success every later frame is
+                // AES-256-GCM. A handshake failure is surfaced as a typed ErrorFrame, never a silent close.
+                if (_requirePq && !await TryHandshakeAsync(connection, cancellationToken).ConfigureAwait(false))
+                {
+                    return;
+                }
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var frame = await connection.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+                    byte[]? frame;
+                    try
+                    {
+                        frame = await connection.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (AuthenticationTagMismatchException)
+                    {
+                        // A tampered/forged frame on the encrypted channel. Reject with a typed error (sent
+                        // on the intact server→client cipher) and tear the connection down — post-AEAD-failure
+                        // nothing on this socket can be trusted again.
+                        await TrySendErrorAsync(connection, ErrorTamper, "frame authentication failed", cancellationToken)
+                            .ConfigureAwait(false);
+                        break;
+                    }
+
                     if (frame is null)
                     {
                         break; // clean EOF
@@ -122,6 +165,60 @@ internal static class PbFrameServer
         catch (Exception)
         {
             // Client disconnected, cancelled, or sent a malformed frame — the connection is done.
+        }
+    }
+
+    // Runs the server handshake and, on success, switches the connection to the encrypted cipher and
+    // publishes the negotiated params for the Trust inspector. Returns false (after sending a typed error)
+    // when the handshake fails, so the caller drops the connection.
+    private static async Task<bool> TryHandshakeAsync(FrameConnection connection, CancellationToken cancellationToken)
+    {
+        var provider = _pqcProvider;
+        var identity = _pqcIdentity;
+        if (provider is null || identity is null)
+        {
+            await TrySendErrorAsync(connection, ErrorHandshakeFailed, "server PQ identity unavailable", cancellationToken)
+                .ConfigureAwait(false);
+            return false;
+        }
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            ServerHandshakeResult result;
+            using (EngineTrace.StartSpan("pb.handshake"))
+            {
+                result = await PqSecureChannel.ServerHandshakeAsync(connection, provider, identity, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            stopwatch.Stop();
+            connection.UseCipher(result.Cipher);
+            TrustPosture.SetBinaryPqChannel(new PqChannelParams(
+                provider.KemAlgorithm, provider.SigAlgorithm, AeadFrameCipher.Algorithm,
+                result.KemPublicKeyBytes, result.CiphertextBytes, result.SharedSecretBytes,
+                Math.Round(stopwatch.Elapsed.TotalMicroseconds, 1)));
+            return true;
+        }
+        catch (PqcHandshakeException ex)
+        {
+            await TrySendErrorAsync(connection, ErrorHandshakeFailed, ex.Message, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+    }
+
+    // Best-effort typed error to the peer; swallows write failures (the socket may already be gone).
+    private static async Task TrySendErrorAsync(
+        FrameConnection connection, int code, string message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await WriteEnvelopeAsync(connection, ErrorEnvelope(string.Empty, code, message), string.Empty, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Peer already gone — nothing more to do.
         }
     }
 
