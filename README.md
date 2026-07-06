@@ -93,7 +93,7 @@ Each feature is its own component: a row that navigates to a detail screen, not 
 ```
       ┌─────────────────────┐            ┌─────────────────────┐
       │   iOS app (Swift)   │            │ Android app (Kotlin)│
-      │  SwiftUI · 3 trans. │            │  Compose (follow-on)│
+      │  SwiftUI · 3 trans. │            │  Compose · 3 trans. │
       └──────────┬──────────┘            └──────────┬──────────┘
                  │      ffi · http · sqlcipher       │
                  ▼                                   ▼
@@ -128,7 +128,7 @@ proto/dni.proto        gRPC contract (excluded build)
 ios/
   Shared/                      models, FeatureService protocol, view models, the SwiftUI shell
   Apps/Unified/                the one app target (FFI + HTTP + SQLCipher, picker + Compare)
-android/ (io.dotnetnativeinterop)      Compose host + JNI shim (follow-on: not yet unified)
+android/ (io.dotnetnativeinterop)      unified Compose app + JNI shim (full 1:1 parity)
 build/                         build-ios-framework.sh · build-android-so.sh
 docs/                          INTEROP_CONTRACT.md · patterns.json · superpowers/specs/
 .github/workflows/             ci-core · ci-ios · ci-android
@@ -167,9 +167,10 @@ Then generate and open the iOS project (`cd ios && xcodegen generate`, then Xcod
 - ✅ **Unified Android app (full 1:1 parity)** — complete Compose port. UI shell with transport picker,
   Dashboard, Features, Compare tabs. **AI tab** (ONNX semantic search + extractive RAG over manuals).
   **Edge Vector Search tab** (on-device offline doc indexing & retrieval, Kotlin ORT). **Lab tab**
-  (Fractal explorer, raymarcher, benchmarks — pure-Kotlin visual compute). **FFI Boundary screen**
-  with JNI instrumentation (echo, throw, traced streaming). **Latency hub** (Distribution, Comparison,
-  Jitter, Payload, Telemetry tabs) — measure all three transports in parallel.
+  (Fractal explorer, raymarcher, benchmarks — pure-Kotlin visual compute). **Precision Instrument
+  theming** (the shared dark instrument design system — identical hex tokens on both platforms).
+  **FFI Boundary screen** with JNI instrumentation (echo, throw, traced streaming). **Latency hub**
+  (Distribution, Comparison, Jitter, Payload, Telemetry tabs) — measure all three transports in parallel.
 - ✅ **On-device AI** — **ONNX semantic search** runs on both iOS & Android (CoreML on iOS, NNAPI + CPU
   fallback on Android). **llama.cpp RAG generation** on iOS (**Llama-3.2-1B-Instruct Q4**, streamed
   over all three transports); Android RAG currently extractive (GGUF bundling pending). Retrieved
