@@ -31,9 +31,18 @@ public readonly record struct AgentDecision(ToolCall? Call, bool IsAnswer)
 
 // UseStringEnumConverter: ForemanStopReason must serialize as its name (e.g. "Answered"), not an int,
 // so the native UI / logs can read it directly. Source-gen-safe (no reflection).
+//
+// FeatureRun (DotnetNativeInterop.Engine.LanguageFeatures.cs) is included here so the real run_feature
+// tool binding (ForemanHost) can serialize LanguageFeatureCatalog.Run's result without reflection.
+// FeaturesJsonContext already source-gens FeatureRun, but it is `internal sealed partial class
+// FeaturesJsonContext` in the NativeBridge assembly (core/DotnetNativeInterop.NativeBridge/
+// FeaturesJsonContext.cs) — unreachable from Engine, which NativeBridge references, not the reverse.
+// FeatureRun the type IS already Engine-visible (declared in the Engine assembly), so no type move is
+// needed; only a second, Engine-side source-gen registration for it.
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(ToolCall))]
 [JsonSerializable(typeof(AgentStep))]
 [JsonSerializable(typeof(ForemanTurnResult))]
 [JsonSerializable(typeof(ForemanStopReason))]
+[JsonSerializable(typeof(FeatureRun))]
 public partial class ForemanJsonContext : System.Text.Json.Serialization.JsonSerializerContext { }
