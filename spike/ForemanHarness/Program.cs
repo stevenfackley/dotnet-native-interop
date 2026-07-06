@@ -14,5 +14,10 @@ var result = new ForemanTurnResult("done", ForemanStopReason.Answered, 2);
 var rjson = JsonSerializer.Serialize(result, ForemanJsonContext.Default.ForemanTurnResult);
 Check("ForemanTurnResult serializes StopReason", rjson.Contains("Answered"));
 
+// Task 2: a tool definition invokes its delegate
+var t = new ToolDefinition("engine_stats", "runtime memory + GC stats",
+    Array.Empty<ToolParam>(), (_, _) => Task.FromResult("{\"heapMB\":12}"));
+Check("ToolDefinition invokes delegate", (await t.Invoke("{}", default)).Contains("heapMB"));
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
