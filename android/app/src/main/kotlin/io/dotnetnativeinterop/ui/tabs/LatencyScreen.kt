@@ -612,7 +612,9 @@ private fun GcLabAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifier) {
                 val gcEvents = LatencyStats.collectionEventXs(heapPoints).take(10)
                 BenchmarkChart(
                     p.series,
-                    colors = listOf(Instrument.textPrimary, Instrument.textTertiary),
+                    // Name-mapped, not positional: heap must stay primary even if the decoder ever
+                    // emits [committedMB, heapMB] — the annotation lookup is by-name too, so both agree.
+                    colors = p.series.map { if (it.name == "heapMB") Instrument.textPrimary else Instrument.textTertiary },
                     annotations = gcEvents.mapIndexed { idx, x ->
                         ChartAnnotation(x, if (idx == 0) "GC" else "", Instrument.warn)
                     },

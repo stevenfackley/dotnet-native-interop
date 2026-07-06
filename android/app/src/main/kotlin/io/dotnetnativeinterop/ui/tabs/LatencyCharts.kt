@@ -129,7 +129,7 @@ internal fun CategoryBarChart(
             drawText(measurer, label, Offset(padL + i * slot + 2f, padT + h + 4f), labelStyle)
         }
 
-        drawText(measurer, "%.1f".format(maxY), Offset(2f, padT - 4f), labelStyle)
+        drawText(measurer, String.format(java.util.Locale.US, "%.1f", maxY), Offset(2f, padT - 4f), labelStyle)
         drawText(measurer, "0", Offset(2f, padT + h - 6f), labelStyle)
     }
 }

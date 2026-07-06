@@ -71,15 +71,19 @@ public object LatencyStats {
     /**
      * "Commit to one unit" (facelift spec §5): sub-millisecond values read as µs — never a bare
      * `0.11 ms` — so FFI's magnitude stays legible next to HTTP/SQLite. At or above 1 ms, plain ms with
-     * 2 decimals. One value, one unit; never both in the same string.
+     * 2 decimals. One value, one unit; never both in the same string. Locale is pinned to US so a
+     * comma-decimal locale can't print "1,00 ms" (parity break + would fail our hardcoded-string tests).
      */
     public fun formatLatencyMs(ms: Double): String =
-        if (ms < 1.0) "%.1f µs".format(ms * 1_000.0) else "%.2f ms".format(ms)
+        if (ms < 1.0) String.format(java.util.Locale.US, "%.1f µs", ms * 1_000.0)
+        else String.format(java.util.Locale.US, "%.2f ms", ms)
 
     /**
      * Indices of [samples] (in original order) whose value exceeds the [p]th percentile — the tail
      * worth annotating on a jitter/sequence chart (facelift spec §5: "annotate outliers"). Empty below
-     * 5 samples, where a percentile isn't meaningful.
+     * 5 samples. NOTE: [percentile] is nearest-rank (`sorted[(p*n).toInt()]`), so at the default
+     * p=0.99 the threshold IS the max for any n ≤ 100 (index n-1) — meaning zero outliers for small n.
+     * A meaningful non-empty result needs n well above 100 (the real caller, JitterAnalysis, uses 400).
      */
     public fun outlierIndices(samples: List<Double>, p: Double = 0.99): List<Int> {
         if (samples.size < 5) return emptyList()

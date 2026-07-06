@@ -105,7 +105,7 @@ internal fun BenchmarkChart(
                 }
             }
 
-            drawText(measurer, "%.1f".format(maxY), Offset(2f, padT - 4f), labelStyle)
+            drawText(measurer, String.format(java.util.Locale.US, "%.1f", maxY), Offset(2f, padT - 4f), labelStyle)
             drawText(measurer, "0", Offset(2f, padT + h - 6f), labelStyle)
             drawText(measurer, minX.toInt().toString(), Offset(padL, padT + h + 4f), labelStyle)
             drawText(measurer, maxX.toInt().toString(), Offset(padL + w - 28f, padT + h + 4f), labelStyle)
