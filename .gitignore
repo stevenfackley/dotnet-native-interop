@@ -58,6 +58,13 @@ build/*.log
 native/llama-shim/.llama-src/
 native/llama-shim/build/
 
+## INT8 quantization gate (tools/int8-quant): venv + generated model/results, never the FP32 source
+tools/int8-quant/.venv/
+tools/int8-quant/*.onnx
+tools/int8-quant/results.json
+__pycache__/
+*.pyc
+
 ## AI model assets staged into APK (sourced from LFS; never commit the copy)
 android/app/src/main/assets/dni-assets/
 /android/app/.cxx
