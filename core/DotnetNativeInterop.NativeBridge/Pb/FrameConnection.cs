@@ -8,8 +8,11 @@ namespace DotnetNativeInterop.NativeBridge.Pb;
 /// attaches (via <see cref="UseCipher"/>) an <see cref="AeadFrameCipher"/> and the payload becomes
 /// AES-256-GCM <c>ciphertext||tag</c> — the length framing is unchanged. Symmetric: both the server and the
 /// loopback client use it.
+///
+/// Owns the AEAD cipher (two AES-GCM handles) once attached, so it is <see cref="IDisposable"/>; it does
+/// NOT own the underlying <paramref name="stream"/> (the caller's TcpClient does), so Dispose leaves it be.
 /// </summary>
-internal sealed class FrameConnection(Stream stream)
+internal sealed class FrameConnection(Stream stream) : IDisposable
 {
     // Cap a single frame so a malformed/hostile length prefix can't drive an unbounded allocation.
     private const int MaxFrameBytes = 16 * 1024 * 1024;
@@ -78,4 +81,7 @@ internal sealed class FrameConnection(Stream stream)
 
         return true;
     }
+
+    /// <summary>Disposes the attached AEAD cipher (its two AES-GCM handles). The stream is the caller's to close.</summary>
+    public void Dispose() => _cipher?.Dispose();
 }

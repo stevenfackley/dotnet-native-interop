@@ -192,8 +192,9 @@ internal static class RawHttpServer
 
             seen += read;
             var text = Encoding.ASCII.GetString(buffer, 0, seen);
-            // Parse once the header block is complete, or once the request line is present with no body.
-            if (text.Contains("\r\n\r\n", StringComparison.Ordinal) || text.Contains("\r\n", StringComparison.Ordinal))
+            // Wait for the FULL header block (\r\n\r\n) so ParseRequest sees the X-Dni-Request-Id header, not
+            // just the request line. The buffer-full / EOF fallback below handles headerless or partial cases.
+            if (text.Contains("\r\n\r\n", StringComparison.Ordinal))
             {
                 return ParseRequest(text);
             }

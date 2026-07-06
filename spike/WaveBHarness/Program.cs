@@ -59,6 +59,7 @@ internal static class Program
         {
             var (client, _, conn) = await ConnectAsync(port, ct).ConfigureAwait(false);
             using (client)
+            using (conn)
             {
                 var features = await RoundTripAsync(conn, new Envelope { RequestId = "pb-features", Features = new FeaturesRequest() }, ct).ConfigureAwait(false);
                 Check("pb plain: features returns a non-empty catalog",
@@ -94,6 +95,7 @@ internal static class Program
             {
                 var (client, _, conn) = await ConnectAsync(port, ct).ConfigureAwait(false);
                 using (client)
+                using (conn)
                 {
                     ClientHandshakeResult handshake;
                     try
@@ -119,6 +121,7 @@ internal static class Program
             {
                 var (client, stream, conn) = await ConnectAsync(port, ct).ConfigureAwait(false);
                 using (client)
+                using (conn)
                 {
                     var handshake = await PqSecureChannel.ClientHandshakeAsync(conn, provider, ct).ConfigureAwait(false);
                     secondSessionId = handshake.SessionId;

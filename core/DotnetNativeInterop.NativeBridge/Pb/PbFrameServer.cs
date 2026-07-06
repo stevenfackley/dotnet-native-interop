@@ -121,7 +121,7 @@ internal static class PbFrameServer
             using (client)
             {
                 var stream = client.GetStream();
-                var connection = new FrameConnection(stream);
+                using var connection = new FrameConnection(stream); // disposes the AEAD cipher on every exit path
 
                 // Opt-in PQ handshake over the still-plaintext connection; on success every later frame is
                 // AES-256-GCM. A handshake failure is surfaced as a typed ErrorFrame, never a silent close.
@@ -202,6 +202,8 @@ internal static class PbFrameServer
         }
         catch (PqcHandshakeException ex)
         {
+            // Echoing ex.Message is a demo-only affordance (this is a loopback teaching artifact) — it is a
+            // mild error oracle. A production server would return a single uniform "handshake failed" reason.
             await TrySendErrorAsync(connection, ErrorHandshakeFailed, ex.Message, cancellationToken).ConfigureAwait(false);
             return false;
         }

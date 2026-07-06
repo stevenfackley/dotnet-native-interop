@@ -10,6 +10,11 @@ namespace DotnetNativeInterop.NativeBridge.Pb;
 /// On the wire an encrypted frame payload is <c>ciphertext || tag(16)</c>; the 12-byte nonce is implicit
 /// (both endpoints derive it from their frame counter), so it is not transmitted.
 ///
+/// No associated data (AAD) is passed to GCM — a deliberate, reasoned choice, not an oversight: there is no
+/// unencrypted header to bind (the only cleartext is the u32 length prefix, and a wrong length simply makes
+/// the tag verification fail at the ciphertext boundary), and the monotonic per-direction counter=nonce
+/// already authenticates frame ORDER (a reordered/replayed frame decrypts under the wrong nonce and fails).
+///
 /// AOT-safe: <see cref="AesGcm"/> is BCL (routed through Apple CryptoKit on iOS/macOS, which requires the
 /// 16-byte tag used here) and needs no reflection.
 /// </summary>
