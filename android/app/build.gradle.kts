@@ -1,11 +1,8 @@
-import com.google.protobuf.gradle.id
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.protobuf)
     // Room KSP — add KSP plugin here if upgrading; for now use kapt-free Room via annotationProcessor
     id("kotlin-kapt")
 }
@@ -95,38 +92,10 @@ android {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Protobuf plugin — generates Kotlin + gRPC stubs from ../../proto/
-// ---------------------------------------------------------------------------
-protobuf {
-    protoc {
-        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.get()}"
-    }
-    plugins {
-        id("grpc") {
-            artifact = "io.grpc:protoc-gen-grpc-java:${libs.versions.grpcJava.get()}"
-        }
-        id("grpckt") {
-            artifact = "io.grpc:protoc-gen-grpc-kotlin:${libs.versions.grpcKotlin.get()}:jdk8@jar"
-        }
-    }
-    generateProtoTasks {
-        all().forEach { task ->
-            // protobuf-lite stack (grpc-protobuf-lite + protobuf-kotlin-lite): both the Java messages
-            // and the Kotlin DSL must be generated in "lite" mode, and the Java builtin must be present
-            // (the Kotlin DSL wraps the Java message classes — without it, the generated `Dni` class is
-            // missing and the Kotlin code fails to resolve).
-            task.builtins {
-                id("java") { option("lite") }
-                id("kotlin") { option("lite") }
-            }
-            task.plugins {
-                id("grpc") { option("lite") }
-                id("grpckt")
-            }
-        }
-    }
-}
+// NOTE: gRPC/UDS is an EXCLUDED transport (no NativeAOT mobile runtime pack). With the Kotlin
+// client (GrpcUdsClient) removed, the protobuf codegen chain (protobuf plugin + grpc/grpckt protoc
+// plugins + stub deps) was removed too — nothing imported the generated dni.v1 classes. The contract
+// stays documented at the repo root: proto/dni.proto + patterns.json's "grpc" entry.
 
 // ---------------------------------------------------------------------------
 // Copy patterns.json into assets at build time
@@ -147,18 +116,6 @@ tasks.register<Copy>("copyAiAssets") {
     into("${projectDir}/src/main/assets/dni-assets")
 }
 tasks.named("preBuild") { dependsOn("copyAiAssets") }
-
-// Stage the shared gRPC contract into the protobuf plugin's default source dir (src/main/proto).
-// The proto/ tree lives at the repo root; the protobuf-gradle-plugin has no stable task-level
-// "extra source dir" API in 0.9.x, so we copy it in before codegen runs.
-tasks.register<Copy>("copyProto") {
-    from("${rootDir.parentFile.absolutePath}/proto") { include("**/*.proto") }
-    into("${projectDir}/src/main/proto")
-}
-afterEvaluate {
-    tasks.matching { it.name.startsWith("generate") && it.name.endsWith("Proto") }
-        .configureEach { dependsOn("copyProto") }
-}
 
 dependencies {
     // Compose BOM + core UI
@@ -182,13 +139,6 @@ dependencies {
     // OkHttp (HTTP SSE)
     implementation(libs.okhttp)
     implementation(libs.okhttp.sse)
-
-    // gRPC
-    implementation(libs.grpc.okhttp)
-    implementation(libs.grpc.protobuf.lite)
-    implementation(libs.grpc.stub)
-    implementation(libs.grpc.kotlin.stub)
-    implementation(libs.protobuf.kotlin.lite)
 
     // Room (SQLite transport)
     implementation(libs.room.runtime)
