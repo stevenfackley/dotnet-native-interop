@@ -56,8 +56,16 @@ internal fun SearchScreen(modifier: Modifier = Modifier) {
                 AiScreen(Modifier.fillMaxWidth().weight(1f))
             }
         } else {
-            val vm: EvsViewModel = viewModel()
-            EdgeSearchScreen(vm, inner)
+            Column(modifier = inner) {
+                Text(
+                    "Runs entirely on-device via ONNX — no engine",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Instrument.textTertiary,
+                    modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.xs),
+                )
+                val vm: EvsViewModel = viewModel()
+                EdgeSearchScreen(vm, Modifier.fillMaxWidth().weight(1f))
+            }
         }
     }
 }
