@@ -39,5 +39,23 @@ Check("parses a final answer", d2.IsAnswer && d2.Call is null);
 var d3 = ToolCallParser.Parse("not json");
 Check("malformed -> answer (never throws)", d3.IsAnswer);
 
+// Task 5: a scripted brain returns a tool call, then an answer once a tool result exists
+var scripted = new ScriptedBrain(ctx =>
+    ctx.Steps.Any(s => s.Kind == "tool_result")
+        ? AgentDecision.Answer
+        : AgentDecision.Tool(new ToolCall("engine_stats", "{}")));
+var ctx0 = new AgentContext("q", new List<AgentStep>());
+Check("brain: first decision is a tool call", scripted.DecideAsync(ctx0, default).Result.Call is not null);
+ctx0.Steps.Add(new AgentStep("tool_result", "engine_stats", "{}"));
+Check("brain: answers after a tool result", scripted.DecideAsync(ctx0, default).Result.IsAnswer);
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
+
+sealed class ScriptedBrain(Func<AgentContext, AgentDecision> decide) : IAgentBrain
+{
+    public Task<AgentDecision> DecideAsync(AgentContext ctx, CancellationToken ct) => Task.FromResult(decide(ctx));
+    public Task StreamAnswerAsync(AgentContext ctx, Action<string> sink, CancellationToken ct)
+    { sink("scripted answer"); return Task.CompletedTask; }
+    public string BackendBadge => "scripted (test)";
+}
