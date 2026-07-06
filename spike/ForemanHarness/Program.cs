@@ -31,5 +31,13 @@ Check("grammar names each tool", g.Contains("\\\"search_manuals\\\"") && g.Conta
 Check("grammar has an answer alternative", g.Contains("answer"));
 Check("grammar has a root rule", g.Contains("root ::="));
 
+// Task 4: parse grammar-shaped emissions
+var d1 = ToolCallParser.Parse("{\"tool\":\"engine_stats\",\"args\":{}}");
+Check("parses a tool call", d1.Call is { } c1 && c1.Tool == "engine_stats" && !d1.IsAnswer);
+var d2 = ToolCallParser.Parse("{\"answer\":\"the filter code is E3\"}");
+Check("parses a final answer", d2.IsAnswer && d2.Call is null);
+var d3 = ToolCallParser.Parse("not json");
+Check("malformed -> answer (never throws)", d3.IsAnswer);
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
