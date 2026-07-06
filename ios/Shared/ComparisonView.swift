@@ -4,6 +4,8 @@ import SwiftUI
 /// client round-trip time per transport as bars, plus totals.
 struct ComparisonView: View {
     @ObservedObject var model: ComparisonViewModel
+    let infos: [TransportInfo]
+    let telemetry: TelemetryService
 
     var body: some View {
         NavigationStack {
@@ -60,6 +62,12 @@ struct ComparisonView: View {
                 }
             }
             .navigationTitle("Compare")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    // IA collapse spec: About is reachable from Analysis as well as Boundary.
+                    AboutToolbarButton(infos: infos, telemetry: telemetry)
+                }
+            }
             .task { await model.loadDescriptorsIfNeeded() }
         }
     }

@@ -75,7 +75,9 @@ struct FeaturesView: View {
         }
     }
 
-    /// Version-bucket + pass/fail filter chips. Each chip toggles independently (tap again to clear).
+    /// Version-bucket + pass/fail filter chips. Single-select within each group: tapping a chip
+    /// replaces that group's active filter; tapping the active chip again clears it. The version
+    /// group and the status group combine (AND) across the divider.
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Instrument.Space.s) {

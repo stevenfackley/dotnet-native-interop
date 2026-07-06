@@ -29,10 +29,15 @@ struct AnalysisView: View {
             .padding(.vertical, Instrument.Space.s)
 
             Group {
+                // Each child hosts an AboutToolbarButton in its own NavigationStack's toolbar (IA
+                // collapse spec: About is reachable from Analysis as well as Boundary), hence the
+                // infos/telemetry plumbing.
                 switch focus {
-                case .overview: DashboardView(viewModel: features)
-                case .compare:  ComparisonView(model: comparison)
-                case .latency:  LatencyHubView(model: latency, telemetry: telemetry)
+                case .overview: DashboardView(viewModel: features, telemetry: telemetry)
+                case .compare:  ComparisonView(model: comparison,
+                                               infos: features.orderedInfos, telemetry: telemetry)
+                case .latency:  LatencyHubView(model: latency,
+                                               infos: features.orderedInfos, telemetry: telemetry)
                 }
             }
         }

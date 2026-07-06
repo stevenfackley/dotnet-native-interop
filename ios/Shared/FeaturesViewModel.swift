@@ -50,7 +50,7 @@ final class FeaturesViewModel: ObservableObject {
             }
         }
         if let versionFilter {
-            shown = shown.filter { versionFilter.matches($0.version) }
+            shown = shown.filter { versionFilter.matches($0) }
         }
         if !searchText.isEmpty {
             let query = searchText.lowercased()
@@ -59,13 +59,27 @@ final class FeaturesViewModel: ObservableObject {
             }
         }
 
+        // All three sorts are made stable explicitly (enumerated offset as tiebreak): Swift's
+        // sorted(by:) does not guarantee stability, and ties are common (equal elapsed for un-run
+        // items, equal version numbers). Ties keep the engine's catalog order.
         switch sort {
         case .name:
-            return shown.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            return shown.enumerated().sorted { a, b in
+                let cmp = a.element.title.localizedStandardCompare(b.element.title)
+                return cmp == .orderedSame ? a.offset < b.offset : cmp == .orderedAscending
+            }.map(\.element)
         case .version:
-            return shown // catalog order is already version-ordered (LanguageFeatures*.cs)
+            // Explicit sort, newest C# version first — the engine's catalog concatenates its Modern
+            // and Classic blocks (LanguageFeatures*.cs), so load order is NOT version-ordered.
+            return shown.enumerated().sorted { a, b in
+                let (va, vb) = (a.element.versionNumber, b.element.versionNumber)
+                return va == vb ? a.offset < b.offset : va > vb
+            }.map(\.element)
         case .elapsed:
-            return shown.sorted { (results[$0.id]?.elapsedMs ?? -1) > (results[$1.id]?.elapsedMs ?? -1) }
+            return shown.enumerated().sorted { a, b in
+                let (ea, eb) = (results[a.element.id]?.elapsedMs ?? -1, results[b.element.id]?.elapsedMs ?? -1)
+                return ea == eb ? a.offset < b.offset : ea > eb
+            }.map(\.element)
         }
     }
 

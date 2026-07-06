@@ -44,6 +44,14 @@ enum RunStatus {
 
 // MARK: - Catalog search/filter/sort (IA collapse spec, 2026-06-21: Catalog's one net-new behavior)
 
+extension FeatureDescriptor {
+    /// Numeric C# version parsed from the "C# N" version label (0 if unparseable). Single parse point
+    /// for the catalog's version filter chips and version sort.
+    var versionNumber: Int {
+        Int(version.replacingOccurrences(of: "C# ", with: "")) ?? 0
+    }
+}
+
 /// C# version-number filter chip. Buckets the "C# N" descriptor version string into a coarse range.
 enum VersionBucket: String, CaseIterable, Identifiable {
     case v1to6 = "C# 1–6"
@@ -51,13 +59,12 @@ enum VersionBucket: String, CaseIterable, Identifiable {
     case v11to14 = "C# 11–14"
     var id: Self { self }
 
-    /// True if `version` (e.g. "C# 12") falls inside this bucket's numeric range.
-    func matches(_ version: String) -> Bool {
-        guard let n = Int(version.replacingOccurrences(of: "C# ", with: "")) else { return false }
+    /// True if the descriptor's numeric C# version falls inside this bucket's range.
+    func matches(_ descriptor: FeatureDescriptor) -> Bool {
         switch self {
-        case .v1to6:   return (1...6).contains(n)
-        case .v7to10:  return (7...10).contains(n)
-        case .v11to14: return (11...14).contains(n)
+        case .v1to6:   return (1...6).contains(descriptor.versionNumber)
+        case .v7to10:  return (7...10).contains(descriptor.versionNumber)
+        case .v11to14: return (11...14).contains(descriptor.versionNumber)
         }
     }
 }

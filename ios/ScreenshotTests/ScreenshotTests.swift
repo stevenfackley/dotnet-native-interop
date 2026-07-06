@@ -20,7 +20,7 @@ final class ScreenshotTests: XCTestCase {
 
     /// 5 top-level sections per the 2026-06-21 IA collapse (was 9 tabs): Boundary, Catalog, Lab, Search
     /// (segmented AI/Manuals), Analysis (segmented Dashboard/Compare/Latency). About is demoted to a
-    /// toolbar ⓘ on Boundary.
+    /// toolbar ⓘ, present on Boundary AND each Analysis child screen.
     func testCaptureEveryScreen() {
         // --- Boundary (hero/default landing tab; FFI lifecycle trace) ---
         tapTab("Boundary")
@@ -30,8 +30,12 @@ final class ScreenshotTests: XCTestCase {
         sleep(3)
         shot("02-boundary-run")
 
-        // --- About (demoted to Boundary's toolbar ⓘ / sheet) ---
-        tapIfExists(button: "About")
+        // --- About (demoted to a toolbar ⓘ / sheet; on Boundary and each Analysis child) ---
+        // Only Boundary has been visited at this point, so exactly one "About" button is in the
+        // hierarchy — but scope to firstMatch anyway so the duplicates on the Analysis children can
+        // never make this query ambiguous.
+        let about = app.buttons["About"].firstMatch
+        if about.waitForExistence(timeout: 8) { about.tap() }
         sleep(2)
         shot("03-about")
         tapIfExists(button: "Done") // dismiss the About sheet

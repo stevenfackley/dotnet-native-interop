@@ -4,6 +4,7 @@ import SwiftUI
 /// engine-telemetry screen (IA collapse spec, 2026-06-21 — was the standalone "Latency" tab).
 struct LatencyHubView: View {
     @ObservedObject var model: LatencyViewModel
+    let infos: [TransportInfo]
     let telemetry: TelemetryService
 
     var body: some View {
@@ -33,6 +34,12 @@ struct LatencyHubView: View {
             }
             .instrumentScreen()
             .navigationTitle("Latency")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    // IA collapse spec: About is reachable from Analysis as well as Boundary.
+                    AboutToolbarButton(infos: infos, telemetry: telemetry)
+                }
+            }
         }
     }
 }
