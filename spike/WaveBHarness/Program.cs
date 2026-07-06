@@ -84,6 +84,8 @@ internal static class Program
     private static async Task RunPbSecureAsync(CancellationToken ct)
     {
         var port = PbFrameServer.Start(1); // flags & 1 => require PQ handshake
+        byte[] firstSessionId = [];
+        byte[] secondSessionId = [];
         try
         {
             IPqcProvider provider = new BouncyCastlePqcProvider();
@@ -93,10 +95,11 @@ internal static class Program
                 var (client, _, conn) = await ConnectAsync(port, ct).ConfigureAwait(false);
                 using (client)
                 {
-                    AeadFrameCipher cipher;
+                    ClientHandshakeResult handshake;
                     try
                     {
-                        cipher = await PqSecureChannel.ClientHandshakeAsync(conn, provider, ct).ConfigureAwait(false);
+                        handshake = await PqSecureChannel.ClientHandshakeAsync(conn, provider, ct).ConfigureAwait(false);
+                        firstSessionId = handshake.SessionId;
                         Check("pb PQ: ML-KEM/ML-DSA handshake completed + signature verified", true);
                     }
                     catch (PqcHandshakeException ex)
@@ -105,7 +108,7 @@ internal static class Program
                         return;
                     }
 
-                    conn.UseCipher(cipher);
+                    conn.UseCipher(handshake.Cipher);
                     var features = await RoundTripAsync(conn, new Envelope { RequestId = "pq-features", Features = new FeaturesRequest() }, ct).ConfigureAwait(false);
                     Check("pb PQ: encrypted features round-trip succeeds",
                         features.BodyCase == Envelope.BodyOneofCase.FeaturesResponse && features.FeaturesResponse.Features.Count > 0);
@@ -117,7 +120,9 @@ internal static class Program
                 var (client, stream, conn) = await ConnectAsync(port, ct).ConfigureAwait(false);
                 using (client)
                 {
-                    var cipher = await PqSecureChannel.ClientHandshakeAsync(conn, provider, ct).ConfigureAwait(false);
+                    var handshake = await PqSecureChannel.ClientHandshakeAsync(conn, provider, ct).ConfigureAwait(false);
+                    secondSessionId = handshake.SessionId;
+                    var cipher = handshake.Cipher;
 
                     // Encrypt a valid ping, flip a ciphertext byte, and write it raw (bypassing FrameConnection
                     // so it is NOT re-encrypted). The GCM tag must then fail on the server.
@@ -146,6 +151,11 @@ internal static class Program
                     Check("pb PQ: tampered frame rejected cleanly (typed error, no crash)", rejected);
                 }
             }
+
+            // Replay freshness: two handshakes to the SAME server boot must carry distinct session_ids, so a
+            // replayed client ciphertext derives different keys (no cross-session AES-GCM key/nonce reuse).
+            Check("pb PQ: fresh session_id per handshake (replay resistance)",
+                firstSessionId.Length == 32 && !firstSessionId.SequenceEqual(secondSessionId));
 
             Check("pb PQ: trust~posture reports a live PQ channel while up",
                 TrustPosture.BinaryPqChannel is not null && TrustPosture.BinaryPqChannel.Cipher == "AES-256-GCM");

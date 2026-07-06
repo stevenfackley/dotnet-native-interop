@@ -52,15 +52,17 @@ message ErrorFrame { int32 code = 1; string message = 2; }
 // ---- PQ handshake (opt-in; only when the server was started with the require-PQ flag) --------------
 
 // Server -> client: the per-boot ML-KEM public key, signed by the per-boot ML-DSA key (whose public
-// half is included so the client can verify the signature). Algorithm names are carried for the Trust
-// inspector's live-params display.
+// half is included so the client can verify the signature). session_id is fresh per handshake; the
+// signature covers (kem_public_key || session_id) and session_id is folded into the HKDF, so replaying a
+// client ciphertext can never resurrect the same session keys. Algorithm names feed the Trust inspector.
 message HandshakeOffer {
   bytes kem_public_key = 1;
   bytes sig_public_key = 2;
-  bytes signature = 3;          // ML-DSA signature over kem_public_key
+  bytes signature = 3;          // ML-DSA signature over (kem_public_key || session_id)
   string kem_algorithm = 4;     // e.g. "ML-KEM-768"
   string sig_algorithm = 5;     // e.g. "ML-DSA-65"
   string cipher = 6;            // e.g. "AES-256-GCM"
+  bytes session_id = 7;         // fresh 32-byte server randomness per handshake (replay freshness)
 }
 
 // Client -> server: the ML-KEM ciphertext encapsulating the shared secret.
