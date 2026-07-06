@@ -99,12 +99,14 @@ internal fun TransportBoundaryScreen(transport: TransportKind, modifier: Modifie
                     }
             }
 
-            // Drain the engine span ring and keep only this transport's server-side spans.
-            val raw = withContext(Dispatchers.IO) { NativeBridge.nativeTraceDrain() }
-            serverSpans = raw
-                ?.let { runCatching { transportTraceJson.decodeFromString<TraceDrain>(it).spans }.getOrNull() }
-                ?.filter { span -> categoryPrefixes(transport).any { span.name.startsWith(it) } }
-                ?: emptyList()
+            // Drain the engine span ring and keep only this transport's server-side spans. The drain +
+            // JSON decode + filter all run on IO (decoding up to 512 spans off the main thread).
+            serverSpans = withContext(Dispatchers.IO) {
+                NativeBridge.nativeTraceDrain()
+                    ?.let { runCatching { transportTraceJson.decodeFromString<TraceDrain>(it).spans }.getOrNull() }
+                    ?.filter { span -> categoryPrefixes(transport).any { span.name.startsWith(it) } }
+                    ?: emptyList()
+            }
             drained = true
             running = false
         }

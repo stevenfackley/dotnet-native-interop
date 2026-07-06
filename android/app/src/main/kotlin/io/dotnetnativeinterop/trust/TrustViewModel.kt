@@ -64,13 +64,16 @@ public class TrustViewModel(
      */
     public fun setPqEnabled(enabled: Boolean) {
         viewModelScope.launch {
+            val previous = _state.value.pqRequested
             _state.update { it.copy(negotiating = true, pqRequested = enabled, error = null) }
             runCatching {
                 PbTransport.setSecure(enabled)
                 // Force a connection so the handshake runs (and publishes live params) or plaintext resumes.
                 binaryCatalog.run("ping")
             }.onFailure { e ->
-                _state.update { it.copy(error = "PQ negotiation failed: ${e.message}") }
+                // Revert the toggle: it must never read ON while the refreshed posture reads PLAINTEXT
+                // (the banner discloses the failure, but the switch itself must not lie — repo honesty DNA).
+                _state.update { it.copy(error = "PQ negotiation failed: ${e.message}", pqRequested = previous) }
             }
             _state.update { it.copy(negotiating = false) }
             refresh()
