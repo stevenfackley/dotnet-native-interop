@@ -46,6 +46,8 @@ internal static class ExportsFfi
             // prompt, and the C ABI only forbids a NULL pointer (checked above), not "".
             var promptText = NativeText.Read((nint)prompt);
 
+            // Span the synchronous session setup (the token stream runs on the background DrainAsync task).
+            using var span = EngineTrace.StartSpan("ffi.session_start");
             var request = new InferenceRequest(promptText, maxTokens, temperature);
             var session = InferenceSession.Start(EngineHost.Orchestrator, request);
             var id = SessionRegistry.Add(session);
@@ -105,6 +107,7 @@ internal static class ExportsFfi
 
             var queryText = NativeText.Read((nint)query);
 
+            using var span = EngineTrace.StartSpan("ffi.rag_session_start");
             var request = new InferenceRequest(queryText, maxTokens, temperature);
             var session = InferenceSession.Start(EngineHost.RagOrchestrator, request);
             var id = SessionRegistry.Add(session);

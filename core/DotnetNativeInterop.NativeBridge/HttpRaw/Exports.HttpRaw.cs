@@ -80,24 +80,40 @@ internal static class RawHttpServer
             using (client)
             {
                 var stream = client.GetStream();
-                var path = await ReadRequestPathAsync(stream, cancellationToken).ConfigureAwait(false);
+                var (path, requestId) = await ReadRequestAsync(stream, cancellationToken).ConfigureAwait(false);
+
+                // One span per request; server-side stage spans (http.execute) nest under it via
+                // Activity.Current. requestId comes from the optional X-Dni-Request-Id correlation header.
+                using var requestSpan = EngineTrace.StartSpan("http.request", requestId);
+                if (requestSpan is not null)
+                {
+                    requestSpan.SetTag("dni.path", path);
+                }
 
                 if (path == "/features")
                 {
-                    var json = JsonSerializer.Serialize(
-                        LanguageFeatureCatalog.Descriptors,
-                        typeof(IReadOnlyList<FeatureDescriptor>),
-                        FeaturesJsonContext.Default);
-                    await WriteJsonAsync(stream, json, cancellationToken).ConfigureAwait(false);
+                    using (EngineTrace.StartSpan("http.execute", requestId))
+                    {
+                        var json = JsonSerializer.Serialize(
+                            LanguageFeatureCatalog.Descriptors,
+                            typeof(IReadOnlyList<FeatureDescriptor>),
+                            FeaturesJsonContext.Default);
+                        await WriteJsonAsync(stream, json, cancellationToken).ConfigureAwait(false);
+                    }
+
                     return;
                 }
 
                 if (path.StartsWith("/feature/run/", StringComparison.Ordinal))
                 {
-                    var id = Uri.UnescapeDataString(path["/feature/run/".Length..]);
-                    var run = LanguageFeatureCatalog.Run(id);
-                    var json = JsonSerializer.Serialize(run, typeof(FeatureRun), FeaturesJsonContext.Default);
-                    await WriteJsonAsync(stream, json, cancellationToken).ConfigureAwait(false);
+                    using (EngineTrace.StartSpan("http.execute", requestId))
+                    {
+                        var id = Uri.UnescapeDataString(path["/feature/run/".Length..]);
+                        var run = LanguageFeatureCatalog.Run(id);
+                        var json = JsonSerializer.Serialize(run, typeof(FeatureRun), FeaturesJsonContext.Default);
+                        await WriteJsonAsync(stream, json, cancellationToken).ConfigureAwait(false);
+                    }
+
                     return;
                 }
 
@@ -110,6 +126,7 @@ internal static class RawHttpServer
                         "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
                         cancellationToken).ConfigureAwait(false);
 
+                    using var execute = EngineTrace.StartSpan("http.execute", requestId);
                     var ragSession = InferenceSession.Start(
                         EngineHost.RagOrchestrator, new InferenceRequest(query),
                         cancellationToken: cancellationToken);
@@ -134,6 +151,7 @@ internal static class RawHttpServer
                     "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
                     cancellationToken).ConfigureAwait(false);
 
+                using var legacyExecute = EngineTrace.StartSpan("http.execute", requestId);
                 var session = InferenceSession.Start(
                     EngineHost.Orchestrator, new InferenceRequest(string.Empty), cancellationToken: cancellationToken);
 
@@ -154,8 +172,13 @@ internal static class RawHttpServer
         }
     }
 
-    /// <summary>Reads the request head and returns the request-target path (e.g. "/features").</summary>
-    private static async Task<string> ReadRequestPathAsync(NetworkStream stream, CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads the request head and returns the request-target path (e.g. "/features") plus the optional
+    /// <c>X-Dni-Request-Id</c> correlation header (null when absent) that ties this request's server-side
+    /// spans to the client's own spans in the boundary waterfall.
+    /// </summary>
+    private static async Task<(string Path, string? RequestId)> ReadRequestAsync(
+        NetworkStream stream, CancellationToken cancellationToken)
     {
         var buffer = new byte[2048];
         var seen = 0;
@@ -169,22 +192,43 @@ internal static class RawHttpServer
 
             seen += read;
             var text = Encoding.ASCII.GetString(buffer, 0, seen);
-            if (text.Contains("\r\n", StringComparison.Ordinal))
+            // Parse once the header block is complete, or once the request line is present with no body.
+            if (text.Contains("\r\n\r\n", StringComparison.Ordinal) || text.Contains("\r\n", StringComparison.Ordinal))
             {
-                return ParsePath(text);
+                return ParseRequest(text);
             }
         }
 
-        return seen > 0 ? ParsePath(Encoding.ASCII.GetString(buffer, 0, seen)) : "/";
+        return seen > 0 ? ParseRequest(Encoding.ASCII.GetString(buffer, 0, seen)) : ("/", null);
     }
 
-    /// <summary>Extracts the path from the request line "METHOD /path HTTP/1.1".</summary>
-    private static string ParsePath(string head)
+    /// <summary>Extracts the path from the request line and the optional X-Dni-Request-Id header.</summary>
+    private static (string Path, string? RequestId) ParseRequest(string head)
     {
-        var lineEnd = head.IndexOf("\r\n", StringComparison.Ordinal);
-        var requestLine = lineEnd >= 0 ? head[..lineEnd] : head;
-        var parts = requestLine.Split(' ');
-        return parts.Length >= 2 ? parts[1] : "/";
+        string path = "/";
+        string? requestId = null;
+
+        var lines = head.Split("\r\n");
+        if (lines.Length > 0)
+        {
+            var parts = lines[0].Split(' ');
+            if (parts.Length >= 2)
+            {
+                path = parts[1];
+            }
+        }
+
+        for (var i = 1; i < lines.Length; i++)
+        {
+            const string headerName = "X-Dni-Request-Id:";
+            if (lines[i].StartsWith(headerName, StringComparison.OrdinalIgnoreCase))
+            {
+                requestId = lines[i][headerName.Length..].Trim();
+                break;
+            }
+        }
+
+        return (path, requestId);
     }
 
     private static async Task WriteJsonAsync(NetworkStream stream, string json, CancellationToken cancellationToken)

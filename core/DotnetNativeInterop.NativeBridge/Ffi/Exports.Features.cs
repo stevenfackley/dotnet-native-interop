@@ -38,6 +38,9 @@ internal static class ExportsFeatures
         try
         {
             var featureId = NativeText.Read((nint)id);
+            // FFI has no separate correlation channel; the command id IS the request id (per the Wave B
+            // tracing design), so the client can align this ffi.feature_run span with its own by feature id.
+            using var span = EngineTrace.StartSpan("ffi.feature_run", featureId);
             var run = LanguageFeatureCatalog.Run(featureId);
             var json = JsonSerializer.Serialize(run, typeof(FeatureRun), FeaturesJsonContext.Default);
             return NativeText.Allocate(json);
