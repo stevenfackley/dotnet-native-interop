@@ -35,7 +35,7 @@ Frozen in `core/DotnetNativeInterop.NativeBridge/abi/dni.h`. Exports use
 | C export | Meaning |
 |----------|---------|
 | `int32 dni_initialize()` | Calls `EngineHost.Initialize()`. 0 / negative status. |
-| `void dni_shutdown()` | Stops servers/broker, disposes sessions. |
+| `void dni_shutdown()` | Stops servers/broker, disposes sessions, resets `EngineHost`'s cached orchestrators (so the next `dni_initialize` re-resolves the RAG model — e.g. after a GGUF is downloaded post-launch). |
 | `int64 dni_session_start(prompt, max_tokens, temperature, cb, user_data)` | Starts an `InferenceSession`; drains the channel on a background task and invokes `cb` per token. Returns session id (>0) or negative status. |
 | `int32 dni_session_cancel(id)` | `session.Cancel()`. |
 | `int32 dni_session_free(id)` | `SessionRegistry.RemoveAsync(id)`. |

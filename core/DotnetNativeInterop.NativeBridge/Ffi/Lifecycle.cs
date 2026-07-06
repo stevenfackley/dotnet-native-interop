@@ -25,8 +25,10 @@ internal static class Lifecycle
 
     /// <summary>
     /// Shuts down the engine: cancels and disposes every live session via
-    /// <see cref="SessionRegistry"/>, then returns. HTTP/gRPC/broker servers are
-    /// stopped by their own exports.
+    /// <see cref="SessionRegistry"/>, then resets <see cref="EngineHost"/>'s cached orchestrators
+    /// so a subsequent <see cref="Initialize"/> re-resolves the RAG model (picks up a GGUF that
+    /// landed on disk after the engine first started — see <see cref="EngineHost.Reset"/>).
+    /// HTTP/gRPC/broker servers are stopped by their own exports.
     /// </summary>
     [UnmanagedCallersOnly(EntryPoint = "dni_shutdown")]
     public static void Shutdown()
@@ -49,6 +51,8 @@ internal static class Lifecycle
 
             // Block synchronously: UnmanagedCallersOnly must be void; we cannot await the ABI.
             Task.WhenAll(pending).GetAwaiter().GetResult();
+
+            EngineHost.Reset();
         }
         catch (Exception)
         {

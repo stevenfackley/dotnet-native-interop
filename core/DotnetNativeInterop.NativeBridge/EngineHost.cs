@@ -44,6 +44,31 @@ public static class EngineHost
         }
     }
 
+    /// <summary>
+    /// Clears the cached orchestrators so the next <see cref="Initialize"/> re-resolves
+    /// <see cref="BuildRagModel"/> from scratch instead of returning the stale <c>??=</c>-cached
+    /// instance. Needed because a GGUF can land on disk (Android's download-on-first-run) AFTER
+    /// this process already resolved the RAG model to the extractive fallback — without a reset,
+    /// the cache would keep serving extraction forever even though a real model is now present.
+    /// Called from <see cref="Ffi.Lifecycle.Shutdown"/> so the existing dni_shutdown -&gt;
+    /// dni_initialize sequence (no new export, no ABI change) is enough for a caller to pick up a
+    /// freshly-downloaded model. Does not dispose the outgoing model — acceptable today because the
+    /// only caller (Android, post-download) transitions extractive -&gt; llama exactly once, and
+    /// <see cref="ExtractiveLanguageModel"/> holds no unmanaged resources to leak. A future caller
+    /// that resets while already on <see cref="LlamaLanguageModel"/> would leak that model's
+    /// native handle — <see cref="LlamaLanguageModel"/> is <see cref="IDisposable"/> but
+    /// <see cref="InferenceOrchestrator"/> does not expose its inner model, so disposing it here
+    /// would need a small additional seam; flagged rather than silently patched over.
+    /// </summary>
+    public static void Reset()
+    {
+        lock (Gate)
+        {
+            _orchestrator = null;
+            _ragOrchestrator = null;
+        }
+    }
+
     // The RAG generator: the llama.cpp model when its GGUF is bundled, otherwise the always-available
     // managed extractive generator — so a missing or unloadable model degrades gracefully rather than
     // breaking the feature. Swapping these two is the entire llama.cpp integration seam.
