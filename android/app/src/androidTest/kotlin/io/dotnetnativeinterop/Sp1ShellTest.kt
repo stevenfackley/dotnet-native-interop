@@ -50,8 +50,9 @@ public class Sp1ShellTest {
                 )
             }
         }
-        // "Dashboard" appears in both the TopAppBar title and the drawer item;
-        // asserting at least one exists is sufficient to prove AppShell composes.
-        compose.onAllNodesWithText("Dashboard")[0].assertExists()
+        // "Catalog" is a non-default rail item (IA collapse spec 2: Boundary/Catalog/Lab/Search/
+        // Analysis); asserting it exists is sufficient to prove AppShell composes with all 5
+        // sections rendered.
+        compose.onAllNodesWithText("Catalog")[0].assertExists()
     }
 }

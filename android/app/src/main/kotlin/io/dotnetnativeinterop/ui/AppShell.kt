@@ -11,15 +11,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.Construction
-import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Stream
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SwapHoriz
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -46,27 +42,26 @@ import io.dotnetnativeinterop.feature.ComparisonViewModel
 import io.dotnetnativeinterop.feature.FeaturesViewModel
 import io.dotnetnativeinterop.feature.LatencyViewModel
 import io.dotnetnativeinterop.ui.tabs.AboutScreen
-import io.dotnetnativeinterop.ui.tabs.AiScreen
-import io.dotnetnativeinterop.ui.tabs.CompareScreen
-import io.dotnetnativeinterop.ui.tabs.DashboardScreen
-import io.dotnetnativeinterop.ui.tabs.EdgeSearchScreen
+import io.dotnetnativeinterop.ui.tabs.AnalysisScreen
+import io.dotnetnativeinterop.ui.tabs.BoundaryHubScreen
 import io.dotnetnativeinterop.ui.tabs.FeatureDetailScreen
 import io.dotnetnativeinterop.ui.tabs.FeaturesScreen
 import io.dotnetnativeinterop.ui.tabs.LabScreen
-import io.dotnetnativeinterop.ui.tabs.LatencyScreen
+import io.dotnetnativeinterop.ui.tabs.SearchScreen
 
-/** Tab order mirrors the iOS RootTabView; Stream is the Android-only extra and stays last. */
+/**
+ * IA collapse (spec 2 of 3, 2026-06-21): 5 sections, identical order/set to iOS. Dashboard,
+ * Compare, Latency + telemetry -> Analysis; AI, Manuals -> Search; the Android-only legacy Stream
+ * tab folds into Boundary (its "streaming callback" preset). About demotes from a top-level tab to
+ * a toolbar info-icon action (see the `showAbout` state in [AppShell]). This is a re-grouping, not
+ * a removal: every prior screen is still reachable, just relocated.
+ */
 internal enum class Tab(val title: String, val icon: ImageVector) {
     Boundary("Boundary", Icons.Outlined.SwapHoriz),
-    Dashboard("Dashboard", Icons.Outlined.GridView),
-    Features("Features", Icons.Outlined.Verified),
+    Catalog("Catalog", Icons.Outlined.Verified),
     Lab("Lab", Icons.Outlined.Memory),
-    Ai("AI", Icons.Outlined.AutoAwesome),
-    Compare("Compare", Icons.Outlined.BarChart),
-    Latency("Latency", Icons.Outlined.Timer),
-    About("About", Icons.Outlined.Info),
-    Manuals("Manuals", Icons.Outlined.Construction),
-    Stream("Stream", Icons.Outlined.Stream),
+    Search("Search", Icons.Outlined.Search),
+    Analysis("Analysis", Icons.Outlined.BarChart),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +72,7 @@ internal fun AppShell(
 ) {
     var tab by remember { mutableStateOf(Tab.Boundary) }
     var detailId by remember { mutableStateOf<String?>(null) }
+    var showAbout by remember { mutableStateOf(false) }
 
     val features: FeaturesViewModel = viewModel()
     val comparison: ComparisonViewModel = viewModel()
@@ -91,8 +87,8 @@ internal fun AppShell(
         ) {
             Tab.entries.forEach { t ->
                 NavigationRailItem(
-                    selected = t == tab,
-                    onClick = { tab = t; detailId = null },
+                    selected = t == tab && !showAbout,
+                    onClick = { tab = t; detailId = null; showAbout = false },
                     icon = { Icon(t.icon, contentDescription = t.title) },
                     label = { Text(t.title) },
                     colors = NavigationRailItemDefaults.colors(
@@ -112,11 +108,30 @@ internal fun AppShell(
             containerColor = Instrument.bg0,
             topBar = {
                 TopAppBar(
-                    title = { Text(if (tab == Tab.Features && detailId != null) "Feature" else tab.title) },
+                    title = {
+                        Text(
+                            when {
+                                showAbout -> "About"
+                                tab == Tab.Catalog && detailId != null -> "Feature"
+                                else -> tab.title
+                            },
+                        )
+                    },
                     navigationIcon = {
-                        if (tab == Tab.Features && detailId != null) {
+                        if (showAbout) {
+                            IconButton(onClick = { showAbout = false }) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                            }
+                        } else if (tab == Tab.Catalog && detailId != null) {
                             IconButton(onClick = { detailId = null }) {
                                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                            }
+                        }
+                    },
+                    actions = {
+                        if (!showAbout) {
+                            IconButton(onClick = { showAbout = true }) {
+                                Icon(Icons.Outlined.Info, contentDescription = "About")
                             }
                         }
                     },
@@ -131,30 +146,23 @@ internal fun AppShell(
             Column(Modifier.padding(pad).fillMaxSize()) {
                 HorizontalDivider(thickness = 1.dp, color = Instrument.hairline)
                 val content = Modifier.fillMaxWidth().weight(1f)
-                when (tab) {
-                    Tab.Boundary -> {
-                        val vm: io.dotnetnativeinterop.boundary.BoundaryViewModel = viewModel()
-                        io.dotnetnativeinterop.boundary.BoundaryScreen(vm, content)
+                if (showAbout) {
+                    AboutScreen(content)
+                } else {
+                    when (tab) {
+                        Tab.Boundary -> BoundaryHubScreen(inference, content)
+                        Tab.Catalog -> {
+                            val id = detailId
+                            if (id == null) FeaturesScreen(features, onOpenDetail = { detailId = it }, modifier = content)
+                            else FeatureDetailScreen(features, id, onBack = { detailId = null }, modifier = content)
+                        }
+                        Tab.Lab -> {
+                            val lab: io.dotnetnativeinterop.lab.LabViewModel = viewModel()
+                            LabScreen(lab, content)
+                        }
+                        Tab.Search -> SearchScreen(content)
+                        Tab.Analysis -> AnalysisScreen(features, comparison, latency, content)
                     }
-                    Tab.Dashboard -> DashboardScreen(features, content)
-                    Tab.Features -> {
-                        val id = detailId
-                        if (id == null) FeaturesScreen(features, onOpenDetail = { detailId = it }, modifier = content)
-                        else FeatureDetailScreen(features, id, onBack = { detailId = null }, modifier = content)
-                    }
-                    Tab.Compare -> CompareScreen(comparison, content)
-                    Tab.Latency -> LatencyScreen(latency, content)
-                    Tab.About -> AboutScreen(content)
-                    Tab.Ai -> AiScreen(content)
-                    Tab.Manuals -> {
-                        val vm: io.dotnetnativeinterop.evs.EvsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-                        EdgeSearchScreen(vm, content)
-                    }
-                    Tab.Lab -> {
-                        val lab: io.dotnetnativeinterop.lab.LabViewModel = viewModel()
-                        LabScreen(lab, content)
-                    }
-                    Tab.Stream -> InferenceScreen(viewModel = inference, modifier = content)
                 }
             }
         }
