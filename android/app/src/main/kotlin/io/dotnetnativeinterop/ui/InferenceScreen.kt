@@ -126,7 +126,7 @@ public fun InferenceScreen(
             // Pattern info panel (required by contract)
             state.patterns?.let { patternsJson ->
                 val pattern = remember(state.selectedTransport, patternsJson) {
-                    patternsJson.patterns.find { it.id == state.selectedTransport.name.lowercase() }
+                    patternsJson.patterns.find { it.id == state.selectedTransport.patternId }
                 }
                 pattern?.let { PatternInfoPanel(pattern = it) }
             }

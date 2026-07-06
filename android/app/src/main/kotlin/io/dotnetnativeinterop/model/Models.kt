@@ -45,6 +45,10 @@ public enum class TransportKind(public val displayName: String, public val mecha
     Ffi("FFI", "In-process C ABI — structured JSON over UnmanagedCallersOnly exports."),
     Http("HTTP", "Raw System.Net.Sockets server on 127.0.0.1 — REST + JSON over the loopback."),
     Sqlite("SQLCipher", "Encrypted on-disk SQLite (SQLCipher, PRAGMA key) — data round-trips through ciphertext."),
+    ;
+
+    /** Contract id — must equal the pattern ids in patterns.json ("ffi" / "http" / "sqlite"). */
+    public val patternId: String get() = name.lowercase()
 }
 
 /** dni_ffi_echo result — native-measured; camelCase mirrors the C# record + iOS BoundaryEcho. */

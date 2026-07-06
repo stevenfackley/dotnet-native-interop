@@ -53,8 +53,11 @@ private enum class CatalogSort(val label: String) {
     Version("Version"), Name("Name"), Elapsed("Elapsed"),
 }
 
+/** Compiled once — versionNumber() runs per item on every filter/sort pass. */
+private val versionNumberRegex = Regex("""\d+""")
+
 private fun FeatureDescriptor.versionNumber(): Int? =
-    Regex("""\d+""").find(version)?.value?.toIntOrNull()
+    versionNumberRegex.find(version)?.value?.toIntOrNull()
 
 /**
  * The Catalog tab (IA collapse spec 2 of 3, was "Features"): the 57-demo catalog, now searchable +

@@ -167,7 +167,7 @@ public class InferenceViewModel(app: Application) : AndroidViewModel(app) {
                 s.copy(
                     isRunning = false,
                     metrics = RunMetrics(
-                        transportId = state.selectedTransport.name.lowercase(),
+                        transportId = state.selectedTransport.patternId,
                         timeToFirstTokenMs = ttft,
                         tokensPerSec = tps,
                         totalTimeMs = totalMs,
