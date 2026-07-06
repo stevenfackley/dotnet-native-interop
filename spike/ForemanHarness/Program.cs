@@ -98,6 +98,22 @@ Check("routes memory query -> engine_stats", router.Route("how much memory?")?.T
 Check("routes fault query -> search_manuals", router.Route("what is fault code E3?")?.Tool == "search_manuals");
 Check("generic query -> no tool", router.Route("hello there") is null);
 
+// Task 9a: RouterBrain drives one tool then answers
+var rb = new RouterBrain(router, prompt => $"answer for [{prompt}]");
+var rbCtx = new AgentContext("how much memory?", new List<AgentStep>());
+var rbD1 = await rb.DecideAsync(rbCtx, default);
+Check("RouterBrain first decides a tool", rbD1.Call?.Tool == "engine_stats");
+rbCtx.Steps.Add(new AgentStep("tool_result","engine_stats","{\"heapMB\":12}"));
+Check("RouterBrain then answers", (await rb.DecideAsync(rbCtx, default)).IsAnswer);
+Check("RouterBrain badge is honest", rb.BackendBadge.Contains("scripted") || rb.BackendBadge.Contains("routing"));
+
+// Task 9b: GrammarBrain parses a constrained completion
+var gb = new GrammarBrain(
+    complete: (_, _) => Task.FromResult("{\"tool\":\"engine_stats\",\"args\":{}}"),
+    streamAnswer: (_, sink, _) => { sink("grounded"); return Task.CompletedTask; },
+    badge: "on-device LLM (grammar-constrained)");
+Check("GrammarBrain parses a tool call", (await gb.DecideAsync(new AgentContext("q",new()), default)).Call?.Tool == "engine_stats");
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 
