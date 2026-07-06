@@ -15,6 +15,13 @@
     <PackageReference Include="System.Numerics.Tensors" Version="10.0.0" />
   </ItemGroup>
 
+  <!-- M.E.AI IChatClient adapter (Ai/Meai/DniChatClient.cs) over the engine's own ILanguageModel seam
+       — the foundation for a future on-device function-calling agent. Version pinned to the one
+       spike/MeaiGate proved AOT-clean (0 warnings); see docs/meai-nativeaot-findings.md. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.7.0" />
+  </ItemGroup>
+
   <!-- On-device AI: all-MiniLM sentence encoder via ONNX Runtime + bundled model/vocab/corpus. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>DniChatClientHarness</AssemblyName>
+    <!-- AOT-publishable so it doubles as the win-x64 NativeAOT gate for DniChatClient plus the Engine
+         code path it now pulls in (ILanguageModel, MockLanguageModel, Microsoft.Extensions.AI.Abstractions) —
+         a stronger check than spike/MeaiGate alone, which never touched the engine. -->
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <!-- Exercises the engine directly (MockLanguageModel, DniChatClient) rather than going through the
+       NativeBridge transports; Microsoft.Extensions.AI.Abstractions flows transitively from the
+       Engine's own PackageReference (see docs/meai-nativeaot-findings.md). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
+  </ItemGroup>
+
+</Project>
