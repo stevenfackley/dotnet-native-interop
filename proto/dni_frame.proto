@@ -1,0 +1,93 @@
+// Wave B — framed protobuf transport (the 4th interop transport).
+//
+// Length-prefixed Google.Protobuf frames over a loopback socket: structured binary RPC with no
+// ASP.NET/gRPC runtime (the gRPC-era proto/dni.proto stays untouched as the documented exclusion).
+// Wire framing: [u32 little-endian length][Envelope bytes]. When the PQ secure channel is active the
+// Envelope bytes are AES-256-GCM ciphertext||tag instead (see the pb transport docs); the framing is
+// unchanged. Messages only — codegen with GrpcServices="None" (proven AOT-clean in
+// docs/gpb-nativeaot-findings.md, the Google.Protobuf + Grpc.Tools recipe reused here verbatim).
+syntax = "proto3";
+
+package dni.frame.v1;
+
+option csharp_namespace = "DotnetNativeInterop.NativeBridge.Pb";
+
+// ---- Shared payload shapes (mirror the engine's FeatureDescriptor / FeatureRun records) -----------
+
+message FeatureDescriptorPb {
+  string id = 1;
+  string title = 2;
+  string version = 3;
+  string code = 4;
+  string expected = 5;
+}
+
+// result stays an opaque string exactly as it crosses every other transport — for bench/gclab commands
+// it is itself a JSON BenchmarkPayload; for plain features it is the feature's textual output.
+message FeatureRunPb {
+  string id = 1;
+  string result = 2;
+  double elapsed_ms = 3;
+  bool ok = 4;
+}
+
+// ---- Requests (mirror the raw-HTTP server's endpoints: features / run / rag / ping / bench) --------
+
+message FeaturesRequest {}
+message RunRequest { string id = 1; }            // one feature/command by id
+message RagRequest { string query = 1; }         // grounded generation over the manuals corpus
+message PingRequest {}                            // latency target — maps to the "ping" feature
+message BenchRequest { string command = 1; }     // a bench-* / gclab command id (rides the run path)
+
+// ---- Responses ------------------------------------------------------------------------------------
+
+message FeaturesResponse { repeated FeatureDescriptorPb features = 1; }
+message RunResponse { FeatureRunPb run = 1; }
+message PingResponse { string reply = 1; }
+message RagChunk { int32 index = 1; string text = 2; bool final = 3; } // streamed: N chunks, last final=true
+
+// Typed error — the transport surfaces failures as a payload, never a silent socket close.
+message ErrorFrame { int32 code = 1; string message = 2; }
+
+// ---- PQ handshake (opt-in; only when the server was started with the require-PQ flag) --------------
+
+// Server -> client: the per-boot ML-KEM public key, signed by the per-boot ML-DSA key (whose public
+// half is included so the client can verify the signature). session_id is fresh per handshake; the
+// signature covers (kem_public_key || session_id) and session_id is folded into the HKDF, so replaying a
+// client ciphertext can never resurrect the same session keys. Algorithm names feed the Trust inspector.
+message HandshakeOffer {
+  bytes kem_public_key = 1;
+  bytes sig_public_key = 2;
+  bytes signature = 3;          // ML-DSA signature over (kem_public_key || session_id)
+  string kem_algorithm = 4;     // e.g. "ML-KEM-768"
+  string sig_algorithm = 5;     // e.g. "ML-DSA-65"
+  string cipher = 6;            // e.g. "AES-256-GCM"
+  bytes session_id = 7;         // fresh 32-byte server randomness per handshake (replay freshness)
+}
+
+// Client -> server: the ML-KEM ciphertext encapsulating the shared secret.
+message HandshakeReply {
+  bytes ciphertext = 1;
+}
+
+// ---- Envelope: one framed message, any direction --------------------------------------------------
+
+message Envelope {
+  string request_id = 1;        // client-minted correlation id, echoed in responses (waterfall grouping)
+  oneof body {
+    FeaturesRequest features = 2;
+    RunRequest run = 3;
+    RagRequest rag = 4;
+    PingRequest ping = 5;
+    BenchRequest bench = 6;
+
+    FeaturesResponse features_response = 7;
+    RunResponse run_response = 8;
+    RagChunk rag_chunk = 9;
+    PingResponse ping_response = 10;
+    ErrorFrame error = 11;
+
+    HandshakeOffer handshake_offer = 12;
+    HandshakeReply handshake_reply = 13;
+  }
+}

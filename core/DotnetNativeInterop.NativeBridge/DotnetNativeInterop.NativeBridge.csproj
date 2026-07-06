@@ -14,6 +14,30 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- Wave B (boundary legibility): the 4th transport (framed Google.Protobuf) + the opt-in PQ secure
+       channel. Both dependencies were gate-proven AOT-clean, 0 warnings: Google.Protobuf + Grpc.Tools
+       codegen (docs/gpb-nativeaot-findings.md) and BouncyCastle's pure-managed ML-KEM/ML-DSA
+       (docs/bouncycastle-pqc-findings.md). Grpc.Tools is build-time only (ships protoc + MSBuild glue,
+       PrivateAssets=all) and runs codegen on the BUILD host for every RID, incl. the mobile publishes. -->
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.35.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.81.1" PrivateAssets="all" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Messages only (GrpcServices="None"); the gRPC-era proto/dni.proto is left untouched/uncompiled. -->
+    <Protobuf Include="..\..\proto\dni_frame.proto" ProtoRoot="..\..\proto"
+              GrpcServices="None" Link="proto\dni_frame.proto" />
+  </ItemGroup>
+
+  <!-- The Windows-verifiable Wave B harness (spike/WaveBHarness) drives the internal transport servers
+       and the PQ provider seam directly over loopback; it cannot call the [UnmanagedCallersOnly] exports
+       from managed code, so it needs the internals. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="WaveBHarness" />
+  </ItemGroup>
+
   <!-- SQLite via SQLCipher (Pattern 4). The stock e_sqlite3 bundle ships NO iOS native
        static lib (only browser-wasm/win/linux/osx), so on NativeAOT iOS its P/Invokes have
        no backing library and the provider's type initializer throws. e_sqlcipher is the ONLY

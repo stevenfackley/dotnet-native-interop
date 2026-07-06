@@ -6,4 +6,5 @@
   <Project Path="MlnetGate/MlnetGate.csproj" />
   <Project Path="PqcGate/PqcGate.csproj" />
   <Project Path="ProtobufGate/ProtobufGate.csproj" />
+  <Project Path="WaveBHarness/WaveBHarness.csproj" />
 </Solution>

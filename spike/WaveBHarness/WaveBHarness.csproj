@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>WaveBHarness</AssemblyName>
+    <!-- AOT-publishable so it doubles as the win-x64 NativeAOT gate for the Wave B native code. -->
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <!-- Drives the internal transport servers + the PQ provider seam directly over loopback (it cannot call
+       the [UnmanagedCallersOnly] exports from managed code); InternalsVisibleTo("WaveBHarness") on the
+       NativeBridge grants access. Google.Protobuf / BouncyCastle / Microsoft.Data.Sqlite flow transitively. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\DotnetNativeInterop.NativeBridge\DotnetNativeInterop.NativeBridge.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -15,13 +15,34 @@ public sealed class RagLanguageModel(
     int topK = 3) : ILanguageModel
 {
     /// <inheritdoc/>
-    public IAsyncEnumerable<string> GenerateAsync(
+    // An async iterator (rather than returning the inner enumerable directly) so each RAG stage —
+    // retrieve, prompt-assembly, generate — gets its own EngineTrace span in the boundary waterfall.
+    public async IAsyncEnumerable<string> GenerateAsync(
         InferenceRequest request,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var engine = search ?? SemanticSearch.Default;       // lazy: built on first use
+
+        var retrieve = EngineTrace.StartSpan("rag.retrieve");
         var hits = engine.Search(request.Prompt, "manuals", topK);
+        retrieve?.Dispose();
+
+        var assemble = EngineTrace.StartSpan("rag.prompt");
         var grounded = request with { Prompt = RagPrompt.Build(request.Prompt, hits) };
-        return inner.GenerateAsync(grounded, cancellationToken);
+        assemble?.Dispose();
+
+        // The generate span brackets the whole streaming completion (time-to-final).
+        var generate = EngineTrace.StartSpan("rag.generate");
+        try
+        {
+            await foreach (var fragment in inner.GenerateAsync(grounded, cancellationToken).ConfigureAwait(false))
+            {
+                yield return fragment;
+            }
+        }
+        finally
+        {
+            generate?.Dispose();
+        }
     }
 }

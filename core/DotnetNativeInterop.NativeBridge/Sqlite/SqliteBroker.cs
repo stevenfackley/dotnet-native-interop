@@ -4,6 +4,7 @@
 
 using Microsoft.Data.Sqlite;
 using DotnetNativeInterop.Engine;
+using System.Globalization;
 
 namespace DotnetNativeInterop.NativeBridge.Sqlite;
 
@@ -135,11 +136,17 @@ internal sealed class SqliteBroker : IDisposable
 
         MarkStatus(conn, requestId, "running");
 
+        // Trace the claimed request end-to-end. The broker has no client-minted requestId column (the
+        // schema is frozen in docs/INTEROP_CONTRACT.md), so the row id — which the client already holds,
+        // having inserted the row — is the natural correlation key for this transport's waterfall.
+        using var process = EngineTrace.StartSpan("broker.process", requestId.ToString(CultureInfo.InvariantCulture));
+
         // --- 2. Run inference and stream tokens into response_tokens -----------
         try
         {
             var request = new InferenceRequest(prompt, maxTokens, temperature);
 
+            using var execute = EngineTrace.StartSpan("broker.execute", requestId.ToString(CultureInfo.InvariantCulture));
             await foreach (var token in orchestrator.RunAsync(request, ct).ConfigureAwait(false))
             {
                 InsertToken(conn, requestId, token);
