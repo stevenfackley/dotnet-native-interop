@@ -28,6 +28,12 @@ public static class GcLab
 
         var after = EngineTelemetry.Snapshot();
 
+        // loh/pinned force a full blocking Gen2 collection each sample tick (see Storm) — those forced
+        // collections ARE the reported counts and pause delta, so the payload must say so or a chart
+        // viewer would read them as the runtime's organic behavior.
+        var forced = preset is "loh" or "pinned";
+        var inclForced = forced ? " (incl. forced)" : "";
+
         return new BenchmarkPayload(
             "benchmark", $"GC Lab ({preset}, {mb} MB, {secs}s)",
             [
@@ -39,9 +45,18 @@ public static class GcLab
                 new SummaryStat("mb (effective)", mb.ToString(CultureInfo.InvariantCulture)),
                 new SummaryStat("secs (effective)", secs.ToString(CultureInfo.InvariantCulture)),
                 new SummaryStat("clamped", clamped ? "yes (cap: mb≤256, secs≤30)" : "no"),
-                new SummaryStat("gen0 collections", (after.GcGen0 - before.GcGen0).ToString(CultureInfo.InvariantCulture)),
-                new SummaryStat("gen1 collections", (after.GcGen1 - before.GcGen1).ToString(CultureInfo.InvariantCulture)),
-                new SummaryStat("gen2 collections", (after.GcGen2 - before.GcGen2).ToString(CultureInfo.InvariantCulture)),
+                new SummaryStat(
+                    "collection mode",
+                    forced ? "forced full GC ~10/s (reclaims LOH/pinned in-window)" : "organic"),
+                new SummaryStat(
+                    $"gen0 collections{inclForced}",
+                    (after.GcGen0 - before.GcGen0).ToString(CultureInfo.InvariantCulture)),
+                new SummaryStat(
+                    $"gen1 collections{inclForced}",
+                    (after.GcGen1 - before.GcGen1).ToString(CultureInfo.InvariantCulture)),
+                new SummaryStat(
+                    $"gen2 collections{inclForced}",
+                    (after.GcGen2 - before.GcGen2).ToString(CultureInfo.InvariantCulture)),
                 new SummaryStat(
                     "GC pause Δ", (after.GcPauseMs - before.GcPauseMs).ToString("F2", CultureInfo.InvariantCulture) + " ms"),
                 new SummaryStat(

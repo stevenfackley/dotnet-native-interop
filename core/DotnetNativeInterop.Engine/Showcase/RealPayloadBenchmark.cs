@@ -28,8 +28,9 @@ public static class RealPayloadBenchmark
     ];
 
     /// <summary>Runs <paramref name="reps"/> repetitions of the <paramref name="kind"/> payload, timing
-    /// each rep's production + serialization.</summary>
-    public static BenchmarkPayload Run(string kind, int reps)
+    /// each rep's production + serialization. <paramref name="clamped"/> reports whether the caller's raw
+    /// reps value was clamped to the safety cap (reps ≤ 25) before reaching this method.</summary>
+    public static BenchmarkPayload Run(string kind, int reps, bool clamped)
     {
         var bytesSeries = new List<BenchmarkPoint>(reps);
         var microsSeries = new List<BenchmarkPoint>(reps);
@@ -61,6 +62,8 @@ public static class RealPayloadBenchmark
                 new BenchmarkSeries("serializeUs", microsSeries.ToArray()),
             ],
             [
+                new SummaryStat("reps (effective)", reps.ToString(CultureInfo.InvariantCulture)),
+                new SummaryStat("clamped", clamped ? "yes (cap: reps≤25)" : "no"),
                 new SummaryStat("total bytes", totalBytes.ToString(CultureInfo.InvariantCulture)),
                 new SummaryStat("avg bytes/rep", (totalBytes / reps).ToString(CultureInfo.InvariantCulture)),
                 new SummaryStat("total serialize", (totalMicros / 1000.0).ToString("F2", CultureInfo.InvariantCulture) + " ms"),

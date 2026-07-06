@@ -66,7 +66,9 @@ public static class ShowcaseCommand
             return $"Unknown showcase command: bench-real (kind={kind})";
         }
 
-        return ShowcaseJson.Serialize(RealPayloadBenchmark.Run(kind, GetI(p, "reps", 5, 1, 25)));
+        var rawReps = GetIRaw(p, "reps", 5);
+        var reps = Math.Clamp(rawReps, 1, 25);
+        return ShowcaseJson.Serialize(RealPayloadBenchmark.Run(kind, reps, reps != rawReps));
     }
 
     // GC behavior lab: runs a bounded allocation storm (gen0 churn / LOH / GCHandle-pinned fragmentation)
