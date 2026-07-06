@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Engineering
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Search
@@ -38,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.dotnetnativeinterop.agent.ForemanScreen
 import io.dotnetnativeinterop.feature.ComparisonViewModel
 import io.dotnetnativeinterop.feature.FeaturesViewModel
 import io.dotnetnativeinterop.feature.LatencyViewModel
@@ -55,8 +57,14 @@ import io.dotnetnativeinterop.ui.tabs.SearchScreen
  * tab folds into Boundary (its "streaming callback" preset). About demotes from a top-level tab to
  * a toolbar info-icon action (see the `showAbout` state in [AppShell]). This is a re-grouping, not
  * a removal: every prior screen is still reachable, just relocated.
+ *
+ * Foreman (2026-07-06) adds a 6th, top-level section for the on-device tool-calling agent — per the
+ * Foreman design doc it gets its own nav entry (not folded into Search), first in the rail as the
+ * app's new flagship demo and the default landing tab. iOS must mirror this exact order when it adds
+ * the same section (tracked with the broader iOS Plan D parity debt).
  */
 internal enum class Tab(val title: String, val icon: ImageVector) {
+    Foreman("Foreman", Icons.Outlined.Engineering),
     Boundary("Boundary", Icons.Outlined.SwapHoriz),
     Catalog("Catalog", Icons.Outlined.Verified),
     Lab("Lab", Icons.Outlined.Memory),
@@ -70,7 +78,7 @@ internal fun AppShell(
     inference: io.dotnetnativeinterop.ui.InferenceViewModel,
     modifier: Modifier = Modifier,
 ) {
-    var tab by remember { mutableStateOf(Tab.Boundary) }
+    var tab by remember { mutableStateOf(Tab.Foreman) }
     var detailId by remember { mutableStateOf<String?>(null) }
     var showAbout by remember { mutableStateOf(false) }
 
@@ -150,6 +158,7 @@ internal fun AppShell(
                     AboutScreen(content)
                 } else {
                     when (tab) {
+                        Tab.Foreman -> ForemanScreen(modifier = content)
                         Tab.Boundary -> BoundaryHubScreen(inference, content)
                         Tab.Catalog -> {
                             val id = detailId

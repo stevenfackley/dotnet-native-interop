@@ -37,13 +37,16 @@ import io.dotnetnativeinterop.ui.components.InstrumentCard
 import io.dotnetnativeinterop.ui.components.PanelHeader
 import io.dotnetnativeinterop.ui.components.StatCell
 
-// Span color by the engine's dotted category prefix (pb./http./sqlite./ffi./rag.).
-private fun spanColor(name: String): Color = when {
+// Span color by the engine's dotted category prefix (pb./http./sqlite./ffi./rag./agent.).
+internal fun spanColor(name: String): Color = when {
     name.startsWith("pb.") -> Instrument.transportBinary
     name.startsWith("http.") -> Instrument.transportHttp
     name.startsWith("sqlite.") || name.startsWith("broker.") -> Instrument.transportSqlite
     name.startsWith("ffi.") -> Instrument.transportFfi
     name.startsWith("rag.") -> Instrument.accent
+    // Foreman agent turn/tool spans (additive category) — a NEW shared token: iOS must mirror this exact
+    // hex (see Instrument.agent in ui/Theme.kt) for the same agent.* spans in its own trace waterfall.
+    name.startsWith("agent.") -> Instrument.agent
     else -> Instrument.textSecondary
 }
 
@@ -131,8 +134,10 @@ internal fun TraceScreen(
     }
 }
 
+/** Reused by the Foreman tool-call strip's "expand into waterfall" (see `agent.ForemanScreen`) — same
+ *  rendering, same span-color legend, no duplicated waterfall code. */
 @Composable
-private fun SpanWaterfall(spans: List<TraceSpan>) {
+internal fun SpanWaterfall(spans: List<TraceSpan>) {
     val minStart = spans.minOf { it.startUs }
     val maxEnd = spans.maxOf { it.startUs + it.durUs }
     val span = (maxEnd - minStart).coerceAtLeast(1.0)

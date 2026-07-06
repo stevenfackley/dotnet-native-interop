@@ -188,6 +188,30 @@ static jstring j_llama_probe(JNIEnv* e, jobject o, jstring path) {
     return take_native_string(e, r);
 }
 
+/* ---- Foreman agent (additive) -------------------------------------------- */
+/* dni_agent_session_start has a narrower signature than dni_session_start/dni_rag_session_start (no
+ * max_tokens/temperature — the turn loop decides its own length), so it gets its own start function
+ * rather than reusing start_streaming(); it shares ffi_token_callback/CallbackState (same dni_token_cb
+ * ABI) and the SAME cancel/free lifecycle (nativeSessionCancel/nativeSessionFree — no new exports). */
+static jlong j_agent_session_start(JNIEnv* e, jobject o, jstring query, jobject listener) {
+    (void)o;
+    if (query == NULL || listener == NULL) return (jlong)DNI_INVALID_ARGUMENT;
+    jclass lc = (*e)->GetObjectClass(e, listener);
+    jmethodID on_token = (*e)->GetMethodID(e, lc, "onToken", "(ILjava/lang/String;Z)V");
+    (*e)->DeleteLocalRef(e, lc);
+    if (on_token == NULL) { LOGE("onToken not found"); return (jlong)DNI_INVALID_ARGUMENT; }
+    CallbackState* st = (CallbackState*)malloc(sizeof(CallbackState));
+    if (st == NULL) return (jlong)DNI_INTERNAL;
+    st->listener_ref = (*e)->NewGlobalRef(e, listener);
+    st->on_token = on_token;
+    const char* c_query = (*e)->GetStringUTFChars(e, query, NULL);
+    if (c_query == NULL) { (*e)->DeleteGlobalRef(e, st->listener_ref); free(st); return (jlong)DNI_INTERNAL; }
+    int64_t sid = dni_agent_session_start(c_query, ffi_token_callback, st);
+    (*e)->ReleaseStringUTFChars(e, query, c_query);
+    if (sid <= 0) { (*e)->DeleteGlobalRef(e, st->listener_ref); free(st); }
+    return (jlong)sid;
+}
+
 /* ---- Boundary instrumentation: echo / throw (sync) + traced streaming ---- */
 static jstring j_ffi_echo(JNIEnv* e, jobject o, jstring text) {
     (void)o; if (text == NULL) return NULL;
@@ -247,6 +271,7 @@ static const JNINativeMethod kMethods[] = {
     {"nativeShutdown",       "()V",                                                                      (void*)j_shutdown},
     {"nativeSessionStart",   "(Ljava/lang/String;IFLio/dotnetnativeinterop/transport/FfiTokenListener;)J", (void*)j_session_start},
     {"nativeRagSessionStart","(Ljava/lang/String;IFLio/dotnetnativeinterop/transport/FfiTokenListener;)J", (void*)j_rag_session_start},
+    {"nativeAgentSessionStart","(Ljava/lang/String;Lio/dotnetnativeinterop/transport/FfiTokenListener;)J",  (void*)j_agent_session_start},
     {"nativeSessionCancel",  "(J)I",                                                                     (void*)j_session_cancel},
     {"nativeSessionFree",    "(J)I",                                                                     (void*)j_session_free},
     {"nativeHttpStart",      "()I",                                                                      (void*)j_http_start},
