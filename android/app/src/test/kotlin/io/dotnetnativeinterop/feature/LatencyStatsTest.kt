@@ -67,4 +67,68 @@ public class LatencyStatsTest {
     public fun binsEmptyForNoSamples() {
         assertTrue(LatencyStats.bins(emptyList(), 24).isEmpty())
     }
+
+    @Test
+    public fun formatLatencyUsesMicrosecondsBelowOneMillisecond() {
+        assertEquals("500.0 µs", LatencyStats.formatLatencyMs(0.5))
+        assertEquals("999.0 µs", LatencyStats.formatLatencyMs(0.999))
+    }
+
+    @Test
+    public fun formatLatencyUsesMillisecondsAtOrAboveOneMillisecond() {
+        assertEquals("1.00 ms", LatencyStats.formatLatencyMs(1.0))
+        assertEquals("12.34 ms", LatencyStats.formatLatencyMs(12.34))
+    }
+
+    @Test
+    public fun outlierIndicesEmptyBelowFiveSamples() {
+        assertTrue(LatencyStats.outlierIndices(listOf(1.0, 2.0)).isEmpty())
+    }
+
+    @Test
+    public fun outlierIndicesFindsOnlyTheValueAboveThreshold() {
+        // Nine 1.0s, one 2.0, one 3.0 (11 samples) -> p90 lands on the 2.0; only the 3.0 exceeds it.
+        val samples = listOf(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 3.0)
+        assertEquals(listOf(10), LatencyStats.outlierIndices(samples, 0.90))
+    }
+
+    @Test
+    public fun collectionEventXsFindsBigDropAfterPeak() {
+        // Ramps 10 -> 100 -> 10: a GC-like give-back at x=2.0.
+        val series = listOf(0.0 to 10.0, 1.0 to 100.0, 2.0 to 10.0)
+        assertEquals(listOf(2.0), LatencyStats.collectionEventXs(series))
+    }
+
+    @Test
+    public fun collectionEventXsEmptyForSmoothlyGrowingSeries() {
+        val series = listOf(0.0 to 10.0, 1.0 to 11.0, 2.0 to 12.0)
+        assertTrue(LatencyStats.collectionEventXs(series).isEmpty())
+    }
+
+    @Test
+    public fun outlierIndicesFindsTailAtDefaultP99WithRealisticN() {
+        // Exercises the DEFAULT p=0.99 path at the real caller's n (400). Nearest-rank index is
+        // (0.99*400).toInt() = 396, so threshold = sorted[396] = 1.0; the three trailing 2.0s exceed it.
+        val samples = List(397) { 1.0 } + List(3) { 2.0 }
+        assertEquals(400, samples.size)
+        assertEquals(listOf(397, 398, 399), LatencyStats.outlierIndices(samples))
+    }
+
+    @Test
+    public fun formatLatencyRollsOverToMicrosecondsAtBoundary() {
+        // 0.99995 ms is still < 1 ms -> µs branch; 999.95 µs rounds (HALF_UP) to "1000.0 µs".
+        assertEquals("1000.0 µs", LatencyStats.formatLatencyMs(0.99995))
+    }
+
+    @Test
+    public fun formatLatencyDoesNotCrashOnNaN() {
+        // NaN < 1.0 is false, so it falls to the ms branch; must not throw.
+        assertEquals("NaN ms", LatencyStats.formatLatencyMs(Double.NaN))
+    }
+
+    @Test
+    public fun formatLatencyDoesNotCrashOnNegative() {
+        // Negative is < 1.0 -> µs branch; must not throw and stays US-locale formatted.
+        assertEquals("-5000.0 µs", LatencyStats.formatLatencyMs(-5.0))
+    }
 }
