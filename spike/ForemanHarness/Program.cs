@@ -39,6 +39,13 @@ var d2 = ToolCallParser.Parse("{\"answer\":\"the filter code is E3\"}");
 Check("parses a final answer", d2.IsAnswer && d2.Call is null);
 var d3 = ToolCallParser.Parse("not json");
 Check("malformed -> answer (never throws)", d3.IsAnswer);
+// Untrusted-model-output safety net: valid JSON that is not a tool-object must collapse to an answer,
+// never throw. JsonElement.TryGetProperty throws InvalidOperationException on a scalar/array (NOT a
+// JsonException), and GetString throws on a non-string tool value — both must be handled.
+Check("scalar string JSON -> answer (no throw)", ToolCallParser.Parse("\"hello there\"").IsAnswer);
+Check("number JSON -> answer (no throw)", ToolCallParser.Parse("42").IsAnswer);
+Check("array JSON -> answer (no throw)", ToolCallParser.Parse("[1,2,3]").IsAnswer);
+Check("non-string tool value -> answer (no throw)", ToolCallParser.Parse("{\"tool\":42,\"args\":{}}").IsAnswer);
 
 // Task 5: a scripted brain returns a tool call, then an answer once a tool result exists
 var scripted = new ScriptedBrain(ctx =>
