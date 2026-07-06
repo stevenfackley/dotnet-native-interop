@@ -93,7 +93,7 @@ Each feature is its own component: a row that navigates to a detail screen, not 
 ```
       ┌─────────────────────┐            ┌─────────────────────┐
       │   iOS app (Swift)   │            │ Android app (Kotlin)│
-      │  SwiftUI · 3 trans. │            │  Compose (follow-on)│
+      │  SwiftUI · 3 trans. │            │  Compose · 3 trans. │
       └──────────┬──────────┘            └──────────┬──────────┘
                  │      ffi · http · sqlcipher       │
                  ▼                                   ▼
@@ -128,7 +128,7 @@ proto/dni.proto        gRPC contract (excluded build)
 ios/
   Shared/                      models, FeatureService protocol, view models, the SwiftUI shell
   Apps/Unified/                the one app target (FFI + HTTP + SQLCipher, picker + Compare)
-android/ (io.dotnetnativeinterop)      Compose host + JNI shim (follow-on: not yet unified)
+android/ (io.dotnetnativeinterop)      unified Compose app + JNI shim (full 1:1 parity)
 build/                         build-ios-framework.sh · build-android-so.sh
 docs/                          INTEROP_CONTRACT.md · patterns.json · superpowers/specs/
 .github/workflows/             ci-core · ci-ios · ci-android
@@ -159,23 +159,26 @@ Then generate and open the iOS project (`cd ios && xcodegen generate`, then Xcod
 
 ## Status
 
-- ✅ **Engine + the 3 built transports (FFI, raw-HTTP, SQLCipher) compile and run on device** (iOS).
-- ✅ **Unified iOS app** with transport picker + side-by-side Compare tab, deployed to a physical iPad.
-- ✅ **Ask the Manuals (on-device RAG)** — in-engine retrieval over a maintenance-manuals corpus feeds a
-  real on-device LLM (**Llama-3.2-1B-Instruct Q4 via llama.cpp**, statically linked into the NativeAOT
-  engine), streamed over **all three transports** and compared head-to-head with **Apple Foundation
-  Models** over the same retrieved context. The README's `ILanguageModel` swap-in promise, made real:
-  llama.cpp is native-link **gate #3** (after SQLCipher + ONNX) — see `docs/llama-nativeaot-ios-findings.md`.
-  A managed extractive generator is the graceful fallback when the GGUF isn't bundled.
+- ✅ **Engine + the 3 built transports (FFI, raw-HTTP, SQLCipher) compile and run on device** (iOS & Android).
+- ✅ **C# / .NET feature catalog** — 57 demos spanning C# 1–14 (collection expressions, `field` keyword,
+  extension blocks, generic math, list patterns, raw string literals, …), all executed live on device.
+- ✅ **Unified iOS app** with transport picker + Compare tab + Dashboard + Features + FFI Boundary
+  inspection screen, deployed to a physical iPad.
+- ✅ **Unified Android app (full 1:1 parity)** — complete Compose port. UI shell with transport picker,
+  Dashboard, Features, Compare tabs. **AI tab** (ONNX semantic search + extractive RAG over manuals).
+  **Edge Vector Search tab** (on-device offline doc indexing & retrieval, Kotlin ORT). **Lab tab**
+  (Fractal explorer, raymarcher, benchmarks — pure-Kotlin visual compute). **Precision Instrument
+  theming** (the shared dark instrument design system — identical hex tokens on both platforms).
+  **FFI Boundary screen** with JNI instrumentation (echo, throw, traced streaming). **Latency hub**
+  (Distribution, Comparison, Jitter, Payload, Telemetry tabs) — measure all three transports in parallel.
+- ✅ **On-device AI** — **ONNX semantic search** runs on both iOS & Android (CoreML on iOS, NNAPI + CPU
+  fallback on Android). **llama.cpp RAG generation** on iOS (**Llama-3.2-1B-Instruct Q4**, streamed
+  over all three transports); Android RAG currently extractive (GGUF bundling pending). Retrieved
+  context vs. generated response compared head-to-head with **Apple Foundation Models** on iOS.
+- ✅ **FFI Boundary showcase screens** — both iOS & Android display in-process C↔managed boundary
+  instrumentation (function calls, exceptions, streaming traces, JNI thread attachment on Android).
 - 🚫 **gRPC + legacy Kestrel HTTP are excluded from the build** (no NativeAOT mobile runtime pack); the
   source is kept under `Grpc/` and `Http/` for reference.
-- ✅ **Android native gate (SP0)** — the complete NativeAOT `linux-bionic-arm64` engine (full JNI/FFI
-  ABI + **SQLCipher** + **llama.cpp** on-device generation) links into one `libdni.so` and runs on an
-  arm64 emulator, proven by an instrumented test (S1 ABI · S2 SQLCipher · S3 llama). The hard parts are
-  Android-specific: NDK clang as the AOT linker, a stamped `DT_SONAME`, SQLCipher as a dynamic `.so`, and
-  hand-linking the NDK static libc++ for llama — see `docs/nativeaot-android-gate-findings.md`.
-- ⏳ **Android UI parity** (the transport trio + Ask-the-Manuals screens in Compose) is the open
-  follow-on, now de-risked — same shared contract, every native dependency proven to load on device.
 
 ---
 
