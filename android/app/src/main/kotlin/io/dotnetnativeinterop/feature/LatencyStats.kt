@@ -67,4 +67,38 @@ public object LatencyStats {
             LatencyBin(midpoint = low + ((index + 0.5) * width), count = count)
         }
     }
+
+    /**
+     * "Commit to one unit" (facelift spec §5): sub-millisecond values read as µs — never a bare
+     * `0.11 ms` — so FFI's magnitude stays legible next to HTTP/SQLite. At or above 1 ms, plain ms with
+     * 2 decimals. One value, one unit; never both in the same string.
+     */
+    public fun formatLatencyMs(ms: Double): String =
+        if (ms < 1.0) "%.1f µs".format(ms * 1_000.0) else "%.2f ms".format(ms)
+
+    /**
+     * Indices of [samples] (in original order) whose value exceeds the [p]th percentile — the tail
+     * worth annotating on a jitter/sequence chart (facelift spec §5: "annotate outliers"). Empty below
+     * 5 samples, where a percentile isn't meaningful.
+     */
+    public fun outlierIndices(samples: List<Double>, p: Double = 0.99): List<Int> {
+        if (samples.size < 5) return emptyList()
+        val threshold = percentile(samples.sorted(), p)
+        return samples.indices.filter { samples[it] > threshold }
+    }
+
+    /**
+     * X-positions where a (x, y) series drops by more than [dropFraction] of its own peak from the
+     * previous point — a GC collection give-back on a heap/committed-over-time series (facelift spec
+     * §5: "annotate ... GC events"). Pure so the detector is unit-tested; the UI supplies engine
+     * BenchmarkPoints as (seconds, MB) pairs.
+     */
+    public fun collectionEventXs(points: List<Pair<Double, Double>>, dropFraction: Double = 0.10): List<Double> {
+        if (points.size < 2) return emptyList()
+        val peak = points.maxOf { it.second }.coerceAtLeast(1e-9)
+        val threshold = peak * dropFraction
+        return (1 until points.size)
+            .filter { points[it - 1].second - points[it].second > threshold }
+            .map { points[it].first }
+    }
 }

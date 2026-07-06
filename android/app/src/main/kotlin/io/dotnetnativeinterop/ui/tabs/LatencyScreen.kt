@@ -46,6 +46,7 @@ import io.dotnetnativeinterop.lab.BenchmarkChart
 import io.dotnetnativeinterop.lab.BenchmarkPayload
 import io.dotnetnativeinterop.lab.BenchmarkPoint
 import io.dotnetnativeinterop.lab.BenchmarkSeries
+import io.dotnetnativeinterop.lab.ChartAnnotation
 import io.dotnetnativeinterop.model.TransportKind
 import io.dotnetnativeinterop.ui.Instrument
 import io.dotnetnativeinterop.ui.Radii
@@ -197,20 +198,30 @@ private fun DistributionAnalysis(vm: LatencyViewModel, modifier: Modifier = Modi
             }
         } else {
             val sorted = samples.sorted()
+            val median = LatencyStats.percentile(sorted, 0.50)
+            val p95 = LatencyStats.percentile(sorted, 0.95)
             InstrumentCard {
                 PanelHeader(
                     if (series.failures > 0) "Distribution — ${samples.size}/$sampleCount · ${series.failures} failed"
                     else "Distribution — ${samples.size} calls",
                 )
-                HistogramChart(LatencyStats.bins(samples, 24), transportColor(transport))
+                HistogramChart(
+                    LatencyStats.bins(samples, 24),
+                    transportColor(transport),
+                    percentileMarkers = listOf(
+                        PercentileMarker("P50", median, Instrument.textSecondary),
+                        PercentileMarker("P95", p95, Instrument.warn),
+                    ),
+                )
             }
             InstrumentCard {
-                PanelHeader("Stats (ms)")
+                PanelHeader("Stats")
+                // One dominant metric above the fold (facelift spec §3); min/p95/max are supporting.
+                StatCell("median round-trip", LatencyStats.formatLatencyMs(median), emphasis = true)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
-                    StatCell("min", ms3(sorted.first()), Modifier.weight(1f), tint = Instrument.ok)
-                    StatCell("median", ms3(LatencyStats.percentile(sorted, 0.50)), Modifier.weight(1f))
-                    StatCell("p95", ms3(LatencyStats.percentile(sorted, 0.95)), Modifier.weight(1f))
-                    StatCell("max", ms3(sorted.last()), Modifier.weight(1f), tint = Instrument.warn)
+                    StatCell("min", LatencyStats.formatLatencyMs(sorted.first()), Modifier.weight(1f), tint = Instrument.ok)
+                    StatCell("p95", LatencyStats.formatLatencyMs(p95), Modifier.weight(1f), tint = Instrument.warn)
+                    StatCell("max", LatencyStats.formatLatencyMs(sorted.last()), Modifier.weight(1f), tint = Instrument.warn)
                 }
             }
         }
@@ -263,10 +274,10 @@ private fun TransportComparisonAnalysis(vm: LatencyViewModel, modifier: Modifier
                             }
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
-                            StatCell("p50", ms2(s.p50), Modifier.weight(1f))
-                            StatCell("p95", ms2(s.p95), Modifier.weight(1f))
-                            StatCell("p99", ms2(s.p99), Modifier.weight(1f))
-                            StatCell("max", ms2(s.max), Modifier.weight(1f))
+                            StatCell("p50", LatencyStats.formatLatencyMs(s.p50), Modifier.weight(1f))
+                            StatCell("p95", LatencyStats.formatLatencyMs(s.p95), Modifier.weight(1f))
+                            StatCell("p99", LatencyStats.formatLatencyMs(s.p99), Modifier.weight(1f))
+                            StatCell("max", LatencyStats.formatLatencyMs(s.max), Modifier.weight(1f))
                         }
                         Text("${s.throughput.toInt()} calls/sec", style = MaterialTheme.typography.labelSmall, color = Instrument.textTertiary)
                     }
@@ -274,6 +285,7 @@ private fun TransportComparisonAnalysis(vm: LatencyViewModel, modifier: Modifier
             }
             InstrumentCard {
                 PanelHeader("Distribution overlay (CDF)")
+                // Transport-colored series, not an arbitrary palette (facelift spec §2/§5).
                 BenchmarkChart(
                     TransportKind.entries.map { t ->
                         BenchmarkSeries(
@@ -282,6 +294,7 @@ private fun TransportComparisonAnalysis(vm: LatencyViewModel, modifier: Modifier
                                 .map { BenchmarkPoint(it.value, it.fraction) },
                         )
                     },
+                    colors = TransportKind.entries.map { transportColor(it) },
                 )
             }
         }
@@ -314,6 +327,9 @@ private fun JitterAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifier) 
             )
         }
         if (samples.isNotEmpty()) {
+            // Annotate the tail (facelift spec §5); cap so the chart doesn't drown in ticks.
+            val allOutliers = LatencyStats.outlierIndices(samples)
+            val outliers = allOutliers.take(6)
             InstrumentCard {
                 PanelHeader("Latency over call index (ms)")
                 BenchmarkChart(
@@ -323,7 +339,15 @@ private fun JitterAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifier) 
                             points = samples.mapIndexed { i, ms -> BenchmarkPoint(i.toDouble(), ms) },
                         ),
                     ),
+                    colors = listOf(transportColor(transport)),
+                    annotations = outliers.mapIndexed { idx, i ->
+                        ChartAnnotation(i.toDouble(), if (idx == 0) "P99+" else "", Instrument.warn)
+                    },
                 )
+                if (allOutliers.isNotEmpty()) {
+                    val note = if (allOutliers.size > outliers.size) " (first ${outliers.size} marked)" else ""
+                    Caption("${allOutliers.size} call(s) above p99$note — GC blips or cold-start spikes.")
+                }
             }
         }
     }
@@ -379,7 +403,7 @@ private fun PayloadScalingAnalysis(vm: LatencyViewModel, modifier: Modifier = Mo
                 points.forEach { (label, ms) ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(label, style = MaterialTheme.typography.bodySmall, color = Instrument.textSecondary)
-                        Text("%.2f ms".format(ms), style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = Instrument.textPrimary)
+                        Text(LatencyStats.formatLatencyMs(ms), style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, color = Instrument.textPrimary)
                     }
                 }
             }
@@ -419,9 +443,9 @@ private fun TelemetryAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifie
             InstrumentCard {
                 PanelHeader("Latency samples (n=${xs.size})")
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
-                    StatCell("Min", ms2(xs.first()), Modifier.weight(1f), tint = Instrument.ok)
-                    StatCell("Median", ms2(xs[xs.size / 2]), Modifier.weight(1f))
-                    StatCell("Max", ms2(xs.last()), Modifier.weight(1f), tint = Instrument.warn)
+                    StatCell("Min", LatencyStats.formatLatencyMs(xs.first()), Modifier.weight(1f), tint = Instrument.ok)
+                    StatCell("Median", LatencyStats.formatLatencyMs(xs[xs.size / 2]), Modifier.weight(1f))
+                    StatCell("Max", LatencyStats.formatLatencyMs(xs.last()), Modifier.weight(1f), tint = Instrument.warn)
                 }
             }
         }
@@ -501,9 +525,12 @@ private fun RealPayloadAnalysis(vm: LatencyViewModel, modifier: Modifier = Modif
         if (rows.isNotEmpty()) {
             InstrumentCard {
                 PanelHeader(if (logScale) "Client round-trip · log₁₀(ms+1)" else "Client round-trip (ms)")
+                // Every bar IS a transport — color each one canonically, not one flat color for all
+                // four (facelift spec §2/§5: transport colors on chart series, not decoration).
                 CategoryBarChart(
                     rows.map { it.transport.displayName to if (logScale) log10(it.roundTripMs + 1.0) else it.roundTripMs },
                     Instrument.transportBinary,
+                    colors = rows.map { transportColor(it.transport) },
                 )
                 Caption(
                     if (logScale) "Bars are log₁₀(ms+1) — a monotonic transform so sub-ms FFI stays visible; not raw ms."
@@ -516,7 +543,7 @@ private fun RealPayloadAnalysis(vm: LatencyViewModel, modifier: Modifier = Modif
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                         TransportDot(row.transport)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
-                            StatCell("round-trip", "%.3f ms".format(row.roundTripMs), Modifier.weight(1f))
+                            StatCell("round-trip", LatencyStats.formatLatencyMs(row.roundTripMs), Modifier.weight(1f))
                             StatCell("avg bytes/rep", row.avgBytes ?: "—", Modifier.weight(1f))
                             StatCell("avg serialize", row.avgSerialize ?: "—", Modifier.weight(1f))
                         }
@@ -578,7 +605,18 @@ private fun GcLabAnalysis(vm: LatencyViewModel, modifier: Modifier = Modifier) {
 
             InstrumentCard {
                 PanelHeader("Heap / committed over time (MB)")
-                BenchmarkChart(p.series)
+                // Heap is the story (primary), committed is supporting context (muted) — not accent,
+                // which the facelift spec reserves for interaction/in-flight, not decoration. GC
+                // collection give-backs are detected from the heap series and annotated.
+                val heapPoints = p.series.firstOrNull { it.name == "heapMB" }?.points?.map { it.x to it.y } ?: emptyList()
+                val gcEvents = LatencyStats.collectionEventXs(heapPoints).take(10)
+                BenchmarkChart(
+                    p.series,
+                    colors = listOf(Instrument.textPrimary, Instrument.textTertiary),
+                    annotations = gcEvents.mapIndexed { idx, x ->
+                        ChartAnnotation(x, if (idx == 0) "GC" else "", Instrument.warn)
+                    },
+                )
                 Caption("X = seconds, Y = MB. Committed staying above heap after a collection is the pin/LOH fragmentation.")
             }
             InstrumentCard {
@@ -658,6 +696,3 @@ private fun Spinner(running: Boolean) {
         }
     }
 }
-
-private fun ms3(v: Double): String = "%.3f".format(v)
-private fun ms2(v: Double): String = "%.2f".format(v)

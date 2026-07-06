@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.dotnetnativeinterop.model.TransportKind
 import io.dotnetnativeinterop.ui.Instrument
@@ -74,13 +75,19 @@ internal fun PanelHeader(title: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** Label-over-readout cell used in telemetry strips and dashboards. */
+/**
+ * Label-over-readout cell used in telemetry strips and dashboards. [emphasis] renders the value as
+ * the screen's one dominant metric — headline-large (32sp), semibold — per the facelift spec's
+ * hierarchy rule ("the dominant metric large, its label small and muted"); use it for at most one
+ * cell per screen, never every cell, or nothing is dominant.
+ */
 @Composable
 internal fun StatCell(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
     tint: Color = Instrument.textPrimary,
+    emphasis: Boolean = false,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(
@@ -90,8 +97,9 @@ internal fun StatCell(
         )
         Text(
             value,
-            style = MaterialTheme.typography.titleMedium,
+            style = if (emphasis) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleMedium,
             fontFamily = FontFamily.Monospace,
+            fontWeight = if (emphasis) FontWeight.SemiBold else null,
             color = tint,
         )
     }
