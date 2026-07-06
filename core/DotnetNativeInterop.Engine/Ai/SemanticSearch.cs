@@ -22,6 +22,13 @@ public sealed class SemanticSearch(ITextEncoder encoder)
         _corpora[id] = (texts.ToArray(), embeddings);
     }
 
+    /// <summary>
+    /// Embeds arbitrary text with the same encoder used for corpus search. For a query-time embedding
+    /// outside a corpus lookup — e.g. Foreman's <see cref="Ai.Agent.DeterministicRouter"/>, which embeds
+    /// the user query and each tool description to pick the nearest tool, with no corpus involved.
+    /// </summary>
+    public float[] Embed(string text) => encoder.Encode(text);
+
     /// <summary>Ranks corpus <paramref name="corpusId"/> by cosine similarity to <paramref name="query"/>.</summary>
     public SearchResult[] Search(string query, string corpusId, int topK)
     {

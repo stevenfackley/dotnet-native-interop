@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using DotnetNativeInterop.Engine;
 using DotnetNativeInterop.Engine.Ai.Agent;
 
 int passed = 0, failed = 0;
@@ -167,6 +168,83 @@ Check("e2e badge discloses no LLM", e2eAgent.BackendBadge.Contains("no on-device
 var realStatsTool = e2eTools.First(tl => tl.Name == "engine_stats");
 var realStatsJson = await realStatsTool.Invoke("{}", default);
 Check("real engine_stats tool returns live telemetry JSON", realStatsJson.Contains("gcGen0") && realStatsJson.Contains("uptimeMs"));
+
+// ============================================================================================
+// Host wiring (ForemanHost): the REAL search_manuals + run_feature bindings, not light doubles.
+// ============================================================================================
+
+// Task 12: search_manuals' real binding — SemanticSearch.Default over the bundled "manuals" corpus
+// (the exact call ForemanHost.SearchManualsAsync makes) returns genuine ONNX-encoded snippets.
+var manualsHits = SemanticSearch.Default.Search(
+    "the compressor does not energize and the rooftop unit stays idle", "manuals", topK: 3);
+Check("real manuals search returns hits", manualsHits.Length > 0);
+Check("real manuals search hits carry non-empty text", manualsHits.All(h => h.Text.Length > 0));
+var manualsJson = AiJson.Serialize(manualsHits);
+Check("real manuals search JSON carries text+score", manualsJson.Contains("\"text\"") && manualsJson.Contains("\"score\""));
+
+// Task 13: run_feature's real binding — LanguageFeatureCatalog.Run(id) + FeatureRun serialized via
+// ForemanJsonContext (the exact call + serializer ForemanHost.RunFeatureAsync makes) round-trips a
+// genuine, known feature run (no reflection: ForemanJsonContext.FeatureRun is the Engine-side
+// source-gen registration added alongside this binding).
+var pingRun = LanguageFeatureCatalog.Run("ping");
+Check("run_feature real op executes a known feature", pingRun is { Ok: true, Result: "pong" });
+var pingJson = JsonSerializer.Serialize(pingRun, ForemanJsonContext.Default.FeatureRun);
+Check("run_feature JSON round-trips via ForemanJsonContext.FeatureRun",
+    pingJson.Contains("\"result\":\"pong\"") && pingJson.Contains("\"ok\":true"));
+
+// Task 14: DeterministicRouter calibrated against REAL MiniLM embeddings (SemanticSearch.Default.Embed)
+// instead of the fake one-hot vectors Task 8 uses — proves ForemanHost's 0.3f threshold (see
+// core/DotnetNativeInterop.Engine/Ai/Agent/ForemanHost.cs) actually separates real tool descriptions
+// from real queries, for all three tools (not just two).
+var calibrationTools = ForemanTools.Build(
+    q => Task.FromResult(AiJson.Serialize(SemanticSearch.Default.Search(q, "manuals", 3))),
+    id => Task.FromResult(JsonSerializer.Serialize(LanguageFeatureCatalog.Run(id), ForemanJsonContext.Default.FeatureRun)),
+    EngineTelemetry.SnapshotJson);
+var calibrationRouter = new DeterministicRouter(calibrationTools, SemanticSearch.Default.Embed, threshold: 0.3f);
+(string Query, string ExpectTool)[] calibrationCases =
+[
+    ("the compressor is overheating and keeps tripping the rooftop unit, what should I check?", "search_manuals"),
+    ("how much heap memory and how many GC collections has the runtime done?", "engine_stats"),
+    ("run the ping feature demo and show me its live result", "run_feature"),
+];
+foreach (var (query, expectTool) in calibrationCases)
+{
+    var pick = calibrationRouter.Route(query);
+    Console.WriteLine($"[calibration] \"{query}\" -> {pick?.Tool ?? "(none)"}");
+    Check($"real router routes '{expectTool}'-style query to {expectTool}", pick?.Tool == expectTool);
+}
+
+// Task 15: ForemanHost end-to-end — the fully-wired agent the host hands out. No GGUF is bundled on
+// this Windows dev box, so brain selection honestly falls back to RouterBrain (the GrammarBrain seam
+// is exercised separately below by construction, not by a live model here).
+var hostAgent = ForemanHost.Agent;
+Check("ForemanHost badge is honest (no GGUF present on this host)",
+    hostAgent.BackendBadge.Contains("no on-device LLM"));
+
+var hostSpans = new List<string>();
+var hostListener = new ActivityListener
+{
+    ShouldListenTo = s => s.Name == "Dni.Engine",
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+    ActivityStopped = a => hostSpans.Add(a.OperationName),
+};
+ActivitySource.AddActivityListener(hostListener);
+
+var hostOut = new System.Text.StringBuilder();
+var hostRes = await hostAgent.RunTurnAsync(
+    "the compressor is overheating and keeps tripping the rooftop unit, what should I check?",
+    s => hostOut.Append(s), default);
+Check("ForemanHost turn answered", hostRes.StopReason == ForemanStopReason.Answered);
+Check("ForemanHost turn used exactly one real tool", hostRes.ToolSteps == 1);
+Check("ForemanHost turn produced a grounded answer", hostOut.Length > 0 && hostOut.ToString().Contains("manual"));
+Check("ForemanHost emitted agent.turn span", hostSpans.Contains("agent.turn"));
+Check("ForemanHost emitted agent.tool.search_manuals span", hostSpans.Contains("agent.tool.search_manuals"));
+
+var hostOut2 = new System.Text.StringBuilder();
+var hostRes2 = await hostAgent.RunTurnAsync(
+    "run the ping feature demo and show me its live result", s => hostOut2.Append(s), default);
+Check("ForemanHost run_feature turn answered", hostRes2.StopReason == ForemanStopReason.Answered);
+Check("ForemanHost emitted agent.tool.run_feature span", hostSpans.Contains("agent.tool.run_feature"));
 
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
