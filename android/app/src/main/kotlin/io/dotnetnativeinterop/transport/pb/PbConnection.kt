@@ -43,22 +43,25 @@ internal class PbConnection private constructor(
 
         /** Connects to [port] on loopback and, when [secure], completes the PQ handshake before returning. */
         fun open(port: Int, secure: Boolean): PbConnection {
+            // tcpNoDelay already forces the fd open, so EVERY failure path below (connect, stream
+            // acquisition, handshake) must close the socket — otherwise the fd leaks. One try/catch
+            // around the whole body covers them all.
             val socket = Socket()
-            socket.tcpNoDelay = true // frames are small; disable Nagle so request latency isn't batched
-            socket.connect(InetSocketAddress("127.0.0.1", port), CONNECT_TIMEOUT_MS)
-            val channel = FrameChannel(BufferedInputStream(socket.getInputStream()), socket.getOutputStream())
-            var params: PqChannelParams? = null
-            if (secure) {
-                val result = try {
-                    PqHandshakeClient.handshake(channel)
-                } catch (e: Exception) {
-                    runCatching { socket.close() }
-                    throw e
+            try {
+                socket.tcpNoDelay = true // frames are small; disable Nagle so request latency isn't batched
+                socket.connect(InetSocketAddress("127.0.0.1", port), CONNECT_TIMEOUT_MS)
+                val channel = FrameChannel(BufferedInputStream(socket.getInputStream()), socket.getOutputStream())
+                var params: PqChannelParams? = null
+                if (secure) {
+                    val result = PqHandshakeClient.handshake(channel)
+                    channel.useCipher(result.cipher)
+                    params = result.params
                 }
-                channel.useCipher(result.cipher)
-                params = result.params
+                return PbConnection(socket, channel, params)
+            } catch (e: Exception) {
+                runCatching { socket.close() }
+                throw e
             }
-            return PbConnection(socket, channel, params)
         }
     }
 }

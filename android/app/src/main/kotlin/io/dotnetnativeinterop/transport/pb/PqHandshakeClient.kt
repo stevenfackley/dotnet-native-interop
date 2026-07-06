@@ -83,8 +83,12 @@ internal object PqHandshakeClient {
         }
 
         // Encapsulate to the server's ML-KEM public key -> (ciphertext on the wire, shared secret local).
-        val kemPub = MLKEMPublicKeyParameters(MLKEMParameters.ml_kem_768, kemPublicKey)
-        val encapsulated = MLKEMGenerator(random).generateEncapsulated(kemPub)
+        // A wrong-length/garbage key throws a raw BC IllegalArgumentException/DataLengthException; wrap it
+        // so a malformed offer surfaces as the PqHandshakeException the class contract promises.
+        val kemPub = wrapBc("invalid ML-KEM public key in offer") {
+            MLKEMPublicKeyParameters(MLKEMParameters.ml_kem_768, kemPublicKey)
+        }
+        val encapsulated = wrapBc("ML-KEM encapsulation failed") { MLKEMGenerator(random).generateEncapsulated(kemPub) }
         val ciphertext = encapsulated.encapsulation
         val sharedSecret = encapsulated.secret
 
@@ -113,14 +117,29 @@ internal object PqHandshakeClient {
         return PqHandshakeResult(cipher, params)
     }
 
-    /** Verifies an ML-DSA-65 signature over [message] with the server's encoded public key. */
-    fun verify(sigPublicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean {
-        val publicKey = MLDSAPublicKeyParameters(MLDSAParameters.ml_dsa_65, sigPublicKey)
-        val verifier = MLDSASigner()
-        verifier.init(false, publicKey)
-        verifier.update(message, 0, message.size)
-        return verifier.verifySignature(signature)
-    }
+    // Verifies an ML-DSA-65 signature over [message] with the server's encoded public key. Private: only
+    // handshake() uses it. A malformed public key/signature (raw BC exception) is wrapped as a
+    // PqHandshakeException; a well-formed-but-wrong signature simply returns false.
+    private fun verify(sigPublicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean =
+        wrapBc("ML-DSA verification error") {
+            val publicKey = MLDSAPublicKeyParameters(MLDSAParameters.ml_dsa_65, sigPublicKey)
+            val verifier = MLDSASigner()
+            verifier.init(false, publicKey)
+            verifier.update(message, 0, message.size)
+            verifier.verifySignature(signature)
+        }
+
+    // Runs a BouncyCastle call, translating its raw RuntimeExceptions (IllegalArgumentException,
+    // DataLengthException, …) into the PqHandshakeException the class contract promises. A
+    // PqHandshakeException already thrown inside passes through unchanged.
+    private inline fun <T> wrapBc(what: String, block: () -> T): T =
+        try {
+            block()
+        } catch (e: PqHandshakeException) {
+            throw e
+        } catch (e: RuntimeException) {
+            throw PqHandshakeException("$what: ${e.message}")
+        }
 
     private fun concat(first: ByteArray, second: ByteArray): ByteArray {
         val result = ByteArray(first.size + second.size)
