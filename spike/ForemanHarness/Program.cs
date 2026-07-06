@@ -125,6 +125,32 @@ Check("engine_stats returns telemetry json", (await statsTool.Invoke("{}", defau
 var searchTool = realTools.First(t => t.Name == "search_manuals");
 Check("search_manuals passes the query arg", (await searchTool.Invoke("{\"query\":\"E3\"}", default)).Contains("snippets"));
 
+// Task 11: full turn through ForemanAgent with the router brain and real telemetry
+// EngineTelemetry.Snapshot() returns the EngineStats record, not a JSON string — ForemanTools.Build's
+// engineStats delegate is Func<string>, so the real binding is EngineTelemetry.SnapshotJson(), the
+// existing public wrapper that serializes Snapshot() via the engine's own TelemetryJsonContext
+// source-gen context. (Divergence from the plan's placeholder call, confirmed by reading EngineTelemetry.cs.)
+var e2eTools = ForemanTools.Build(
+    q => Task.FromResult("{\"snippets\":[\"clear code E3 by resetting the panel\"]}"),
+    id => Task.FromResult("{\"ok\":true}"),
+    DotnetNativeInterop.Engine.EngineTelemetry.SnapshotJson);
+float[] Emb2(string s) => s.Contains("memory") ? new[]{1f,0f} : new[]{0f,1f};
+var e2eRouter = new DeterministicRouter(e2eTools, Emb2, 0.5f);
+var e2eBrain = new RouterBrain(e2eRouter, prompt => $"Based on the manual: {prompt}");
+var e2eAgent = new ForemanAgent(e2eTools, e2eBrain);
+var e2eOut = new System.Text.StringBuilder();
+var e2eRes = await e2eAgent.RunTurnAsync("how much memory?", s => e2eOut.Append(s), default);
+Check("e2e turn answered", e2eRes.StopReason == ForemanStopReason.Answered);
+Check("e2e produced an answer", e2eOut.Length > 0);
+Check("e2e badge discloses no LLM", e2eAgent.BackendBadge.Contains("no on-device LLM"));
+
+// Task 11b: ForemanTools genuinely bound to the real engine_stats accessor end-to-end (not just via the
+// factory test's light double) — proves the real EngineTelemetry.SnapshotJson binding produces usable
+// tool-result JSON when actually invoked through a ToolDefinition.
+var realStatsTool = e2eTools.First(tl => tl.Name == "engine_stats");
+var realStatsJson = await realStatsTool.Invoke("{}", default);
+Check("real engine_stats tool returns live telemetry JSON", realStatsJson.Contains("gcGen0") && realStatsJson.Contains("uptimeMs"));
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 
