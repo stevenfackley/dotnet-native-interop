@@ -181,13 +181,20 @@ void    dni_pb_stop(void);
  * via the existing dni_trace_drain — no new tracing export either.
  *
  * Completion contract: the LAST fragment delivered via dni_token_cb before the terminal
- * is_final=1 marker (which itself stays empty, per dni_token_cb's existing contract) is always a
- * status fragment: the literal ASCII bytes "dni.agent.status" immediately followed (no separator) by
- * a JSON object {"stopReason":"Answered"|"StepCapReached"|"Error","toolSteps":<int>}. Real answer
- * prose never begins with that literal prefix, so a client can split "answer text" (every fragment
- * up to but excluding the one that starts with the prefix) from "turn status" (that one fragment)
- * unambiguously. A client MUST check stopReason before presenting a turn as a clean answer —
- * StepCapReached/Error must not be shown to the user as if they were Answered. */
+ * is_final=1 marker (which itself stays empty, per dni_token_cb's existing contract) is always the
+ * status fragment. It is identified STRUCTURALLY by its first byte: a status fragment is exactly the
+ * fragment whose text[0] == 0x01 (SOH, an ASCII C0 control byte). That leading 0x01 is immediately
+ * followed by the readable tag "dni.agent.status" (kept only for log greppability) and then, with no
+ * separator, a JSON object {"stopReason":"Answered"|"StepCapReached"|"Error","toolSteps":<int>}.
+ *
+ * DETECT ON THE 0x01 BYTE, NOT ON THE READABLE TAG. No real UTF-8 answer prose from either brain ever
+ * contains a C0 control byte, so text[0]==0x01 is a collision-proof discriminator; matching the tag
+ * text alone is NOT safe, because the on-device LLM could stream the literal characters
+ * "dni.agent.status" while answering a question ABOUT the marker. To parse: treat every fragment whose
+ * text[0] != 0x01 as answer text; on the one fragment whose text[0] == 0x01, skip the leading 0x01
+ * byte plus the fixed "dni.agent.status" tag and JSON-parse the remainder. A client MUST check
+ * stopReason before presenting a turn as a clean answer — StepCapReached/Error must not be shown to
+ * the user as if they were Answered. */
 int64_t dni_agent_session_start(const char* query,
                                  dni_token_cb callback,
                                  void* user_data);
