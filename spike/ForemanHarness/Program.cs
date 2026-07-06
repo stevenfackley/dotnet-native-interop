@@ -114,6 +114,17 @@ var gb = new GrammarBrain(
     badge: "on-device LLM (grammar-constrained)");
 Check("GrammarBrain parses a tool call", (await gb.DecideAsync(new AgentContext("q",new()), default)).Call?.Tool == "engine_stats");
 
+// Task 10: engine_stats returns real telemetry JSON
+var realTools = ForemanTools.Build(
+    searchManuals: q => Task.FromResult("{\"snippets\":[]}"),   // inject light doubles for the two heavy ops
+    runFeature:    id => Task.FromResult("{\"ok\":true}"),
+    engineStats:   () => "{\"heapMB\":7}");
+Check("Build yields 3 tools", realTools.Count == 3);
+var statsTool = realTools.First(t => t.Name == "engine_stats");
+Check("engine_stats returns telemetry json", (await statsTool.Invoke("{}", default)).Contains("heapMB"));
+var searchTool = realTools.First(t => t.Name == "search_manuals");
+Check("search_manuals passes the query arg", (await searchTool.Invoke("{\"query\":\"E3\"}", default)).Contains("snippets"));
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 
