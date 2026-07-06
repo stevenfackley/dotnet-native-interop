@@ -110,6 +110,11 @@ static jint    j_session_free  (JNIEnv* e, jobject o, jlong id) { (void)e; (void
 static jint    j_http_start(JNIEnv* e, jobject o) { (void)e; (void)o; return dni_http_start(); }
 static jint    j_http_stop (JNIEnv* e, jobject o) { (void)e; (void)o; return dni_http_stop(); }
 
+/* ---- Wave B: framed-protobuf transport + trace drain -------------------- */
+static jint    j_pb_start(JNIEnv* e, jobject o, jint flags) { (void)e; (void)o; return dni_pb_start((int32_t)flags); }
+static void    j_pb_stop (JNIEnv* e, jobject o) { (void)e; (void)o; dni_pb_stop(); }
+static jstring j_trace_drain(JNIEnv* e, jobject o) { (void)o; return take_native_string(e, dni_trace_drain()); }
+
 static jint    j_broker_start(JNIEnv* e, jobject o, jstring path) {
     (void)o;
     if (path == NULL) return DNI_INVALID_ARGUMENT;
@@ -246,6 +251,9 @@ static const JNINativeMethod kMethods[] = {
     {"nativeSessionFree",    "(J)I",                                                                     (void*)j_session_free},
     {"nativeHttpStart",      "()I",                                                                      (void*)j_http_start},
     {"nativeHttpStop",       "()I",                                                                      (void*)j_http_stop},
+    {"nativePbStart",        "(I)I",                                                                     (void*)j_pb_start},
+    {"nativePbStop",         "()V",                                                                      (void*)j_pb_stop},
+    {"nativeTraceDrain",     "()Ljava/lang/String;",                                                     (void*)j_trace_drain},
     {"nativeBrokerStart",    "(Ljava/lang/String;)I",                                                    (void*)j_broker_start},
     {"nativeBrokerStop",     "()I",                                                                      (void*)j_broker_stop},
     {"nativeFeaturesJson",   "()Ljava/lang/String;",                                                     (void*)j_features_json},
