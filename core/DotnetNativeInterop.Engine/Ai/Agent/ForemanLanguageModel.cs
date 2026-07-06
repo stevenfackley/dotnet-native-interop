@@ -68,7 +68,7 @@ public sealed class ForemanLanguageModel(ForemanAgent agent) : ILanguageModel
                 // ForemanAgent.RunTurnAsync contains every non-cancellation fault internally and always
                 // returns a ForemanTurnResult (Answered/StepCapReached/Error) rather than throwing — so
                 // this line is reached on any non-cancelled completion, cap, or contained error.
-                var status = new AgentSessionStatus(result.StopReason, result.ToolSteps);
+                var status = new AgentSessionStatus(result.StopReason, result.ToolSteps, agent.BackendBadge);
                 var statusJson = JsonSerializer.Serialize(status, ForemanJsonContext.Default.AgentSessionStatus);
                 channel.Writer.TryWrite(StatusMarker + statusJson);
             }
