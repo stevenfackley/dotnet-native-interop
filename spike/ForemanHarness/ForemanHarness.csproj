@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ForemanHarness</AssemblyName>
+    <!-- AOT-publishable: the win-x64 NativeAOT gate for the Foreman agent core (Ai/Agent/*), mirroring
+         spike/DniChatClientHarness's role for the DniChatClient adapter. -->
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <!-- Exercises the engine's agent core directly (ForemanAgent, brains, tools) — no NativeBridge, no
+       transport, no device/llama. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
+  </ItemGroup>
+
+</Project>
