@@ -82,6 +82,22 @@ var res7 = await new ForemanAgent(tools7, greedy).RunTurnAsync("q", _=>{}, defau
 Check("stops at MaxToolSteps", stats7 == ForemanAgent.MaxToolSteps);
 Check("reports StepCapReached", res7.StopReason == ForemanStopReason.StepCapReached);
 
+// Task 8: router picks the nearest tool by cosine; generic query -> none
+// Dim 2 is a deliberately unrelated axis for generic queries: cosine against either tool's
+// one-hot vector (dims 0/1) is exactly 0, unlike an equal-weight vector which is ~0.577 against
+// any one-hot axis (1/sqrt(3)) and would wrongly clear a 0.5 threshold.
+float[] Emb(string s) => s.Contains("memory") ? new[]{1f,0f,0f}
+                        : s.Contains("manual") || s.Contains("fault") ? new[]{0f,1f,0f}
+                        : new[]{0f,0f,1f};
+var rtools = new[] {
+    new ToolDefinition("engine_stats","current memory and gc stats",Array.Empty<ToolParam>(),(_,_)=>Task.FromResult("")),
+    new ToolDefinition("search_manuals","search the maintenance manuals for a fault",new[]{new ToolParam("query","string",true)},(_,_)=>Task.FromResult("")),
+};
+var router = new DeterministicRouter(rtools, Emb, threshold: 0.5f);
+Check("routes memory query -> engine_stats", router.Route("how much memory?")?.Tool == "engine_stats");
+Check("routes fault query -> search_manuals", router.Route("what is fault code E3?")?.Tool == "search_manuals");
+Check("generic query -> no tool", router.Route("hello there") is null);
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 
