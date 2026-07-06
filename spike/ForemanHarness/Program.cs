@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using DotnetNativeInterop.Engine.Ai.Agent;
 
@@ -48,6 +49,30 @@ var ctx0 = new AgentContext("q", new List<AgentStep>());
 Check("brain: first decision is a tool call", scripted.DecideAsync(ctx0, default).Result.Call is not null);
 ctx0.Steps.Add(new AgentStep("tool_result", "engine_stats", "{}"));
 Check("brain: answers after a tool result", scripted.DecideAsync(ctx0, default).Result.IsAnswer);
+
+// Task 6: loop dispatches a tool, streams an answer, and emits agent.* spans
+// listen for agent spans
+var seen = new List<string>();
+var listener = new ActivityListener {
+    ShouldListenTo = s => s.Name == "Dni.Engine",
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+    ActivityStopped = a => seen.Add(a.OperationName),
+};
+ActivitySource.AddActivityListener(listener);
+
+bool toolRan = false;
+var tools6 = new[] { new ToolDefinition("engine_stats","d",Array.Empty<ToolParam>(),
+    (_,_) => { toolRan = true; return Task.FromResult("{\"heapMB\":12}"); }) };
+var brain6 = new ScriptedBrain(ctx => ctx.Steps.Any(s=>s.Kind=="tool_result") ? AgentDecision.Answer
+    : AgentDecision.Tool(new ToolCall("engine_stats","{}")));
+var agent6 = new ForemanAgent(tools6, brain6);
+var sb6 = new System.Text.StringBuilder();
+var res6 = await agent6.RunTurnAsync("how much memory?", s => sb6.Append(s), default);
+Check("loop dispatched the tool", toolRan);
+Check("loop streamed an answer", sb6.Length > 0);
+Check("turn ended Answered with 1 tool step", res6.StopReason == ForemanStopReason.Answered && res6.ToolSteps == 1);
+Check("emitted agent.turn span", seen.Contains("agent.turn"));
+Check("emitted agent.tool.engine_stats span", seen.Contains("agent.tool.engine_stats"));
 
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
