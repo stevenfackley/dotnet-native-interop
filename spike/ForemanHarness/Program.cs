@@ -80,6 +80,8 @@ Check("loop streamed an answer", sb6.Length > 0);
 Check("turn ended Answered with 1 tool step", res6.StopReason == ForemanStopReason.Answered && res6.ToolSteps == 1);
 Check("emitted agent.turn span", seen.Contains("agent.turn"));
 Check("emitted agent.tool.engine_stats span", seen.Contains("agent.tool.engine_stats"));
+// #5: the serialized result carries the streamed answer (not a misleading empty string).
+Check("turn result carries the streamed answer", res6.Answer.Length > 0 && res6.Answer == sb6.ToString());
 
 // Task 7: runaway tool-calling stops at the cap with an honest StopReason
 int stats7 = 0;
@@ -88,6 +90,11 @@ var greedy = new ScriptedBrain(_ => AgentDecision.Tool(new ToolCall("engine_stat
 var res7 = await new ForemanAgent(tools7, greedy).RunTurnAsync("q", _=>{}, default);
 Check("stops at MaxToolSteps", stats7 == ForemanAgent.MaxToolSteps);
 Check("reports StepCapReached", res7.StopReason == ForemanStopReason.StepCapReached);
+
+// Task 7b: a brain whose StreamAnswerAsync throws must resolve the turn as Error, never propagate.
+var throwingBrain = new ThrowingAnswerBrain();
+var res7b = await new ForemanAgent(Array.Empty<ToolDefinition>(), throwingBrain).RunTurnAsync("q", _=>{}, default);
+Check("StreamAnswerAsync throw -> StopReason.Error (turn never throws)", res7b.StopReason == ForemanStopReason.Error);
 
 // Task 8: router picks the nearest tool by cosine; generic query -> none
 // Dim 2 is a deliberately unrelated axis for generic queries: cosine against either tool's
@@ -167,4 +174,14 @@ sealed class ScriptedBrain(Func<AgentContext, AgentDecision> decide) : IAgentBra
     public Task StreamAnswerAsync(AgentContext ctx, Action<string> sink, CancellationToken ct)
     { sink("scripted answer"); return Task.CompletedTask; }
     public string BackendBadge => "scripted (test)";
+}
+
+// Decides to answer immediately, but its answer stream throws — models a llama token stream / prose
+// func blowing up mid-answer. RunTurnAsync must contain this and resolve the turn as Error.
+sealed class ThrowingAnswerBrain : IAgentBrain
+{
+    public Task<AgentDecision> DecideAsync(AgentContext ctx, CancellationToken ct) => Task.FromResult(AgentDecision.Answer);
+    public Task StreamAnswerAsync(AgentContext ctx, Action<string> sink, CancellationToken ct)
+        => throw new InvalidOperationException("answer stream failed");
+    public string BackendBadge => "throwing (test)";
 }

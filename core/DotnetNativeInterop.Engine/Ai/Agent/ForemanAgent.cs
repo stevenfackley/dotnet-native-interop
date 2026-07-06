@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace DotnetNativeInterop.Engine.Ai.Agent;
 
@@ -25,26 +26,39 @@ public sealed class ForemanAgent
         using var turn = Trace.StartActivity("agent.turn");
         turn?.SetTag("dni.agent.query_len", query.Length);
         var ctx = new AgentContext(query, new List<AgentStep>());
+        // Mirror every sinked token into the recorded answer so the returned ForemanTurnResult.Answer is
+        // honest (the sink is the live streaming path; this is the durable copy a JSON consumer reads).
+        var answer = new StringBuilder();
+        void Sink(string s) { answer.Append(s); answerSink(s); }
         int toolSteps = 0;
+
+        // Both answer-stream sites can throw (llama token stream / injected prose func); contain them the
+        // same way DecideAsync is contained so the turn always resolves and never propagates an exception.
+        async Task<bool> TryStreamAnswerAsync()
+        {
+            try { await _brain.StreamAnswerAsync(ctx, Sink, ct); return true; }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            { Sink($"(agent error: {ex.GetType().Name})"); return false; }
+        }
 
         while (true)
         {
             AgentDecision decision;
             try { decision = await _brain.DecideAsync(ctx, ct); }
             catch (Exception ex) when (ex is not OperationCanceledException)
-            { answerSink($"(agent error: {ex.GetType().Name})"); return new ForemanTurnResult("", ForemanStopReason.Error, toolSteps); }
+            { Sink($"(agent error: {ex.GetType().Name})"); return new ForemanTurnResult(answer.ToString(), ForemanStopReason.Error, toolSteps); }
 
             if (decision.IsAnswer || decision.Call is null)
             {
-                await _brain.StreamAnswerAsync(ctx, answerSink, ct);
-                return new ForemanTurnResult("", ForemanStopReason.Answered, toolSteps);
+                if (!await TryStreamAnswerAsync()) return new ForemanTurnResult(answer.ToString(), ForemanStopReason.Error, toolSteps);
+                return new ForemanTurnResult(answer.ToString(), ForemanStopReason.Answered, toolSteps);
             }
 
             if (toolSteps >= MaxToolSteps)
             {
                 // Honest cap: never a silent loop. Ask the brain to answer with what it has.
-                await _brain.StreamAnswerAsync(ctx, answerSink, ct);
-                return new ForemanTurnResult("", ForemanStopReason.StepCapReached, toolSteps);
+                if (!await TryStreamAnswerAsync()) return new ForemanTurnResult(answer.ToString(), ForemanStopReason.Error, toolSteps);
+                return new ForemanTurnResult(answer.ToString(), ForemanStopReason.StepCapReached, toolSteps);
             }
 
             var call = decision.Call.Value;
