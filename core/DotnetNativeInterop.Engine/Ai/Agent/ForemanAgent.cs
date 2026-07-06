@@ -10,8 +10,10 @@ namespace DotnetNativeInterop.Engine.Ai.Agent;
 public sealed class ForemanAgent
 {
     public const int MaxToolSteps = 5;
-    // Reuse the Wave B engine trace source so agent spans land in the same drain/waterfall.
-    private static readonly ActivitySource Trace = new("Dni.Engine");
+    // Reuse the Wave B engine trace source (the SAME ActivitySource EngineTrace records from — not a
+    // second one that merely shares the name) so agent spans land in the very ring/drain/waterfall the
+    // native UI already reads.
+    private static readonly ActivitySource Trace = EngineTrace.Source;
 
     private readonly IReadOnlyList<ToolDefinition> _tools;
     private readonly IAgentBrain _brain;
@@ -69,8 +71,8 @@ public sealed class ForemanAgent
                 if (tool is null) { result = "{\"error\":\"unknown tool\"}"; span?.SetTag("dni.agent.tool_known", false); }
                 else { try { result = await tool.Invoke(call.ArgsJson, ct); } catch (Exception ex) when (ex is not OperationCanceledException) { result = $"{{\"error\":\"{ex.GetType().Name}\"}}"; } }
             }
-            ctx.Steps.Add(new AgentStep("tool_call", call.Tool, call.ArgsJson));
-            ctx.Steps.Add(new AgentStep("tool_result", call.Tool, result));
+            ctx.Steps.Add(new AgentStep(AgentStep.KindToolCall, call.Tool, call.ArgsJson));
+            ctx.Steps.Add(new AgentStep(AgentStep.KindToolResult, call.Tool, result));
             toolSteps++;
         }
     }

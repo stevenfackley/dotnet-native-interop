@@ -11,14 +11,14 @@ public sealed class RouterBrain(DeterministicRouter router, Func<string, string>
 
     public Task<AgentDecision> DecideAsync(AgentContext ctx, CancellationToken ct)
     {
-        var used = ctx.Steps.Any(s => s.Kind == "tool_result");
+        var used = ctx.Steps.Any(s => s.Kind == AgentStep.KindToolResult);
         if (!used && router.Route(ctx.Query) is { } call) return Task.FromResult(AgentDecision.Tool(call));
         return Task.FromResult(AgentDecision.Answer);
     }
 
     public Task StreamAnswerAsync(AgentContext ctx, Action<string> sink, CancellationToken ct)
     {
-        var results = string.Join(" ", ctx.Steps.Where(s => s.Kind == "tool_result").Select(s => s.Result));
+        var results = string.Join(" ", ctx.Steps.Where(s => s.Kind == AgentStep.KindToolResult).Select(s => s.Result));
         sink(prose($"{ctx.Query}\n{results}"));
         return Task.CompletedTask;
     }

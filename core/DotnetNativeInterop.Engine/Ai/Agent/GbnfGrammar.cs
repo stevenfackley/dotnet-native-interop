@@ -11,7 +11,20 @@ public static class GbnfGrammar
 {
     public static string Build(IReadOnlyList<ToolDefinition> tools)
     {
+        // Tool + param names are emitted verbatim into GBNF rule names (tc_<name>) and JSON string
+        // terminals, so they must be GBNF-identifier-safe [A-Za-z0-9_]. Every tool this engine builds is a
+        // compile-time constant that satisfies that (search_manuals / run_feature / engine_stats, args
+        // query / id) — there are no runtime-named tools, so no escaping/validation is needed here.
         var sb = new StringBuilder();
+        // No tools: the only valid turn is a final answer. Emitting "root ::= toolcall | answer" with an
+        // empty "toolcall ::=" alternative would be invalid GBNF, so short-circuit to an answer-only grammar.
+        if (tools.Count == 0)
+        {
+            sb.Append("root ::= answer\n");
+            sb.Append("answer ::= \"{\\\"answer\\\":\" string \"}\"\n");
+            sb.Append("string ::= \"\\\"\" ([^\"\\\\] | \"\\\\\" .)* \"\\\"\"\n");
+            return sb.ToString();
+        }
         // root is either a tool call or an answer object
         sb.Append("root ::= toolcall | answer\n");
         sb.Append("answer ::= \"{\\\"answer\\\":\" string \"}\"\n");
@@ -28,8 +41,9 @@ public static class GbnfGrammar
             sb.Append("tc_").Append(t.Name).Append(" ::= \"{\\\"tool\\\":\\\"")
               .Append(t.Name).Append("\\\",\\\"args\\\":\" ").Append(ArgsRule(t)).Append(" \"}\"\n");
         }
+        // Compact JSON only for the constrained turn — no whitespace rule (a "ws" rule was previously
+        // emitted but never referenced by any other rule, i.e. dead grammar).
         sb.Append("string ::= \"\\\"\" ([^\"\\\\] | \"\\\\\" .)* \"\\\"\"\n");
-        sb.Append("ws ::= [ \\t\\n]*\n");
         return sb.ToString();
     }
 

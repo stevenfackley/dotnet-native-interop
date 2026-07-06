@@ -31,7 +31,18 @@ public static class ForemanTools
 
     private static string GetString(string argsJson, string name)
     {
-        try { using var d = JsonDocument.Parse(argsJson); return d.RootElement.TryGetProperty(name, out var v) ? v.GetString() ?? "" : ""; }
+        try
+        {
+            using var d = JsonDocument.Parse(argsJson);
+            var root = d.RootElement;
+            // Same non-object hole ToolCallParser guards against: TryGetProperty throws on a scalar/array
+            // and GetString throws on a non-string value. Contained by the agent's tool try/catch, but
+            // hardened here so the arg extractor is honestly total.
+            return root.ValueKind == JsonValueKind.Object && root.TryGetProperty(name, out var v)
+                && v.ValueKind == JsonValueKind.String
+                ? v.GetString() ?? ""
+                : "";
+        }
         catch (JsonException) { return ""; }
     }
 }

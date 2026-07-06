@@ -9,7 +9,15 @@ public readonly record struct ToolCall(string Tool, string ArgsJson);
 public enum ForemanStopReason { Answered, StepCapReached, Error }
 
 /// <summary>One recorded step in a turn (a tool call + its result, or the final answer).</summary>
-public readonly record struct AgentStep(string Kind, string Detail, string? Result);
+public readonly record struct AgentStep(string Kind, string Detail, string? Result)
+{
+    // Shared <see cref="Kind"/> values: written by ForemanAgent, read by the brains for routing —
+    // constants so a typo is a compile error, not a silently-broken "did a tool run yet?" check.
+    /// <summary><see cref="Kind"/> value for a recorded tool invocation.</summary>
+    public const string KindToolCall = "tool_call";
+    /// <summary><see cref="Kind"/> value for a recorded tool result.</summary>
+    public const string KindToolResult = "tool_result";
+}
 
 /// <summary>The outcome of a single Foreman turn.</summary>
 public readonly record struct ForemanTurnResult(string Answer, ForemanStopReason StopReason, int ToolSteps);

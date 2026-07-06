@@ -31,6 +31,9 @@ var g = GbnfGrammar.Build(tools3);
 Check("grammar names each tool", g.Contains("\\\"search_manuals\\\"") && g.Contains("\\\"engine_stats\\\""));
 Check("grammar has an answer alternative", g.Contains("answer"));
 Check("grammar has a root rule", g.Contains("root ::="));
+// Empty tool set: answer-only grammar, never a bare "toolcall ::=" (invalid GBNF).
+var gEmpty = GbnfGrammar.Build(Array.Empty<ToolDefinition>());
+Check("empty tool set -> answer-only grammar", gEmpty.Contains("root ::= answer") && !gEmpty.Contains("toolcall"));
 
 // Task 4: parse grammar-shaped emissions
 var d1 = ToolCallParser.Parse("{\"tool\":\"engine_stats\",\"args\":{}}");
