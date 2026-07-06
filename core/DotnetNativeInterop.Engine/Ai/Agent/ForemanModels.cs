@@ -22,6 +22,14 @@ public readonly record struct AgentStep(string Kind, string Detail, string? Resu
 /// <summary>The outcome of a single Foreman turn.</summary>
 public readonly record struct ForemanTurnResult(string Answer, ForemanStopReason StopReason, int ToolSteps);
 
+/// <summary>
+/// The status <see cref="ForemanLanguageModel"/> serializes into the final fragment of an agent
+/// session's stream (see <see cref="ForemanLanguageModel.StatusMarker"/>) — the FFI-facing surface a
+/// client reads to tell an <see cref="ForemanStopReason.Answered"/> turn apart from a
+/// <see cref="ForemanStopReason.StepCapReached"/> or <see cref="ForemanStopReason.Error"/> one.
+/// </summary>
+public readonly record struct AgentSessionStatus(ForemanStopReason StopReason, int ToolSteps);
+
 /// <summary>A decision produced by an <c>IAgentBrain</c>: either a tool call or a final answer.</summary>
 public readonly record struct AgentDecision(ToolCall? Call, bool IsAnswer)
 {
@@ -31,9 +39,19 @@ public readonly record struct AgentDecision(ToolCall? Call, bool IsAnswer)
 
 // UseStringEnumConverter: ForemanStopReason must serialize as its name (e.g. "Answered"), not an int,
 // so the native UI / logs can read it directly. Source-gen-safe (no reflection).
+//
+// FeatureRun (DotnetNativeInterop.Engine.LanguageFeatures.cs) is included here so the real run_feature
+// tool binding (ForemanHost) can serialize LanguageFeatureCatalog.Run's result without reflection.
+// FeaturesJsonContext already source-gens FeatureRun, but it is `internal sealed partial class
+// FeaturesJsonContext` in the NativeBridge assembly (core/DotnetNativeInterop.NativeBridge/
+// FeaturesJsonContext.cs) — unreachable from Engine, which NativeBridge references, not the reverse.
+// FeatureRun the type IS already Engine-visible (declared in the Engine assembly), so no type move is
+// needed; only a second, Engine-side source-gen registration for it.
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(ToolCall))]
 [JsonSerializable(typeof(AgentStep))]
 [JsonSerializable(typeof(ForemanTurnResult))]
 [JsonSerializable(typeof(ForemanStopReason))]
+[JsonSerializable(typeof(FeatureRun))]
+[JsonSerializable(typeof(AgentSessionStatus))]
 public partial class ForemanJsonContext : System.Text.Json.Serialization.JsonSerializerContext { }

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using DotnetNativeInterop.Engine;
+using DotnetNativeInterop.Engine.Ai.Agent;
 
 namespace DotnetNativeInterop.NativeBridge.Ffi;
 
@@ -110,6 +111,60 @@ internal static class ExportsFfi
             using var span = EngineTrace.StartSpan("ffi.rag_session_start");
             var request = new InferenceRequest(queryText, maxTokens, temperature);
             var session = InferenceSession.Start(EngineHost.RagOrchestrator, request);
+            var id = SessionRegistry.Add(session);
+            FfiState.AllocatedIds.TryAdd(id, 0);
+
+            var callbackAsNint = (nint)callback;
+            var userDataAsNint = (nint)userData;
+
+            _ = Task.Run(() => DrainAsync(session, callbackAsNint, userDataAsNint));
+
+            return id;
+        }
+        catch (Exception)
+        {
+            return NativeStatus.Internal;
+        }
+    }
+
+    /// <summary>
+    /// Foreman agent (additive — see abi/dni.h): runs a full tool-calling agent turn
+    /// (<see cref="DotnetNativeInterop.Engine.Ai.Agent.ForemanHost.Agent"/>) instead of a single-shot
+    /// LLM/RAG completion, streaming the answer via the SAME <c>dni_token_cb</c> callback and sharing
+    /// the SAME <see cref="SessionRegistry"/> handle/cancel/free lifecycle as every other session —
+    /// no new lifecycle exports. The final NORMAL fragment before the empty <c>is_final=1</c> marker is
+    /// always a <see cref="ForemanLanguageModel.StatusMarker"/>-prefixed JSON
+    /// <see cref="AgentSessionStatus"/>; a client must read it before trusting the turn as a clean
+    /// answer (a <c>StepCapReached</c>/<c>Error</c> turn must never be presented as <c>Answered</c>).
+    /// </summary>
+    /// <param name="query">NUL-terminated UTF-8 question. Must not be null.</param>
+    /// <param name="callback">Per-fragment callback. Must not be null.</param>
+    /// <param name="userData">Opaque pointer forwarded verbatim to every callback invocation.</param>
+    /// <returns>Session id (&gt; 0) on success; a negative <see cref="NativeStatus"/> on failure.</returns>
+    [UnmanagedCallersOnly(EntryPoint = "dni_agent_session_start")]
+    public static unsafe long AgentSessionStart(
+        byte* query,
+        delegate* unmanaged[Cdecl]<void*, int, byte*, int, void> callback,
+        void* userData)
+    {
+        try
+        {
+            if (!EngineHost.IsInitialized)
+            {
+                return NativeStatus.NotInitialized;
+            }
+
+            if (query == null || callback == null)
+            {
+                return NativeStatus.InvalidArgument;
+            }
+
+            var queryText = NativeText.Read((nint)query);
+
+            using var span = EngineTrace.StartSpan("ffi.agent_session_start");
+            var request = new InferenceRequest(queryText);
+            var orchestrator = new InferenceOrchestrator(new ForemanLanguageModel(ForemanHost.Agent));
+            var session = InferenceSession.Start(orchestrator, request);
             var id = SessionRegistry.Add(session);
             FfiState.AllocatedIds.TryAdd(id, 0);
 

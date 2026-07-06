@@ -169,6 +169,36 @@ void    dni_pb_stop(void);
  *   "trace~stats"   -> span-ring snapshot { capacity, occupancy, droppedSinceDrain,
  *                      recordedTotal, droppedTotal }.                          */
 
+/* ---- Foreman agent (additive) ------------------------------------------- */
+/* One new export; the frozen production surface and the Wave B additions above are unchanged.
+ *
+ * Runs a full Foreman turn — a bounded tool-calling loop over the engine's real ops
+ * (search_manuals / engine_stats / run_feature), decided by a router brain (no GGUF bundled) or a
+ * grammar-seamed on-device LLM brain (GGUF present) — instead of a single-shot LLM/RAG completion.
+ * Streams the agent's answer fragments via dni_token_cb exactly like dni_rag_session_start, and
+ * shares its SAME session lifecycle: cancel with dni_session_cancel, free with dni_session_free
+ * (no new lifecycle exports). agent.turn / agent.tool.<name> spans for the turn are already visible
+ * via the existing dni_trace_drain — no new tracing export either.
+ *
+ * Completion contract: the LAST fragment delivered via dni_token_cb before the terminal
+ * is_final=1 marker (which itself stays empty, per dni_token_cb's existing contract) is always the
+ * status fragment. It is identified STRUCTURALLY by its first byte: a status fragment is exactly the
+ * fragment whose text[0] == 0x01 (SOH, an ASCII C0 control byte). That leading 0x01 is immediately
+ * followed by the readable tag "dni.agent.status" (kept only for log greppability) and then, with no
+ * separator, a JSON object {"stopReason":"Answered"|"StepCapReached"|"Error","toolSteps":<int>}.
+ *
+ * DETECT ON THE 0x01 BYTE, NOT ON THE READABLE TAG. No real UTF-8 answer prose from either brain ever
+ * contains a C0 control byte, so text[0]==0x01 is a collision-proof discriminator; matching the tag
+ * text alone is NOT safe, because the on-device LLM could stream the literal characters
+ * "dni.agent.status" while answering a question ABOUT the marker. To parse: treat every fragment whose
+ * text[0] != 0x01 as answer text; on the one fragment whose text[0] == 0x01, skip the leading 0x01
+ * byte plus the fixed "dni.agent.status" tag and JSON-parse the remainder. A client MUST check
+ * stopReason before presenting a turn as a clean answer — StepCapReached/Error must not be shown to
+ * the user as if they were Answered. */
+int64_t dni_agent_session_start(const char* query,
+                                 dni_token_cb callback,
+                                 void* user_data);
+
 #ifdef __cplusplus
 }
 #endif
