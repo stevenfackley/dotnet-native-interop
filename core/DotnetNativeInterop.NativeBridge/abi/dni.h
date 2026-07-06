@@ -169,6 +169,29 @@ void    dni_pb_stop(void);
  *   "trace~stats"   -> span-ring snapshot { capacity, occupancy, droppedSinceDrain,
  *                      recordedTotal, droppedTotal }.                          */
 
+/* ---- Foreman agent (additive) ------------------------------------------- */
+/* One new export; the frozen production surface and the Wave B additions above are unchanged.
+ *
+ * Runs a full Foreman turn — a bounded tool-calling loop over the engine's real ops
+ * (search_manuals / engine_stats / run_feature), decided by a router brain (no GGUF bundled) or a
+ * grammar-seamed on-device LLM brain (GGUF present) — instead of a single-shot LLM/RAG completion.
+ * Streams the agent's answer fragments via dni_token_cb exactly like dni_rag_session_start, and
+ * shares its SAME session lifecycle: cancel with dni_session_cancel, free with dni_session_free
+ * (no new lifecycle exports). agent.turn / agent.tool.<name> spans for the turn are already visible
+ * via the existing dni_trace_drain — no new tracing export either.
+ *
+ * Completion contract: the LAST fragment delivered via dni_token_cb before the terminal
+ * is_final=1 marker (which itself stays empty, per dni_token_cb's existing contract) is always a
+ * status fragment: the literal ASCII bytes "dni.agent.status" immediately followed (no separator) by
+ * a JSON object {"stopReason":"Answered"|"StepCapReached"|"Error","toolSteps":<int>}. Real answer
+ * prose never begins with that literal prefix, so a client can split "answer text" (every fragment
+ * up to but excluding the one that starts with the prefix) from "turn status" (that one fragment)
+ * unambiguously. A client MUST check stopReason before presenting a turn as a clean answer —
+ * StepCapReached/Error must not be shown to the user as if they were Answered. */
+int64_t dni_agent_session_start(const char* query,
+                                 dni_token_cb callback,
+                                 void* user_data);
+
 #ifdef __cplusplus
 }
 #endif

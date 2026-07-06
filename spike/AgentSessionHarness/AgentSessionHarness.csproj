@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>AgentSessionHarness</AssemblyName>
+    <!-- AOT-publishable so it doubles as the win-x64 NativeAOT gate for the Foreman-over-FFI seam
+         (ForemanLanguageModel + the InferenceSession/SessionRegistry wiring dni_agent_session_start
+         wraps), mirroring spike/WaveBHarness's role for the rest of the FFI surface. -->
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <!-- UnmanagedCallersOnly exports can't be called from managed code, so this drives the INTERNAL
+       session-start logic dni_agent_session_start wraps directly: InferenceSession.Start over a
+       ForemanLanguageModel(ForemanHost.Agent), SessionRegistry.Add/TryGet/RemoveAsync, session.Cancel().
+       Everything exercised here (InferenceSession, InferenceOrchestrator, SessionRegistry, ForemanHost,
+       ForemanLanguageModel) is public, so a plain ProjectReference to NativeBridge — which transitively
+       carries Engine's public API — is enough; no InternalsVisibleTo needed. The native-callback
+       marshaling (DrainAsync/Invoke in Exports.Ffi.cs) is NOT re-tested here: it is the same generic
+       code path dni_session_start/dni_rag_session_start already exercise in production, unchanged by
+       this new export. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\DotnetNativeInterop.NativeBridge\DotnetNativeInterop.NativeBridge.csproj" />
+  </ItemGroup>
+
+</Project>

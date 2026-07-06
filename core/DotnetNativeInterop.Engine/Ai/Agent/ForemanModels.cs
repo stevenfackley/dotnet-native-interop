@@ -22,6 +22,14 @@ public readonly record struct AgentStep(string Kind, string Detail, string? Resu
 /// <summary>The outcome of a single Foreman turn.</summary>
 public readonly record struct ForemanTurnResult(string Answer, ForemanStopReason StopReason, int ToolSteps);
 
+/// <summary>
+/// The status <see cref="ForemanLanguageModel"/> serializes into the final fragment of an agent
+/// session's stream (see <see cref="ForemanLanguageModel.StatusMarker"/>) — the FFI-facing surface a
+/// client reads to tell an <see cref="ForemanStopReason.Answered"/> turn apart from a
+/// <see cref="ForemanStopReason.StepCapReached"/> or <see cref="ForemanStopReason.Error"/> one.
+/// </summary>
+public readonly record struct AgentSessionStatus(ForemanStopReason StopReason, int ToolSteps);
+
 /// <summary>A decision produced by an <c>IAgentBrain</c>: either a tool call or a final answer.</summary>
 public readonly record struct AgentDecision(ToolCall? Call, bool IsAnswer)
 {
@@ -45,4 +53,5 @@ public readonly record struct AgentDecision(ToolCall? Call, bool IsAnswer)
 [JsonSerializable(typeof(ForemanTurnResult))]
 [JsonSerializable(typeof(ForemanStopReason))]
 [JsonSerializable(typeof(FeatureRun))]
+[JsonSerializable(typeof(AgentSessionStatus))]
 public partial class ForemanJsonContext : System.Text.Json.Serialization.JsonSerializerContext { }
