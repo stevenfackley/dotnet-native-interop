@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.dotnetnativeinterop.boundary.BoundaryScreen
 import io.dotnetnativeinterop.boundary.BoundaryViewModel
+import io.dotnetnativeinterop.trust.TrustInspector
 import io.dotnetnativeinterop.ui.InferenceScreen
 import io.dotnetnativeinterop.ui.InferenceViewModel
 import io.dotnetnativeinterop.ui.Spacing
@@ -24,8 +25,9 @@ import io.dotnetnativeinterop.ui.Spacing
  * Boundary hub (IA collapse spec 2 of 3): the hero/default landing tab. "Trace" is the FFI
  * phase-trace demo (unchanged). "Transports" is the Android-only legacy Stream tab (multi-transport
  * streaming picker + patterns) folded in here per the design doc, rather than removed —
- * additive-expansion rule. Kills the iOS<->Android Stream parity gap: neither shell has a
- * top-level Stream destination anymore.
+ * additive-expansion rule. "Trust" is the Wave B per-transport security posture + opt-in PQ channel
+ * inspector. Kills the iOS<->Android Stream parity gap: neither shell has a top-level Stream
+ * destination anymore.
  */
 @Composable
 internal fun BoundaryHubScreen(
@@ -33,7 +35,7 @@ internal fun BoundaryHubScreen(
     modifier: Modifier = Modifier,
 ) {
     var section by remember { mutableIntStateOf(0) }
-    val labels = listOf("Trace", "Transports")
+    val labels = listOf("Trace", "Transports", "Trust")
 
     Column(modifier = modifier) {
         SingleChoiceSegmentedButtonRow(
@@ -49,11 +51,13 @@ internal fun BoundaryHubScreen(
         }
 
         val inner = Modifier.fillMaxWidth().weight(1f)
-        if (section == 0) {
-            val vm: BoundaryViewModel = viewModel()
-            BoundaryScreen(vm, inner)
-        } else {
-            InferenceScreen(viewModel = inference, modifier = inner)
+        when (section) {
+            0 -> {
+                val vm: BoundaryViewModel = viewModel()
+                BoundaryScreen(vm, inner)
+            }
+            1 -> InferenceScreen(viewModel = inference, modifier = inner)
+            else -> TrustInspector(modifier = inner)
         }
     }
 }
