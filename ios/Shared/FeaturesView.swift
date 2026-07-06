@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Table-of-contents over all features for the SELECTED transport: a transport picker, collapsible
-/// version sections, and rows that drill into a per-feature FeatureDetailView.
+/// Catalog: table-of-contents over all features for the SELECTED transport — a transport picker, a
+/// search field, version/status filter chips, a sort order, collapsible version sections, and rows that
+/// drill into a per-feature FeatureDetailView. Search/filter/sort is the Catalog's one net-new behavior
+/// from the IA collapse spec (2026-06-21) — 57 items is past scan-only.
 struct FeaturesView: View {
     @ObservedObject var viewModel: FeaturesViewModel
     @State private var collapsed: Set<String> = []
@@ -12,6 +14,10 @@ struct FeaturesView: View {
                 Section { TransportPicker(viewModel: viewModel) }
                     .instrumentRow()
 
+                Section { filterChips }
+                    .instrumentRow()
+                    .listRowSeparator(.hidden)
+
                 if viewModel.isLoading && viewModel.descriptors.isEmpty {
                     Section {
                         HStack(spacing: 8) { ProgressView(); Text("Loading features…") }
@@ -20,6 +26,12 @@ struct FeaturesView: View {
                 } else if viewModel.descriptors.isEmpty {
                     Section {
                         Text(viewModel.errorMessage ?? "No features. Tap Refresh.")
+                            .foregroundStyle(Instrument.textSecondary)
+                    }
+                    .instrumentRow()
+                } else if viewModel.grouped.isEmpty {
+                    Section {
+                        Text("No features match your search or filters.")
                             .foregroundStyle(Instrument.textSecondary)
                     }
                     .instrumentRow()
@@ -35,24 +47,62 @@ struct FeaturesView: View {
                     .listRowInsets(EdgeInsets())
                 }
             }
-            .navigationTitle("Features · \(viewModel.selected.displayName)")
+            .searchable(text: $viewModel.searchText, prompt: "Search the catalog…")
+            .navigationTitle("Catalog · \(viewModel.selected.displayName)")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Refresh") { Task { await viewModel.load() } }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        viewModel.onlyFailed.toggle()
-                    } label: {
-                        Image(systemName: viewModel.onlyFailed
-                              ? "line.3.horizontal.decrease.circle.fill"
-                              : "line.3.horizontal.decrease.circle")
-                    }
+                    sortMenu
                 }
             }
             .task { if viewModel.descriptors.isEmpty { await viewModel.load() } }
             .instrumentScreen()
         }
+    }
+
+    /// Sort menu — replaces a plain toggle since there are now three orders, not just a pass/fail flip.
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $viewModel.sort) {
+                ForEach(CatalogSort.allCases) { order in
+                    Text("Sort by \(order.rawValue)").tag(order)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down.circle")
+        }
+    }
+
+    /// Version-bucket + pass/fail filter chips. Each chip toggles independently (tap again to clear).
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Instrument.Space.s) {
+                ForEach(VersionBucket.allCases) { bucket in
+                    chip(bucket.rawValue, selected: viewModel.versionFilter == bucket) {
+                        viewModel.versionFilter = (viewModel.versionFilter == bucket) ? nil : bucket
+                    }
+                }
+                Rectangle()
+                    .fill(Instrument.hairline)
+                    .frame(width: 1, height: 18)
+                ForEach(StatusChip.allCases) { status in
+                    chip(status.rawValue, selected: viewModel.statusFilter == status) {
+                        viewModel.statusFilter = (viewModel.statusFilter == status) ? nil : status
+                    }
+                }
+            }
+        }
+    }
+
+    private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Text(title)
+            .font(Instrument.panelLabel)
+            .padding(.horizontal, Instrument.Space.m).padding(.vertical, Instrument.Space.s)
+            .background(selected ? Instrument.accent : Instrument.bg2, in: Capsule())
+            .foregroundStyle(selected ? Instrument.bg0 : Instrument.textSecondary)
+            .onTapGesture(perform: action)
     }
 
     private var groups: some View {

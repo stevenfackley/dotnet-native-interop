@@ -7,6 +7,10 @@ struct AboutView: View {
     let telemetry: TelemetryService
 
     @State private var stats: EngineStats?
+    // About is now only ever presented as a sheet (IA collapse spec, 2026-06-21), so it needs its own
+    // explicit dismiss affordance instead of relying on tab-bar navigation. @Environment(\.dismiss):
+    // iOS 15+; pre-iOS 15 fallback: @Environment(\.presentationMode) + presentationMode.wrappedValue.dismiss().
+    @Environment(\.dismiss) private var dismiss
 
     private let architecture = """
     iOS app (SwiftUI)
@@ -82,6 +86,11 @@ struct AboutView: View {
                 }
             }
             .navigationTitle("About")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .task { stats = try? await telemetry.stats() }
             .instrumentScreen()
         }
@@ -89,5 +98,26 @@ struct AboutView: View {
 
     private func bullet(_ text: String) -> some View {
         Label { Text(text) } icon: { Image(systemName: "circle.fill").font(.system(size: 5)) }
+    }
+}
+
+/// Toolbar affordance that surfaces the demoted About screen as a sheet from a top-level tab (IA collapse
+/// spec, 2026-06-21: About moved from a top-level tab to a toolbar ⓘ / sheet). Self-contained — drop into
+/// any NavigationStack's `.toolbar` without extra plumbing at the call site.
+struct AboutToolbarButton: View {
+    let infos: [TransportInfo]
+    let telemetry: TelemetryService
+    @State private var showingAbout = false
+
+    var body: some View {
+        Button {
+            showingAbout = true
+        } label: {
+            Image(systemName: "info.circle")
+        }
+        .accessibilityLabel("About")
+        .sheet(isPresented: $showingAbout) {
+            AboutView(infos: infos, telemetry: telemetry)
+        }
     }
 }

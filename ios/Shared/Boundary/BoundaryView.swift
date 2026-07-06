@@ -1,41 +1,53 @@
 import SwiftUI
 
 /// Approach A · A1: swimlane hero + segmented inspector that auto-follows the phase in Auto-step.
+/// Also the app's hero/landing tab, first in the tab order — carries the demoted About screen behind an
+/// ⓘ toolbar button (IA collapse spec, 2026-06-21: About moves from a top-level tab to a toolbar/sheet).
 struct BoundaryView: View {
     @ObservedObject var viewModel: BoundaryViewModel
+    let infos: [TransportInfo]
+    let telemetry: TelemetryService
     @State private var revealed = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Instrument.Space.l) {
-                PanelHeader("Boundary · trace one FFI call")
-                    .revealCard(revealed, delay: 0)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Instrument.Space.l) {
+                    PanelHeader("Boundary · trace one FFI call")
+                        .revealCard(revealed, delay: 0)
 
-                presetRow.revealCard(revealed, delay: 0.05)
+                    presetRow.revealCard(revealed, delay: 0.05)
 
-                VStack(alignment: .leading, spacing: Instrument.Space.s) {
-                    PanelHeader("lifecycle — swimlane")
-                    SwimlaneView(activePhase: viewModel.activePhase, streaming: viewModel.preset == .stream)
-                    Label("callback fires off the UI thread → hops to @MainActor",
-                          systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(Instrument.warn)
+                    VStack(alignment: .leading, spacing: Instrument.Space.s) {
+                        PanelHeader("lifecycle — swimlane")
+                        SwimlaneView(activePhase: viewModel.activePhase, streaming: viewModel.preset == .stream)
+                        Label("callback fires off the UI thread → hops to @MainActor",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(Instrument.warn)
+                    }
+                    .instrumentCard()
+                    .revealCard(revealed, delay: 0.1)
+
+                    controls.revealCard(revealed, delay: 0.15)
+
+                    if let message = viewModel.errorMessage {
+                        ErrorBanner(message: message) { Task { await viewModel.run() } }
+                            .revealCard(revealed, delay: 0.2)
+                    }
+
+                    inspectorPicker.revealCard(revealed, delay: 0.2)
+                    BoundaryInspectorPanel(vm: viewModel).revealCard(revealed, delay: 0.25)
                 }
-                .instrumentCard()
-                .revealCard(revealed, delay: 0.1)
-
-                controls.revealCard(revealed, delay: 0.15)
-
-                if let message = viewModel.errorMessage {
-                    ErrorBanner(message: message) { Task { await viewModel.run() } }
-                        .revealCard(revealed, delay: 0.2)
-                }
-
-                inspectorPicker.revealCard(revealed, delay: 0.2)
-                BoundaryInspectorPanel(vm: viewModel).revealCard(revealed, delay: 0.25)
+                .padding(Instrument.Space.l)
             }
-            .padding(Instrument.Space.l)
+            .instrumentScreen()
+            .navigationTitle("Boundary")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    AboutToolbarButton(infos: infos, telemetry: telemetry)
+                }
+            }
         }
-        .instrumentScreen()
         .task { revealed = true }
     }
 
@@ -91,5 +103,7 @@ struct BoundaryView: View {
 }
 
 #Preview {
-    BoundaryView(viewModel: BoundaryViewModel(service: MockBoundaryService()))
+    BoundaryView(viewModel: BoundaryViewModel(service: MockBoundaryService()),
+                 infos: [.ffi, .http, .sqlite],
+                 telemetry: TelemetryService())
 }

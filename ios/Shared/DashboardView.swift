@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Overview tab, styled as the instrument's front panel: the active transport (switchable),
-/// a "Run all" action, and live aggregate results.
+/// The Analysis section's "Overview" segment, styled as the instrument's front panel: the active
+/// transport (switchable), a "Run all" action, and live aggregate results (IA collapse spec, 2026-06-21 —
+/// was the standalone "Dashboard" tab).
 struct DashboardView: View {
     @ObservedObject var viewModel: FeaturesViewModel
     @State private var revealed = false

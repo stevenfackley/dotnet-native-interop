@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The "Manuals" tab root — offline edge search driven entirely Swift-side (ONNX + Core ML), a contrast
-/// to the AI tab's in-engine NativeAOT ONNX search.
+/// The Search section's "On-device" segment root — offline edge search driven entirely Swift-side (ONNX +
+/// Core ML), a contrast to the Engine (FFI) segment's in-engine NativeAOT ONNX search (IA collapse spec,
+/// 2026-06-21 — was the standalone "Manuals" tab).
 struct EdgeSearchHubView: View {
     var body: some View {
         NavigationStack { EdgeSearchView() }

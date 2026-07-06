@@ -11,7 +11,12 @@ final class FeaturesViewModel: ObservableObject {
     @Published var running: Set<String> = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var onlyFailed = false
+
+    // Catalog search/filter/sort (IA collapse spec, 2026-06-21).
+    @Published var searchText = ""
+    @Published var versionFilter: VersionBucket?
+    @Published var statusFilter: StatusChip?
+    @Published var sort: CatalogSort = .version
 
     private let services: TransportMap<FeatureService>
     let infos: TransportMap<TransportInfo>
@@ -25,11 +30,42 @@ final class FeaturesViewModel: ObservableObject {
     var transport: TransportInfo { infos[selected] }
     var orderedInfos: [TransportInfo] { TransportKind.allCases.map { infos[$0] } }
 
-    /// Descriptors grouped into ordered (version, items) sections, after the optional failed filter.
+    /// Descriptors grouped into ordered (version, items) sections, after search text + the version/status
+    /// filter chips, with items ordered per the active sort (57 items is past scan-only — the catalog's
+    /// one net-new behavior from the IA collapse spec).
     var grouped: [(String, [FeatureDescriptor])] {
-        let shown = onlyFailed ? descriptors.filter { results[$0.id]?.ok == false } : descriptors
+        let shown = filteredAndSorted
         return shown.map(\.version).uniqued().map { version in
             (version, shown.filter { $0.version == version })
+        }
+    }
+
+    private var filteredAndSorted: [FeatureDescriptor] {
+        var shown = descriptors
+
+        if let statusFilter {
+            shown = shown.filter { descriptor in
+                let ok = results[descriptor.id]?.ok
+                return statusFilter == .pass ? ok == true : ok == false
+            }
+        }
+        if let versionFilter {
+            shown = shown.filter { versionFilter.matches($0.version) }
+        }
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            shown = shown.filter {
+                $0.title.lowercased().contains(query) || $0.id.lowercased().contains(query)
+            }
+        }
+
+        switch sort {
+        case .name:
+            return shown.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        case .version:
+            return shown // catalog order is already version-ordered (LanguageFeatures*.cs)
+        case .elapsed:
+            return shown.sorted { (results[$0.id]?.elapsedMs ?? -1) > (results[$1.id]?.elapsedMs ?? -1) }
         }
     }
 

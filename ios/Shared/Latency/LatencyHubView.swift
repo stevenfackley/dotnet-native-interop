@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The Latency tab: a hub of focused latency analyses + the live engine-telemetry screen.
+/// The Analysis section's "Latency" segment: a hub of focused latency analyses + the live
+/// engine-telemetry screen (IA collapse spec, 2026-06-21 — was the standalone "Latency" tab).
 struct LatencyHubView: View {
     @ObservedObject var model: LatencyViewModel
     let telemetry: TelemetryService
