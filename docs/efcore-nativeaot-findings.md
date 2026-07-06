@@ -72,6 +72,13 @@ using `UseSqlite` (naive attempts) or `UseSqlite(...).UseModel(EfGate.CompiledMo
 **second** scope read/update/delete/count — deliberately exercising the "reopen the context" shape
 a real app uses, not a single long-lived context.
 
+**Publish command (identical for all three attempts):**
+```powershell
+dotnet publish -r win-x64 -c Release -p:PublishAot=true -p:IlcUseEnvironmentalTools=true
+```
+(same MSVC-toolset environment workaround as the sibling gates in this batch — see
+`onnx-nativeaot-ios-findings.md` "Toolchain potholes".)
+
 ### Attempt 1 — naive
 
 `OnConfiguring` → `options.UseSqlite($"Data Source={dbPath}")`, and `Main` calls

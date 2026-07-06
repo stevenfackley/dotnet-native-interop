@@ -1,0 +1,25 @@
+// Trimmed spike copy — resembles proto/dni.proto's InferRequest/InferToken (NOT modified there)
+// plus the timings/token-list shape that killed protobuf-net in spike/ProtobufGate.
+syntax = "proto3";
+
+package dni.spike.v1;
+
+option csharp_namespace = "GpbGate.Proto";
+
+message InferenceRequest {
+  string prompt = 1;
+  int32 max_tokens = 2;
+  float temperature = 3;
+  repeated int32 token_ids = 4;
+}
+
+message LatencyBreakdown {
+  double first_token_ms = 1;
+  double total_ms = 2;
+  int32 token_count = 3;
+}
+
+message InferenceResponse {
+  string text = 1;
+  LatencyBreakdown timings = 2;
+}
