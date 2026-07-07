@@ -17,6 +17,13 @@ public object NativeBridge {
     public external fun nativeSessionCancel(sessionId: Long): Int
     public external fun nativeSessionFree(sessionId: Long): Int
 
+    // Foreman agent (additive) — mirrors dni_agent_session_start (abi/dni.h). No max_tokens/temperature
+    // (the turn loop decides its own length); shares the FfiTokenListener callback ABI and the SAME
+    // nativeSessionCancel/nativeSessionFree lifecycle above — no new lifecycle exports. The last normal
+    // fragment before the empty is_final=1 marker is a status fragment identified by a leading 0x01
+    // control byte (see io.dotnetnativeinterop.agent.parseAgentFragment).
+    public external fun nativeAgentSessionStart(query: String, listener: FfiTokenListener): Long
+
     // Pattern 1 — HTTP loopback
     public external fun nativeHttpStart(): Int
     public external fun nativeHttpStop(): Int

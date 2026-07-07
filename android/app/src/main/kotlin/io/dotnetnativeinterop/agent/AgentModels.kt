@@ -1,0 +1,89 @@
+package io.dotnetnativeinterop.agent
+
+import io.dotnetnativeinterop.trace.TraceDrain
+import io.dotnetnativeinterop.trace.TraceSpan
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/**
+ * Mirrors `DotnetNativeInterop.Engine.Ai.Agent.ForemanStopReason` (source-gen'd as its name string via
+ * `UseStringEnumConverter` — see `ForemanModels.cs`) — why a Foreman turn ended. A client MUST distinguish
+ * these honestly: [StepCapReached] / [Error] must never be presented to the user as a clean [Answered].
+ */
+@Serializable
+public enum class AgentStopReason { Answered, StepCapReached, Error }
+
+/** Wire shape of the status fragment's JSON payload (mirrors `AgentSessionStatus` in `ForemanModels.cs`). */
+@Serializable
+internal data class RawAgentSessionStatus(
+    val stopReason: AgentStopReason,
+    val toolSteps: Int,
+    val backend: String,
+)
+
+/**
+ * Parsed, honest turn status. [backend] is the ACTUAL brain that ran the turn (e.g. "scripted routing —
+ * no on-device LLM present"), read from the wire — never hardcoded/assumed by the client.
+ */
+public data class AgentTurnStatus(
+    val stopReason: AgentStopReason,
+    val toolSteps: Int,
+    val backend: String,
+)
+
+/** One item streamed by a Foreman turn: either real answer text, or the terminal status. */
+public sealed interface AgentFragment {
+    public data class Answer(val text: String) : AgentFragment
+    public data class Status(val status: AgentTurnStatus) : AgentFragment
+}
+
+// The status marker's readable tag, kept only for log greppability — mirrors
+// ForemanLanguageModel.StatusMarker / dni_agent_session_start's documented contract in abi/dni.h.
+// DETECTION below happens on the leading 0x01 control byte alone, NEVER on this tag text, because an
+// on-device LLM answer could legitimately stream the literal characters "dni.agent.status" while
+// answering a question about the marker itself.
+// internal (not private): AgentModelsTest builds a synthetic status fragment from these directly, so the
+// test always agrees with production on what the marker actually is instead of hand-rolling a duplicate.
+internal const val STATUS_TAG = "dni.agent.status"
+internal const val CONTROL_BYTE = '\u0001'
+
+/** Total fragment prefix length to skip before the JSON payload: the 0x01 byte + the readable tag. */
+private const val STATUS_PREFIX_LENGTH = 1 + STATUS_TAG.length
+
+private val agentJson = Json { ignoreUnknownKeys = true }
+
+/**
+ * Classifies one raw `dni_token_cb` fragment per `dni_agent_session_start`'s completion contract
+ * (abi/dni.h): the ONE fragment whose first character is the 0x01 control byte is the status fragment;
+ * every other (non-empty) fragment is real streamed answer text. Detect on the control byte, not the tag.
+ */
+public fun parseAgentFragment(text: String): AgentFragment {
+    if (text.isNotEmpty() && text[0] == CONTROL_BYTE) {
+        val payload = text.substring(STATUS_PREFIX_LENGTH.coerceAtMost(text.length))
+        val raw = agentJson.decodeFromString<RawAgentSessionStatus>(payload)
+        return AgentFragment.Status(AgentTurnStatus(raw.stopReason, raw.toolSteps, raw.backend))
+    }
+    return AgentFragment.Answer(text)
+}
+
+/**
+ * Best-effort per-turn span slice for the tool-call strip: the `agent.turn` span (if present) plus the
+ * last [expectedToolSteps] `agent.tool.*` spans in the drain, oldest first — reusing the SAME
+ * `dni_trace_drain` ring the Analysis · Trace waterfall reads (no new export).
+ *
+ * NOT correlated by request id: `ForemanAgent.RunTurnAsync` starts its spans via
+ * `EngineTrace.Source.StartActivity` directly (see ForemanAgent.cs), not `EngineTrace.StartSpan(name,
+ * requestId)`, so agent spans carry no `dni.request_id` tag today. This is reliable only when a single
+ * Foreman turn is in flight at a time, which [io.dotnetnativeinterop.agent.AgentViewModel] enforces
+ * (one active turn job). A future engine change to tag agent spans with a turn id would make this exact
+ * rather than best-effort — flagged, not done here (out of this task's authorized scope).
+ */
+public fun turnSpansFrom(drain: TraceDrain?, expectedToolSteps: Int): List<TraceSpan> {
+    if (drain == null) return emptyList()
+    val toolSpans = drain.spans
+        .filter { it.name.startsWith("agent.tool.") }
+        .sortedBy { it.startUs }
+        .takeLast(expectedToolSteps.coerceAtLeast(0))
+    val turnSpan = drain.spans.filter { it.name == "agent.turn" }.maxByOrNull { it.startUs }
+    return (listOfNotNull(turnSpan) + toolSpans).sortedBy { it.startUs }
+}

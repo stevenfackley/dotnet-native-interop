@@ -28,7 +28,14 @@ public readonly record struct ForemanTurnResult(string Answer, ForemanStopReason
 /// client reads to tell an <see cref="ForemanStopReason.Answered"/> turn apart from a
 /// <see cref="ForemanStopReason.StepCapReached"/> or <see cref="ForemanStopReason.Error"/> one.
 /// </summary>
-public readonly record struct AgentSessionStatus(ForemanStopReason StopReason, int ToolSteps);
+/// <param name="StopReason">Why the turn ended (Answered / StepCapReached / Error).</param>
+/// <param name="ToolSteps">Number of tool calls the turn made before ending.</param>
+/// <param name="Backend">
+/// The honest UI badge for the brain that actually ran the turn (<see cref="IAgentBrain.BackendBadge"/>,
+/// e.g. <c>"scripted routing — no on-device LLM present"</c> or an on-device-LLM badge) — additive: a
+/// new JSON property on an already-parsed payload, not an ABI export signature change.
+/// </param>
+public readonly record struct AgentSessionStatus(ForemanStopReason StopReason, int ToolSteps, string Backend);
 
 /// <summary>A decision produced by an <c>IAgentBrain</c>: either a tool call or a final answer.</summary>
 public readonly record struct AgentDecision(ToolCall? Call, bool IsAnswer)

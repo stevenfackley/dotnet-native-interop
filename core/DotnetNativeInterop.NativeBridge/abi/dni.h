@@ -185,7 +185,13 @@ void    dni_pb_stop(void);
  * status fragment. It is identified STRUCTURALLY by its first byte: a status fragment is exactly the
  * fragment whose text[0] == 0x01 (SOH, an ASCII C0 control byte). That leading 0x01 is immediately
  * followed by the readable tag "dni.agent.status" (kept only for log greppability) and then, with no
- * separator, a JSON object {"stopReason":"Answered"|"StepCapReached"|"Error","toolSteps":<int>}.
+ * separator, a JSON object {"stopReason":"Answered"|"StepCapReached"|"Error","toolSteps":<int>,
+ * "backend":<string>}.
+ *
+ * "backend" is the HONEST UI badge for whichever brain actually ran the turn (e.g. "scripted
+ * routing — no on-device LLM present" when no GGUF is bundled, or an on-device-LLM badge when the
+ * grammar-constrained brain ran) — added additively to this JSON payload; it is not a signature change
+ * to this export.
  *
  * DETECT ON THE 0x01 BYTE, NOT ON THE READABLE TAG. No real UTF-8 answer prose from either brain ever
  * contains a C0 control byte, so text[0]==0x01 is a collision-proof discriminator; matching the tag
@@ -194,7 +200,8 @@ void    dni_pb_stop(void);
  * text[0] != 0x01 as answer text; on the one fragment whose text[0] == 0x01, skip the leading 0x01
  * byte plus the fixed "dni.agent.status" tag and JSON-parse the remainder. A client MUST check
  * stopReason before presenting a turn as a clean answer — StepCapReached/Error must not be shown to
- * the user as if they were Answered. */
+ * the user as if they were Answered, and the backend badge must always reflect this field, never an
+ * assumed/hardcoded value. */
 int64_t dni_agent_session_start(const char* query,
                                  dni_token_cb callback,
                                  void* user_data);

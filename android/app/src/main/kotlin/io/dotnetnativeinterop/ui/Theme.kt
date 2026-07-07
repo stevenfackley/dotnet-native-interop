@@ -35,6 +35,10 @@ public object Instrument {
     public val transportBinary: Color = Color(0xFFA78BFA)  // violet — the framed-protobuf (4th) transport
     public val transportHttp: Color = Color(0xFFFBBF24)
     public val transportSqlite: Color = Color(0xFFFB7185)
+
+    /** Foreman agent.turn / agent.tool.* spans in the trace waterfall — NEW token (2026-07-06), distinct
+     *  from the four transport colors above. iOS must mirror this exact hex in Instrument.swift. */
+    public val agent: Color = Color(0xFFF472B6)
 }
 
 public object Spacing {
