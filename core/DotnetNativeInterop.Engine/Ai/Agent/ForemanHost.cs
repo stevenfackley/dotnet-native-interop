@@ -24,6 +24,10 @@ public static class ForemanHost
 
     private static readonly object Gate = new();
     private static ForemanAgent? _agent;
+    // Process-wide "one Foreman chat": every dni_agent_session_start call shares this instance (via
+    // Agent below), so a client continues a conversation just by calling that export again — zero ABI
+    // change. See ResetConversation for how a client starts a fresh one.
+    private static ConversationSession? _conversation;
 
     /// <summary>The shared, fully-wired agent. Built lazily on first use.</summary>
     public static ForemanAgent Agent
@@ -42,10 +46,25 @@ public static class ForemanHost
         }
     }
 
+    /// <summary>
+    /// Starts a fresh Foreman conversation: clears the process-wide history so the NEXT
+    /// <c>dni_agent_session_start</c> turn has no prior-turn context (today's pre-memory, single-shot
+    /// behavior). Zero-ABI — reachable via the existing command-grammar seam (<c>agent~reset</c>, served
+    /// by <c>dni_feature_run</c> exactly like <c>trust~posture</c>/<c>trace~stats</c>/<c>metrics~snapshot</c>;
+    /// see <c>ShowcaseCommand.RunAgent</c>) or directly, by any caller that already holds a reference to
+    /// this host. Idempotent: resetting an already-empty conversation is a no-op.
+    /// </summary>
+    public static void ResetConversation()
+    {
+        _ = Agent; // force Build() once so _conversation is assigned even on a cold host
+        _conversation?.Reset();
+    }
+
     private static ForemanAgent Build()
     {
         var tools = ForemanTools.Build(SearchManualsAsync, RunFeatureAsync, EngineTelemetry.SnapshotJson);
-        return new ForemanAgent(tools, BuildBrain(tools));
+        _conversation = new ConversationSession();
+        return new ForemanAgent(tools, BuildBrain(tools), _conversation);
     }
 
     // ---- tool bindings (the real engine ops) ----
@@ -219,6 +238,8 @@ public static class ForemanHost
             sb.Append("- ").Append(t.Name).Append(": ").AppendLine(t.Description);
         }
 
+        AppendHistory(sb, ctx);
+
         if (ctx.Steps.Count > 0)
         {
             sb.AppendLine("Steps so far:");
@@ -244,6 +265,7 @@ public static class ForemanHost
     {
         var sb = new StringBuilder();
         sb.AppendLine("Using only the tool results below, answer the question concisely.");
+        AppendHistory(sb, ctx);
         foreach (var step in ctx.Steps)
         {
             if (step.Kind == AgentStep.KindToolResult)
@@ -254,5 +276,24 @@ public static class ForemanHost
 
         sb.Append("Question: ").AppendLine(ctx.Query);
         return sb.ToString();
+    }
+
+    // Real, prompt-level memory for the grammar (LLM) brain: prior turns are read verbatim by the model,
+    // unlike the router brain's mechanical embedding-only "memory" (see RouterBrain.DecideAsync). Emits
+    // nothing for a fresh/single-shot turn (ctx.History empty) so today's prompts are byte-identical
+    // when no conversation memory is wired.
+    private static void AppendHistory(StringBuilder sb, AgentContext ctx)
+    {
+        if (ctx.History.Count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine("Conversation so far (oldest first):");
+        foreach (var turn in ctx.History)
+        {
+            sb.Append("User: ").AppendLine(turn.Query);
+            sb.Append("Foreman: ").AppendLine(turn.Answer);
+        }
     }
 }

@@ -173,7 +173,11 @@ void    dni_pb_stop(void);
  *                        agentTurns, agentToolCalls[] (tool, count), operationDurations[]
  *                        (op, count, sumUs, minUs, maxUs) }. Process-lifetime cumulative,
  *                        never reset by a read (like trace~stats, not dni_trace_drain) —
- *                        no percentiles, only count/sum/min/max.                       */
+ *                        no percentiles, only count/sum/min/max.
+ *   "agent~reset"      -> clears the process-wide Foreman conversation history (see
+ *                        dni_agent_session_start below); the NEXT agent turn starts fresh with no
+ *                        prior-turn context. Returns {"reset":true}. Idempotent (resetting an
+ *                        already-empty conversation is a no-op).                       */
 
 /* ---- Foreman agent (additive) ------------------------------------------- */
 /* One new export; the frozen production surface and the Wave B additions above are unchanged.
@@ -198,6 +202,17 @@ void    dni_pb_stop(void);
  * routing — no on-device LLM present" when no GGUF is bundled, or an on-device-LLM badge when the
  * grammar-constrained brain ran) — added additively to this JSON payload; it is not a signature change
  * to this export.
+ *
+ * Conversation continuity (additive, zero ABI change): every call to this export appends to and reads
+ * from ONE process-wide Foreman conversation — there is exactly one "the app's Foreman chat" per
+ * process. A client does nothing special to continue one: it just calls this export again with the
+ * next question, and that turn's brain sees the last few prior turns as context (bounded — see
+ * DotnetNativeInterop.Engine.Ai.Agent.ConversationSession: a handful of turns, each length-clamped). To
+ * start a FRESH conversation, call dni_feature_run("agent~reset") first (see the command-grammar block
+ * above) — it clears the history so the next turn here has none. How much a turn's brain actually USES
+ * that history differs honestly by brain: the on-device-LLM (grammar) brain reads prior turns verbatim
+ * in its prompt; the no-LLM router brain has no language understanding of pronouns and can only fold
+ * the single most recent turn into its tool-routing embedding text.
  *
  * DETECT ON THE 0x01 BYTE, NOT ON THE READABLE TAG. No real UTF-8 answer prose from either brain ever
  * contains a C0 control byte, so text[0]==0x01 is a collision-proof discriminator; matching the tag

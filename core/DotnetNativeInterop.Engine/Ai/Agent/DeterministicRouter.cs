@@ -21,9 +21,19 @@ public sealed class DeterministicRouter
         for (int i = 0; i < tools.Count; i++) _tools[i] = (tools[i], embed(tools[i].Description));
     }
 
-    public ToolCall? Route(string query)
+    /// <param name="query">The current turn's raw question.</param>
+    /// <param name="contextHint">
+    /// Optional prior-conversation text (see <see cref="RouterBrain.DecideAsync"/>) folded into the SAME
+    /// text used both to embed the routing decision and, if a string-arg tool is picked, as its arg.
+    /// This is NOT semantic pronoun resolution — the router has no language model and does not know
+    /// "that" refers to anything — it is the one honest, mechanical thing a cosine-similarity router can
+    /// do with history: give the embedding more real words to work with. Null/empty (the default)
+    /// reproduces the exact pre-memory behavior (routes on <paramref name="query"/> alone).
+    /// </param>
+    public ToolCall? Route(string query, string? contextHint = null)
     {
-        var q = _embed(query);
+        var routedText = string.IsNullOrEmpty(contextHint) ? query : $"{contextHint}\n{query}";
+        var q = _embed(routedText);
         float best = float.NegativeInfinity; ToolDefinition? pick = null;
         foreach (var (tool, vec) in _tools)
         {
@@ -31,9 +41,10 @@ public sealed class DeterministicRouter
             if (sim > best) { best = sim; pick = tool; }
         }
         if (pick is null || best < _threshold) return null;
-        // string-arg tools get the query; no-arg tools get {}
+        // string-arg tools get the routed text (query, or query+context when a hint was folded in);
+        // no-arg tools get {}
         var args = pick.Params.Count > 0
-            ? $"{{\"{pick.Params[0].Name}\":{JsonStringLiteral(query)}}}"
+            ? $"{{\"{pick.Params[0].Name}\":{JsonStringLiteral(routedText)}}}"
             : "{}";
         return new ToolCall(pick.Name, args);
     }

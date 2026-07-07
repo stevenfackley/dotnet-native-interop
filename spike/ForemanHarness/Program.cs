@@ -275,14 +275,149 @@ Check("ForemanHost turn produced a grounded answer", hostOut.Length > 0 && hostO
 Check("ForemanHost emitted agent.turn span", hostSpans.Contains("agent.turn"));
 Check("ForemanHost emitted agent.tool.search_manuals span", hostSpans.Contains("agent.tool.search_manuals"));
 
+// ForemanHost.Agent now carries process-wide conversation memory (see Task 16+ below) — the prior
+// compressor/manuals turn would otherwise get folded into THIS query's routing text and drag it off
+// topic (proven deliberately in Task 18). This query is meant to stand alone, so reset first, exactly
+// as a real client would if it fired two genuinely unrelated one-off questions back to back.
+LanguageFeatureCatalog.Run("agent~reset");
 var hostOut2 = new System.Text.StringBuilder();
 var hostRes2 = await hostAgent.RunTurnAsync(
     "run the ping feature demo and show me its live result", s => hostOut2.Append(s), default);
 Check("ForemanHost run_feature turn answered", hostRes2.StopReason == ForemanStopReason.Answered);
 Check("ForemanHost emitted agent.tool.run_feature span", hostSpans.Contains("agent.tool.run_feature"));
 
+// ============================================================================================
+// Conversation memory (multi-turn follow-on): ConversationSession bounds, ForemanAgent plumbing,
+// history-aware routing, and the agent~reset command-grammar seam.
+// ============================================================================================
+
+// Task 16: ConversationSession bounds — growth, FIFO eviction at MaxTurns, per-turn char clamping, Reset.
+{
+    var convo = new ConversationSession();
+    Check("fresh session has no history", convo.Snapshot().Count == 0);
+
+    convo.Append("q1", "a1");
+    convo.Append("q2", "a2");
+    var snap = convo.Snapshot();
+    Check("history grows with each completed turn", snap.Count == 2);
+    Check("history is oldest-first", snap[0].Query == "q1" && snap[1].Query == "q2");
+
+    var evictConvo = new ConversationSession();
+    var totalAppends = ConversationSession.MaxTurns + 3;
+    for (var i = 0; i < totalAppends; i++) evictConvo.Append($"q{i}", $"a{i}");
+    var evictSnap = evictConvo.Snapshot();
+    Check($"history caps at MaxTurns ({ConversationSession.MaxTurns})", evictSnap.Count == ConversationSession.MaxTurns);
+    Check("FIFO: oldest evicted first, newest retained",
+        evictSnap[0].Query == $"q{totalAppends - ConversationSession.MaxTurns}"
+        && evictSnap[^1].Query == $"q{totalAppends - 1}");
+
+    var clampConvo = new ConversationSession();
+    var longQuery = new string('x', ConversationSession.MaxQueryChars + 50);
+    var longAnswer = new string('y', ConversationSession.MaxAnswerChars + 50);
+    clampConvo.Append(longQuery, longAnswer);
+    var clamped = clampConvo.Snapshot()[0];
+    Check("over-long query is clamped", clamped.Query.Length < longQuery.Length && clamped.Query.Contains("truncated"));
+    Check("over-long answer is clamped", clamped.Answer.Length < longAnswer.Length && clamped.Answer.Contains("truncated"));
+
+    clampConvo.Reset();
+    Check("Reset clears history", clampConvo.Snapshot().Count == 0);
+}
+
+// Task 17: ForemanAgent threads ConversationSession into AgentContext.History across turns — a
+// recording brain observes exactly what ForemanAgent hands it, so this proves real plumbing, not a
+// tautology: each turn streams a DIFFERENT, test-controlled answer, and we assert the NEXT turn's
+// ctx.History carries THAT exact prior query/answer, then that Reset makes it disappear again.
+{
+    var seenContexts = new List<AgentContext>();
+    var recordingBrain = new RecordingBrain(seenContexts);
+    var memConvo = new ConversationSession();
+    var memAgent = new ForemanAgent(Array.Empty<ToolDefinition>(), recordingBrain, memConvo);
+
+    var t1 = new System.Text.StringBuilder();
+    await memAgent.RunTurnAsync("search the manuals for fault E3", s => t1.Append(s), default);
+    Check("turn 1 starts with empty history (fresh conversation)", seenContexts[0].History.Count == 0);
+    Check("turn 1 streamed its own distinct answer", t1.ToString() == "turn-1-answer");
+
+    var t2 = new System.Text.StringBuilder();
+    await memAgent.RunTurnAsync("how do I clear THAT?", s => t2.Append(s), default);
+    Check("turn 2 sees exactly turn 1 in history", seenContexts[1].History.Count == 1);
+    Check("turn 2's history carries turn 1's EXACT query",
+        seenContexts[1].History[0].Query == "search the manuals for fault E3");
+    Check("turn 2's history carries turn 1's EXACT streamed answer",
+        seenContexts[1].History[0].Answer == "turn-1-answer");
+
+    memConvo.Reset();
+    var t3 = new System.Text.StringBuilder();
+    await memAgent.RunTurnAsync("how do I clear THAT?", s => t3.Append(s), default);
+    Check("after Reset, the next turn has empty history again", seenContexts[2].History.Count == 0);
+}
+
+// Task 18: DeterministicRouter's history-aware routing with the REAL MiniLM encoder (same tools/
+// threshold ForemanHost ships — calibrationTools/ForemanHost.RouterThreshold from Task 14 above).
+// "how do I clear THAT?" alone shares no real words with any tool description, so it must NOT route on
+// its own; only WITH the prior turn folded in must it clear the shipped threshold for search_manuals.
+// This proves the "router memory" claim actually moves a real routing decision, not just that history
+// is present in ctx.
+{
+    var bareFollowUp = "how do I clear THAT?";
+    var withoutHistory = calibrationRouter.Route(bareFollowUp);
+    var (bestToolBare, bestSimBare) = BestTool(bareFollowUp);
+    Console.WriteLine($"[history] bare follow-up: best={bestToolBare} sim={bestSimBare:0.###} route={withoutHistory?.Tool ?? "(none)"}");
+    Check("bare ambiguous follow-up does not route on its own (no keyword overlap)", withoutHistory is null);
+
+    var priorTurnHint = "search the manuals for fault E3 " +
+        "the manual says reset the panel breaker and re-energize the compressor contactor";
+    var withHistory = calibrationRouter.Route(bareFollowUp, priorTurnHint);
+    var (bestToolHint, bestSimHint) = BestTool($"{priorTurnHint}\n{bareFollowUp}");
+    Console.WriteLine($"[history] with prior-turn hint: best={bestToolHint} sim={bestSimHint:0.###} route={withHistory?.Tool ?? "(none)"}");
+    Check("folding the prior turn into routing text sends the SAME follow-up to search_manuals",
+        withHistory?.Tool == "search_manuals");
+}
+
+// Task 19: full ForemanHost + agent~reset end-to-end — the REAL router brain (no GGUF on this box), the
+// REAL ConversationSession wired via ForemanHost.Build, and the REAL command-grammar reset path
+// (LanguageFeatureCatalog.Run("agent~reset"), the exact call dni_feature_run makes — see
+// ShowcaseCommand.RunAgent). ToolSteps is the honest observable: a routed follow-up spends exactly 1
+// tool step, an unrouted one goes straight to Answered with 0.
+{
+    LanguageFeatureCatalog.Run("agent~reset"); // clean slate regardless of what Task 15 above ran on hostAgent
+    var ambiguousFollowUp = "how do I clear THAT?";
+
+    var freshRes = await hostAgent.RunTurnAsync(ambiguousFollowUp, _ => { }, default);
+    Check("fresh conversation: ambiguous follow-up with no history does not route to a tool",
+        freshRes.ToolSteps == 0);
+
+    await hostAgent.RunTurnAsync(
+        "the compressor is overheating and keeps tripping the rooftop unit, what should I check?",
+        _ => { }, default);
+
+    var followUpRes = await hostAgent.RunTurnAsync(ambiguousFollowUp, _ => { }, default);
+    Check("same ambiguous follow-up, now WITH real prior-turn context, routes to search_manuals",
+        followUpRes.ToolSteps == 1);
+
+    var resetRun = LanguageFeatureCatalog.Run("agent~reset");
+    Check("agent~reset command reports ok", resetRun is { Ok: true } && resetRun.Result.Contains("reset"));
+
+    var afterResetRes = await hostAgent.RunTurnAsync(ambiguousFollowUp, _ => { }, default);
+    Check("after agent~reset, the same follow-up again has no history and does not route",
+        afterResetRes.ToolSteps == 0);
+}
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
+
+// Records the AgentContext ForemanAgent hands DecideAsync each turn (so a test can inspect ctx.History)
+// and streams a distinct, turn-numbered answer each time (so history content-equality checks are
+// non-tautological — see Task 17).
+sealed class RecordingBrain(List<AgentContext> seen) : IAgentBrain
+{
+    private int _n;
+    public Task<AgentDecision> DecideAsync(AgentContext ctx, CancellationToken ct)
+    { seen.Add(ctx); return Task.FromResult(AgentDecision.Answer); }
+    public Task StreamAnswerAsync(AgentContext ctx, Action<string> sink, CancellationToken ct)
+    { sink($"turn-{++_n}-answer"); return Task.CompletedTask; }
+    public string BackendBadge => "recording (test)";
+}
 
 sealed class ScriptedBrain(Func<AgentContext, AgentDecision> decide) : IAgentBrain
 {
