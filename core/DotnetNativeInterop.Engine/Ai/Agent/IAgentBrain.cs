@@ -1,10 +1,20 @@
 namespace DotnetNativeInterop.Engine.Ai.Agent;
 
 /// <summary>Running state of a turn passed to the brain each step.</summary>
-public sealed class AgentContext(string query, List<AgentStep> steps)
+public sealed class AgentContext(string query, List<AgentStep> steps, IReadOnlyList<ConversationTurn>? history = null)
 {
     public string Query { get; } = query;
     public List<AgentStep> Steps { get; } = steps;
+
+    /// <summary>
+    /// Completed turns from earlier in this conversation, oldest-to-newest — empty for a fresh
+    /// conversation or a single-shot turn (the default when no history is supplied, so every existing
+    /// <c>new AgentContext(query, steps)</c> call site is unaffected). Populated from
+    /// <see cref="ConversationSession.Snapshot"/> by <see cref="ForemanAgent.RunTurnAsync"/>. A brain MAY
+    /// use it — see <see cref="RouterBrain"/> and <see cref="ForemanHost"/>'s prompt builders for how
+    /// each brain honestly does (or, for the router, can only partly do) so.
+    /// </summary>
+    public IReadOnlyList<ConversationTurn> History { get; } = history ?? Array.Empty<ConversationTurn>();
 }
 
 /// <summary>

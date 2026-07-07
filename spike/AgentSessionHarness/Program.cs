@@ -167,6 +167,51 @@ async Task<List<(int Index, string Text, bool IsFinal)>> DrainAsync(InferenceSes
     Check("dni_session_free-equivalent removes a cancelled session", removed);
 }
 
+// ============================================================================================
+// Task 5: conversation continuity + agent~reset over the REAL dni_agent_session_start-equivalent path.
+// ForemanHost.Agent is process-wide (REAL router brain — no GGUF on this box), started via
+// InferenceOrchestrator(ForemanLanguageModel(...))/InferenceSession/SessionRegistry exactly like
+// dni_agent_session_start does, called independently multiple times, with the SECOND call's correct
+// tool-routing depending on the FIRST call's content — proving two separate session-starts share one
+// conversation with zero new ABI. A THIRD call after dni_feature_run("agent~reset") proves reset
+// actually breaks that continuity, not just that ConversationSession.Reset() works in isolation.
+// ============================================================================================
+async Task<(ForemanStopReason StopReason, int ToolSteps)> RunHostTurnAsync(string query)
+{
+    var orchestrator = new InferenceOrchestrator(new ForemanLanguageModel(ForemanHost.Agent));
+    var session = InferenceSession.Start(orchestrator, new InferenceRequest(query));
+    var id = SessionRegistry.Add(session);
+    var tokens = await DrainAsync(session);
+    var status = ReadStatus(tokens);
+    await SessionRegistry.RemoveAsync(id);
+    return status;
+}
+
+{
+    // Clean slate: Task 1 above already ran a turn against this SAME ForemanHost.Agent, and this suite
+    // is specifically about proving conversation continuity/reset, not incidentally inheriting it.
+    LanguageFeatureCatalog.Run("agent~reset");
+
+    var ambiguousFollowUp = "how do I clear THAT?";
+    var isolatedFirst = await RunHostTurnAsync(ambiguousFollowUp);
+    Check("FFI path: ambiguous follow-up with no prior turn does not route to a tool",
+        isolatedFirst.ToolSteps == 0);
+
+    await RunHostTurnAsync(
+        "the compressor is overheating and keeps tripping the rooftop unit, what should I check?");
+
+    var primedFollowUp = await RunHostTurnAsync(ambiguousFollowUp);
+    Check("FFI path: two independent dni_agent_session_start-equivalent calls share ONE conversation " +
+        "(the second sees the first as context and now routes)", primedFollowUp.ToolSteps == 1);
+
+    var resetRun = LanguageFeatureCatalog.Run("agent~reset"); // the exact dni_feature_run("agent~reset") call
+    Check("FFI path: agent~reset (dni_feature_run) reports ok", resetRun is { Ok: true });
+
+    var afterReset = await RunHostTurnAsync(ambiguousFollowUp);
+    Check("FFI path: after agent~reset, the same follow-up again has no prior context and does not route",
+        afterReset.ToolSteps == 0);
+}
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 

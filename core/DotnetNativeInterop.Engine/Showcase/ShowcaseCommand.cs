@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using DotnetNativeInterop.Engine.Ai.Agent;
 
 namespace DotnetNativeInterop.Engine;
 
@@ -40,6 +41,7 @@ public static class ShowcaseCommand
                 "trust" => RunTrust(parts),
                 "trace" => RunTrace(parts),
                 "metrics" => RunMetrics(parts),
+                "agent" => RunAgent(parts),
                 _ => $"Unknown showcase command: {name}",
             };
 
@@ -124,6 +126,21 @@ public static class ShowcaseCommand
         return sub == "snapshot"
             ? EngineMetrics.SnapshotJson()
             : $"Unknown showcase command: metrics (sub={sub})";
+    }
+
+    // agent~reset -> clears the process-wide Foreman conversation (ForemanHost.ResetConversation); the
+    // NEXT dni_agent_session_start turn starts fresh with no prior-turn context. Zero-ABI, same
+    // bare-subcommand shape as trust~/trace~/metrics~ above.
+    private static string RunAgent(string[] parts)
+    {
+        var sub = parts.Length > 1 ? parts[1] : string.Empty;
+        if (sub != "reset")
+        {
+            return $"Unknown showcase command: agent (sub={sub})";
+        }
+
+        ForemanHost.ResetConversation();
+        return "{\"reset\":true}";
     }
 
     private static Dictionary<string, string> ParseParams(string[] parts)
