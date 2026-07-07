@@ -18,7 +18,10 @@ public data class AiSearchUiState(
     val error: String? = null,
 )
 
-public class AiSearchViewModel(
+// @JvmOverloads emits a genuinely reflectable no-arg constructor; without it a defaults-only Kotlin
+// constructor is NOT no-arg-reflectable, so Compose's zero-arg viewModel() factory (AiScreen.kt) throws
+// on first navigation to the AI screen. Same fix AgentViewModel carries.
+public class AiSearchViewModel @JvmOverloads constructor(
     private val service: SearchService = SearchService(),
 ) : ViewModel() {
 

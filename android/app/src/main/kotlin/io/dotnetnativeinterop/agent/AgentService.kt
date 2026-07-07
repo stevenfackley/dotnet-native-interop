@@ -29,7 +29,17 @@ public class FfiAgentService : AgentService {
         val listener = object : FfiTokenListener {
             override fun onToken(index: Int, text: String, isFinal: Boolean) {
                 if (text.isNotEmpty()) {
-                    val result = channel.trySend(parseAgentFragment(text))
+                    // parseAgentFragment throws only while JSON-decoding a status fragment (a malformed
+                    // terminal marker). Contain it: a throw inside this JNI callback is swallowed by the
+                    // shim's ExceptionCheck, so the status would never be applied and the turn would stick
+                    // at Streaming forever (a silent-broken spinner, against the repo's DNA). Instead
+                    // surface an honest Error status so a bad terminal fragment shows as an errored turn.
+                    val fragment = runCatching { parseAgentFragment(text) }.getOrElse {
+                        AgentFragment.Status(
+                            AgentTurnStatus(AgentStopReason.Error, 0, "unknown (status fragment unparseable)"),
+                        )
+                    }
+                    val result = channel.trySend(fragment)
                     if (result.isFailure && !isFinal) {
                         channel.close(IllegalStateException("Agent fragment buffer overflow"))
                     }

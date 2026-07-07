@@ -115,6 +115,20 @@ public class AgentViewModelTest {
     }
 
     @Test
+    public fun turnEndingWithNoStatusFragmentIsMarkedErrorNotLeftStreaming(): Unit = runTest {
+        // Stream completes normally but no terminal status fragment ever arrives (the stuck-spinner root):
+        // the turn must land as Error, never stay Streaming forever.
+        val vm = vmUnder(scriptedService(listOf(AgentFragment.Answer("partial answer, then the stream just ended"))))
+        vm.setQuery("q")
+        vm.ask()
+
+        val turn = vm.state.value.turns.single()
+        assertEquals(TurnOutcome.Error, turn.outcome)
+        assertTrue(turn.outcome != TurnOutcome.Streaming)
+        assertTrue(!vm.state.value.running)
+    }
+
+    @Test
     public fun toolStripIsPopulatedFromTheTraceDrainAfterStatusArrives(): Unit = runTest {
         val drain = TraceDrain(
             nowUs = 10.0,

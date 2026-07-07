@@ -59,13 +59,15 @@ import io.dotnetnativeinterop.ui.tabs.SearchScreen
  * a removal: every prior screen is still reachable, just relocated.
  *
  * Foreman (2026-07-06) adds a 6th, top-level section for the on-device tool-calling agent — per the
- * Foreman design doc it gets its own nav entry (not folded into Search), first in the rail as the
- * app's new flagship demo and the default landing tab. iOS must mirror this exact order when it adds
- * the same section (tracked with the broader iOS Plan D parity debt).
+ * Foreman design doc it gets its own nav entry (not folded into Search). It sits AFTER Boundary, which
+ * stays the rail's first item and the default landing tab (the interop-boundary showcase is the repo's
+ * thesis centerpiece — changing the default is a product call, not part of building the Foreman UI).
+ * iOS must mirror this exact order when it adds the same section (tracked with the broader iOS Plan D
+ * parity debt).
  */
 internal enum class Tab(val title: String, val icon: ImageVector) {
-    Foreman("Foreman", Icons.Outlined.Engineering),
     Boundary("Boundary", Icons.Outlined.SwapHoriz),
+    Foreman("Foreman", Icons.Outlined.Engineering),
     Catalog("Catalog", Icons.Outlined.Verified),
     Lab("Lab", Icons.Outlined.Memory),
     Search("Search", Icons.Outlined.Search),
@@ -78,7 +80,7 @@ internal fun AppShell(
     inference: io.dotnetnativeinterop.ui.InferenceViewModel,
     modifier: Modifier = Modifier,
 ) {
-    var tab by remember { mutableStateOf(Tab.Foreman) }
+    var tab by remember { mutableStateOf(Tab.Boundary) }
     var detailId by remember { mutableStateOf<String?>(null) }
     var showAbout by remember { mutableStateOf(false) }
 

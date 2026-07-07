@@ -60,6 +60,20 @@ public class AgentModelsTest {
     }
 
     @Test
+    public fun malformedStatusFragmentThrows() {
+        // A 0x01-prefixed fragment with a garbage JSON payload throws — this is the exact failure the
+        // FfiAgentService.onToken guard contains (a throw there would be swallowed by the JNI shim and
+        // leave the turn stuck at Streaming). Pinning the throw documents why that guard exists.
+        var threw = false
+        try {
+            parseAgentFragment("$CONTROL_BYTE$STATUS_TAG{not valid json")
+        } catch (_: Exception) {
+            threw = true
+        }
+        assertTrue(threw)
+    }
+
+    @Test
     public fun theThreeStopReasonsAreMutuallyDistinguishable() {
         val answered = (parseAgentFragment(statusFragment("Answered", 1, "x")) as AgentFragment.Status).status.stopReason
         val capped = (parseAgentFragment(statusFragment("StepCapReached", 5, "x")) as AgentFragment.Status).status.stopReason

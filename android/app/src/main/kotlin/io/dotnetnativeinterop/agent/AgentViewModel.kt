@@ -83,6 +83,11 @@ public class AgentViewModel @JvmOverloads constructor(
                 updateLastTurn { it.copy(outcome = TurnOutcome.Error) }
                 _state.update { it.copy(error = "Foreman turn failed: ${e.message}") }
             }
+            // Belt-and-braces for the stuck-spinner root: if the stream completed without ever delivering
+            // a terminal status fragment, the last turn is still Streaming — mark it Error rather than
+            // leave a perpetual spinner. No-op when a status already resolved the turn, or onFailure above
+            // already marked it Error.
+            updateLastTurn { if (it.outcome == TurnOutcome.Streaming) it.copy(outcome = TurnOutcome.Error) else it }
             _state.update { it.copy(running = false) }
         }
     }
