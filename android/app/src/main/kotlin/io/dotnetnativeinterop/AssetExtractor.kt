@@ -19,6 +19,15 @@ internal object AssetExtractor {
         return out
     }
 
+    /**
+     * The extracted-assets dir path, without touching the filesystem or copying anything. This is
+     * the SAME dir [ensure] returns and the same one [io.dotnetnativeinterop.DotnetNativeInteropApp]
+     * hands to `nativeSetAssetsDir` — the engine's GGUF probe (`EngineHost.BuildRagModel`) looks for
+     * the model file here, so [io.dotnetnativeinterop.ai.GgufDownloader] must land it in this exact
+     * directory.
+     */
+    internal fun dir(context: Context): File = File(context.filesDir, DIR)
+
     private fun copyIfMissing(context: Context, assetPath: String, dest: File) {
         if (dest.exists() && dest.length() > 0L) return
         context.assets.open(assetPath).use { input -> dest.outputStream().use { input.copyTo(it) } }
