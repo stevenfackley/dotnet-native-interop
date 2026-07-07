@@ -14,6 +14,13 @@ public static class EngineHost
     private static InferenceOrchestrator? _orchestrator;
     private static InferenceOrchestrator? _ragOrchestrator;
 
+    // Retained handle on the RAG model when it's the llama.cpp backend (which owns a ~0.77 GB native
+    // model handle). InferenceOrchestrator doesn't expose its inner model, so we keep this reference
+    // ourselves purely so Reset() can dispose it. Null when the RAG model is the managed
+    // ExtractiveLanguageModel (nothing to free). Concrete type (not IDisposable) to satisfy CA1859,
+    // which is warning-as-error here; LlamaLanguageModel is IDisposable so Dispose() still frees it.
+    private static LlamaLanguageModel? _ragModelDisposable;
+
     /// <summary>The shared orchestrator. Throws if <see cref="Initialize"/> has not run.</summary>
     public static InferenceOrchestrator Orchestrator =>
         _orchestrator ?? throw new InvalidOperationException("EngineHost.Initialize() has not been called.");
@@ -52,18 +59,18 @@ public static class EngineHost
     /// the cache would keep serving extraction forever even though a real model is now present.
     /// Called from <see cref="Ffi.Lifecycle.Shutdown"/> so the existing dni_shutdown -&gt;
     /// dni_initialize sequence (no new export, no ABI change) is enough for a caller to pick up a
-    /// freshly-downloaded model. Does not dispose the outgoing model — acceptable today because the
-    /// only caller (Android, post-download) transitions extractive -&gt; llama exactly once, and
-    /// <see cref="ExtractiveLanguageModel"/> holds no unmanaged resources to leak. A future caller
-    /// that resets while already on <see cref="LlamaLanguageModel"/> would leak that model's
-    /// native handle — <see cref="LlamaLanguageModel"/> is <see cref="IDisposable"/> but
-    /// <see cref="InferenceOrchestrator"/> does not expose its inner model, so disposing it here
-    /// would need a small additional seam; flagged rather than silently patched over.
+    /// freshly-downloaded model. Disposes the outgoing RAG model first (freeing the llama.cpp native
+    /// handle when that was the backend — see <see cref="_ragModelDisposable"/>); ordering is safe
+    /// because <see cref="Ffi.Lifecycle.Shutdown"/> drains the live FFI sessions before calling here,
+    /// so no in-flight generation is still holding the handle. A reusable lifecycle seam (iOS parity
+    /// drives the same path), so the disposal is not merely for today's one-shot Android flow.
     /// </summary>
-    public static void Reset()
+    internal static void Reset()
     {
         lock (Gate)
         {
+            _ragModelDisposable?.Dispose();
+            _ragModelDisposable = null;
             _orchestrator = null;
             _ragOrchestrator = null;
         }
@@ -79,7 +86,12 @@ public static class EngineHost
             var gguf = Path.Combine(SemanticSearch.ResolveAssetsDir(), "Llama-3.2-1B-Instruct-Q4_K_M.gguf");
             if (File.Exists(gguf))
             {
-                return new RagLanguageModel(new LlamaLanguageModel(gguf), SemanticSearch.Default);
+                // Retain the llama model so Reset() can dispose its native handle (LlamaLanguageModel
+                // .Dispose() calls dni_llama_free). RagLanguageModel only wraps it for retrieval +
+                // prompting and does not own its lifetime.
+                var llama = new LlamaLanguageModel(gguf);
+                _ragModelDisposable = llama;
+                return new RagLanguageModel(llama, SemanticSearch.Default);
             }
         }
         catch (Exception)
