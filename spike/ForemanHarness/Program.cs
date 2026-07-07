@@ -403,6 +403,44 @@ Check("ForemanHost emitted agent.tool.run_feature span", hostSpans.Contains("age
         afterResetRes.ToolSteps == 0);
 }
 
+// Task 20: the agent's run_feature tool is SCOPED to catalog demos — it must NOT be a back door into the
+// command grammar (gclab storms, agent~reset, trust~/trace~/metrics~). Invokes the REAL, fully-wired
+// run_feature tool ForemanHost ships (ForemanHost.Tools, guard and all — not a replicated double) with a
+// command-grammar id, and proves BOTH halves: it returns the honest error, AND the operational command
+// never actually ran. agent~reset is the sharpest probe — if the guard were absent the tool call would
+// clear the process-wide conversation as a side effect; we prime real history, fire the guarded tool,
+// and confirm the history SURVIVES (a follow-up still routes), so the reset genuinely did not execute.
+{
+    var runFeatureTool = ForemanHost.Tools.First(t => t.Name == "run_feature");
+
+    // Guard returns the honest error, not a FeatureRun, for a command-grammar id.
+    var guardedReset = await runFeatureTool.Invoke("{\"id\":\"agent~reset\"}", default);
+    Check("run_feature tool rejects agent~reset with an honest error",
+        guardedReset.Contains("error") && guardedReset.Contains("catalog demos"));
+    var guardedStorm = await runFeatureTool.Invoke("{\"id\":\"gclab~preset_loh\"}", default);
+    Check("run_feature tool rejects gclab~ (GC storm) with the same error", guardedStorm.Contains("catalog demos"));
+
+    // Side-effect proof: prime real history, fire the guarded agent~reset through the tool, and confirm
+    // the reset did NOT run — history survives, so a follow-up still routes.
+    LanguageFeatureCatalog.Run("agent~reset"); // known-empty starting point
+    await hostAgent.RunTurnAsync(
+        "the compressor is overheating and keeps tripping the rooftop unit, what should I check?",
+        _ => { }, default);
+    var guardedResetAgain = await runFeatureTool.Invoke("{\"id\":\"agent~reset\"}", default);
+    Check("run_feature{agent~reset} via the tool still returns the error even with live history",
+        guardedResetAgain.Contains("catalog demos"));
+    var afterGuardedReset = await hostAgent.RunTurnAsync("how do I clear THAT?", _ => { }, default);
+    Check("the guarded run_feature{agent~reset} did NOT clear history (follow-up still routes)",
+        afterGuardedReset.ToolSteps == 1);
+
+    // A genuine catalog demo id still runs normally through the very same guarded tool.
+    var realDemo = await runFeatureTool.Invoke("{\"id\":\"ping\"}", default);
+    Check("run_feature tool still runs a real catalog demo (ping -> pong)",
+        realDemo.Contains("pong") && realDemo.Contains("\"ok\":true"));
+
+    LanguageFeatureCatalog.Run("agent~reset"); // leave the process-wide conversation clean for anything after
+}
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 

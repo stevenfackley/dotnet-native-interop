@@ -28,6 +28,10 @@ public static class ForemanHost
     // Agent below), so a client continues a conversation just by calling that export again — zero ABI
     // change. See ResetConversation for how a client starts a fresh one.
     private static ConversationSession? _conversation;
+    // The exact tool set the shipped agent runs (real bindings, incl. the SCOPED run_feature guard —
+    // see RunFeatureAsync). Captured so a test can invoke the real guarded tool directly rather than a
+    // replicated double.
+    private static IReadOnlyList<ToolDefinition>? _tools;
 
     /// <summary>The shared, fully-wired agent. Built lazily on first use.</summary>
     public static ForemanAgent Agent
@@ -47,6 +51,16 @@ public static class ForemanHost
     }
 
     /// <summary>
+    /// The shipped agent's real tool set (same instances the <see cref="Agent"/> uses), including the
+    /// command-grammar-scoped <c>run_feature</c> binding (see <see cref="RunFeatureAsync"/>). Built lazily
+    /// alongside the agent. Exposed so callers/tests can invoke a real, fully-wired tool directly.
+    /// </summary>
+    public static IReadOnlyList<ToolDefinition> Tools
+    {
+        get { _ = Agent; return _tools!; }
+    }
+
+    /// <summary>
     /// Starts a fresh Foreman conversation: clears the process-wide history so the NEXT
     /// <c>dni_agent_session_start</c> turn has no prior-turn context (today's pre-memory, single-shot
     /// behavior). Zero-ABI — reachable via the existing command-grammar seam (<c>agent~reset</c>, served
@@ -63,6 +77,7 @@ public static class ForemanHost
     private static ForemanAgent Build()
     {
         var tools = ForemanTools.Build(SearchManualsAsync, RunFeatureAsync, EngineTelemetry.SnapshotJson);
+        _tools = tools;
         _conversation = new ConversationSession();
         return new ForemanAgent(tools, BuildBrain(tools), _conversation);
     }
@@ -77,11 +92,22 @@ public static class ForemanHost
         return Task.FromResult(AiJson.Serialize(hits));
     }
 
-    // Real op: the exact path `dni_feature_run` calls (LanguageFeatureCatalog.Run, which itself
-    // branches into ShowcaseCommand.Run for command-grammar ids) — serialized via ForemanJsonContext's
-    // FeatureRun registration (see ForemanModels.cs) so this stays reflection-free in Engine.
+    // Real op: LanguageFeatureCatalog.Run, but SCOPED DOWN for the agent's tool — this binding runs
+    // actual C#/.NET feature-catalog DEMOS only. LanguageFeatureCatalog.Run routes any id containing '~'
+    // (ShowcaseCommand.IsCommand) into the full command grammar — GC storms (gclab~), benchmarks, and
+    // operational commands like trust~/trace~/metrics~/agent~reset. A misbehaving or hallucinating brain
+    // must NOT be able to reach those through a tool call (e.g. run_feature{"id":"agent~reset"} would
+    // wipe its own conversation memory mid-turn; run_feature{"id":"gclab~preset_loh"} would kick off an
+    // allocation storm). Reject the command-grammar marker up front and return an honest tool-result the
+    // brain can read. The direct dni_feature_run FFI path is deliberately unaffected — only the agent's
+    // tool is scoped; the Lab UI still drives command ids straight through that export.
     private static Task<string> RunFeatureAsync(string id)
     {
+        if (ShowcaseCommand.IsCommand(id))
+        {
+            return Task.FromResult("{\"error\":\"run_feature only runs catalog demos, not command-grammar ids\"}");
+        }
+
         var run = LanguageFeatureCatalog.Run(id);
         return Task.FromResult(JsonSerializer.Serialize(run, ForemanJsonContext.Default.FeatureRun));
     }
