@@ -39,6 +39,7 @@ public static class ShowcaseCommand
                 "gclab" => RunGcLab(p),
                 "trust" => RunTrust(parts),
                 "trace" => RunTrace(parts),
+                "metrics" => RunMetrics(parts),
                 _ => $"Unknown showcase command: {name}",
             };
 
@@ -113,6 +114,16 @@ public static class ShowcaseCommand
         return sub == "stats"
             ? EngineTrace.StatsJson()
             : $"Unknown showcase command: trace (sub={sub})";
+    }
+
+    // metrics~snapshot -> the Dni.Engine meter aggregator's cumulative counters + duration summaries
+    // (a non-draining, process-lifetime snapshot — same shape of contract as trace~stats).
+    private static string RunMetrics(string[] parts)
+    {
+        var sub = parts.Length > 1 ? parts[1] : string.Empty;
+        return sub == "snapshot"
+            ? EngineMetrics.SnapshotJson()
+            : $"Unknown showcase command: metrics (sub={sub})";
     }
 
     private static Dictionary<string, string> ParseParams(string[] parts)

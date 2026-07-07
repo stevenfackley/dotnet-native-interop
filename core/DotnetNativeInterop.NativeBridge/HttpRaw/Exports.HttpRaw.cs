@@ -85,6 +85,7 @@ internal static class RawHttpServer
                 // One span per request; server-side stage spans (http.execute) nest under it via
                 // Activity.Current. requestId comes from the optional X-Dni-Request-Id correlation header.
                 using var requestSpan = EngineTrace.StartSpan("http.request", requestId);
+                EngineTrace.RecordRequest(EngineTrace.Transports.Http);
                 if (requestSpan is not null)
                 {
                     requestSpan.SetTag("dni.path", path);

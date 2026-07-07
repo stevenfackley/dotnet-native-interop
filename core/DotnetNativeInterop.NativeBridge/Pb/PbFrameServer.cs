@@ -228,6 +228,11 @@ internal static class PbFrameServer
     {
         var requestId = request.RequestId;
 
+        // Counted once per successfully decoded+dispatched envelope (a frame that fails AEAD
+        // authentication never reaches here — see ReadFrameAsync's catch above — so a rejected/tampered
+        // frame is correctly NOT counted as a request).
+        EngineTrace.RecordRequest(EngineTrace.Transports.Pb);
+
         switch (request.BodyCase)
         {
             case Envelope.BodyOneofCase.Features:

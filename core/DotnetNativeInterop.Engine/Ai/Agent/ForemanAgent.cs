@@ -27,6 +27,7 @@ public sealed class ForemanAgent
     {
         using var turn = Trace.StartActivity("agent.turn");
         turn?.SetTag("dni.agent.query_len", query.Length);
+        EngineTrace.RecordAgentTurn();
         var ctx = new AgentContext(query, new List<AgentStep>());
         // Mirror every sinked token into the recorded answer so the returned ForemanTurnResult.Answer is
         // honest (the sink is the live streaming path; this is the durable copy a JSON consumer reads).
@@ -68,6 +69,7 @@ public sealed class ForemanAgent
             string result;
             using (var span = Trace.StartActivity($"agent.tool.{call.Tool}"))
             {
+                EngineTrace.RecordAgentToolCall(call.Tool);
                 if (tool is null) { result = "{\"error\":\"unknown tool\"}"; span?.SetTag("dni.agent.tool_known", false); }
                 else { try { result = await tool.Invoke(call.ArgsJson, ct); } catch (Exception ex) when (ex is not OperationCanceledException) { result = $"{{\"error\":\"{ex.GetType().Name}\"}}"; } }
             }

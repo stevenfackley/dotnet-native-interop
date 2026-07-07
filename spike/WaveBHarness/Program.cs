@@ -1,6 +1,9 @@
 // Wave B native proof harness. Over loopback, it drives the framed-protobuf transport (plain + PQ),
-// the raw-HTTP server, and the SQLite broker, then drains the in-process trace ring and asserts the
-// boundary spans exist. Every check prints PASS/FAIL; a non-zero exit code means at least one failed.
+// the raw-HTTP server, the SQLite broker, and a Foreman agent turn (via ForemanHost.Agent directly —
+// the internal path, since this harness cannot call the FFI exports either), then drains the in-process
+// trace ring AND takes a metrics~snapshot, asserting both the boundary spans and the Dni.Engine meter's
+// counters agree with the operations just driven. Every check prints PASS/FAIL; a non-zero exit code
+// means at least one failed.
 //
 // It acts as the CLIENT against the internal servers (managed code cannot call the [UnmanagedCallersOnly]
 // exports, so this is the Windows-verifiable equivalent). See docs and the Wave B spec.
@@ -8,9 +11,11 @@ using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Google.Protobuf;
 using Microsoft.Data.Sqlite;
 using DotnetNativeInterop.Engine;
+using DotnetNativeInterop.Engine.Ai.Agent;
 using DotnetNativeInterop.NativeBridge;
 using DotnetNativeInterop.NativeBridge.HttpRaw;
 using DotnetNativeInterop.NativeBridge.Pb;
@@ -35,8 +40,10 @@ internal static class Program
             await RunPbSecureAsync(ct).ConfigureAwait(false);
             await RunHttpAsync(ct).ConfigureAwait(false);
             RunBroker();
+            await RunAgentTurnAsync(ct).ConfigureAwait(false);
             RunTraceDrain();
             RunTrustAndTraceCommands();
+            RunMetricsSnapshot();
         }
         catch (Exception ex)
         {
@@ -230,6 +237,22 @@ internal static class Program
         }
     }
 
+    // ----- Foreman agent turn (internal path: ForemanHost.Agent directly, no FFI session wrapper) ---
+
+    private static async Task RunAgentTurnAsync(CancellationToken ct)
+    {
+        // The exact calibrated query from ForemanHarness Task 15: with the real MiniLM encoder and no
+        // GGUF bundled on this dev box, ForemanHost's RouterBrain routes it to search_manuals in exactly
+        // one tool step, then answers grounded prose. Reused here (not re-derived) so this assertion
+        // rests on an already-proven real routing result, not a fresh unverified guess.
+        const string query = "the compressor is overheating and keeps tripping the rooftop unit, what should I check?";
+        var answer = new System.Text.StringBuilder();
+        var result = await ForemanHost.Agent.RunTurnAsync(query, s => answer.Append(s), ct).ConfigureAwait(false);
+        Check("agent: turn answered", result.StopReason == ForemanStopReason.Answered);
+        Check("agent: exactly one tool step (search_manuals)", result.ToolSteps == 1);
+        Check("agent: produced a grounded answer", answer.Length > 0);
+    }
+
     // ----- Trace drain -----------------------------------------------------------------------------
 
     private static void RunTraceDrain()
@@ -257,6 +280,64 @@ internal static class Program
         var stats = LanguageFeatureCatalog.Run("trace~stats");
         Check("cmd: trace~stats ok + reports capacity 512",
             stats.Ok && stats.Result.Contains("\"capacity\":512", StringComparison.Ordinal));
+    }
+
+    // ----- metrics~ command grammar ------------------------------------------------------------------
+    //
+    // Asserts the Dni.Engine meter aggregator's counters against the EXACT operations this harness just
+    // drove: 3 pb-plain dispatches (features/run/ping) + 1 pb-secure dispatch (features) = 4 pb requests;
+    // 1 http request; 1 sqlite (broker) request; 0 ffi requests (this harness cannot call the
+    // [UnmanagedCallersOnly] exports — see the file banner); 1 agent turn with exactly 1 tool call
+    // (search_manuals, per RunAgentTurnAsync's calibrated query). Real assertions against known totals,
+    // not tautologies (e.g. "count >= 0").
+    private static void RunMetricsSnapshot()
+    {
+        var statsRun = LanguageFeatureCatalog.Run("trace~stats");
+        var metricsRun = LanguageFeatureCatalog.Run("metrics~snapshot");
+        Check("cmd: metrics~snapshot ok", metricsRun.Ok);
+
+        using var statsDoc = JsonDocument.Parse(statsRun.Result);
+        using var metricsDoc = JsonDocument.Parse(metricsRun.Result);
+        var stats = statsDoc.RootElement;
+        var metrics = metricsDoc.RootElement;
+
+        var recordedTotal = stats.GetProperty("recordedTotal").GetInt64();
+        var droppedTotal = stats.GetProperty("droppedTotal").GetInt64();
+        var spansRecorded = metrics.GetProperty("spansRecorded").GetInt64();
+        var spansDropped = metrics.GetProperty("spansDropped").GetInt64();
+        Console.WriteLine(
+            $"   metrics: spansRecorded={spansRecorded} spansDropped={spansDropped}" +
+            $" (trace~stats: recordedTotal={recordedTotal} droppedTotal={droppedTotal})");
+        Check("metrics: spansRecorded agrees with trace~stats.recordedTotal (metrics corroborate the trace ring)",
+            spansRecorded == recordedTotal && spansRecorded > 0);
+        Check("metrics: spansDropped agrees with trace~stats.droppedTotal (0 for this small run)",
+            spansDropped == droppedTotal && droppedTotal == 0);
+
+        var requests = metrics.GetProperty("requests");
+        var ffiCount = requests.GetProperty("ffi").GetInt64();
+        var httpCount = requests.GetProperty("http").GetInt64();
+        var sqliteCount = requests.GetProperty("sqlite").GetInt64();
+        var pbCount = requests.GetProperty("pb").GetInt64();
+        Console.WriteLine($"   metrics: requests ffi={ffiCount} http={httpCount} sqlite={sqliteCount} pb={pbCount}");
+        Check("metrics: pb requests == 4 (3 plain + 1 secure)", pbCount == 4);
+        Check("metrics: http requests == 1", httpCount == 1);
+        Check("metrics: sqlite requests == 1", sqliteCount == 1);
+        Check("metrics: ffi requests == 0 (harness cannot call UnmanagedCallersOnly exports)", ffiCount == 0);
+
+        Check("metrics: agentTurns == 1", metrics.GetProperty("agentTurns").GetInt64() == 1);
+
+        var toolCallCounts = metrics.GetProperty("agentToolCalls").EnumerateArray()
+            .ToDictionary(e => e.GetProperty("tool").GetString()!, e => e.GetProperty("count").GetInt64());
+        Check("metrics: agentToolCalls[search_manuals] == 1",
+            toolCallCounts.TryGetValue("search_manuals", out var searchManualsCalls) && searchManualsCalls == 1);
+
+        var opNames = metrics.GetProperty("operationDurations").EnumerateArray()
+            .Select(e => e.GetProperty("op").GetString())
+            .ToHashSet(StringComparer.Ordinal);
+        Console.WriteLine($"   metrics: operationDurations ops: {string.Join(", ", opNames.OrderBy(n => n, StringComparer.Ordinal))}");
+        Check("metrics: operationDurations includes pb.execute", opNames.Contains("pb.execute"));
+        Check("metrics: operationDurations includes agent.turn", opNames.Contains("agent.turn"));
+        Check("metrics: operationDurations includes agent.tool.search_manuals", opNames.Contains("agent.tool.search_manuals"));
     }
 
     // ----- helpers ---------------------------------------------------------------------------------
