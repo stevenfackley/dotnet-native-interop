@@ -163,11 +163,17 @@ int32_t dni_pb_start(int32_t flags);
 void    dni_pb_stop(void);
 
 /* Command-grammar additions (no ABI change) served by dni_feature_run:
- *   "trust~posture" -> per-transport security posture JSON (HTTP is reported as
- *                      plaintext; the binary transport reports live negotiated PQ
- *                      params { kem, sig, cipher, key sizes, handshakeUs } when up).
- *   "trace~stats"   -> span-ring snapshot { capacity, occupancy, droppedSinceDrain,
- *                      recordedTotal, droppedTotal }.                          */
+ *   "trust~posture"   -> per-transport security posture JSON (HTTP is reported as
+ *                        plaintext; the binary transport reports live negotiated PQ
+ *                        params { kem, sig, cipher, key sizes, handshakeUs } when up).
+ *   "trace~stats"     -> span-ring snapshot { capacity, occupancy, droppedSinceDrain,
+ *                        recordedTotal, droppedTotal }.
+ *   "metrics~snapshot" -> Dni.Engine meter snapshot { nowUs, requests (per-transport
+ *                        ffi/http/sqlite/pb counts), spansRecorded, spansDropped,
+ *                        agentTurns, agentToolCalls[] (tool, count), operationDurations[]
+ *                        (op, count, sumUs, minUs, maxUs) }. Process-lifetime cumulative,
+ *                        never reset by a read (like trace~stats, not dni_trace_drain) —
+ *                        no percentiles, only count/sum/min/max.                       */
 
 /* ---- Foreman agent (additive) ------------------------------------------- */
 /* One new export; the frozen production surface and the Wave B additions above are unchanged.

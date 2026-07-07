@@ -140,6 +140,7 @@ internal sealed class SqliteBroker : IDisposable
         // schema is frozen in docs/INTEROP_CONTRACT.md), so the row id — which the client already holds,
         // having inserted the row — is the natural correlation key for this transport's waterfall.
         using var process = EngineTrace.StartSpan("broker.process", requestId.ToString(CultureInfo.InvariantCulture));
+        EngineTrace.RecordRequest(EngineTrace.Transports.Sqlite);
 
         // --- 2. Run inference and stream tokens into response_tokens -----------
         try

@@ -49,6 +49,7 @@ internal static class ExportsFfi
 
             // Span the synchronous session setup (the token stream runs on the background DrainAsync task).
             using var span = EngineTrace.StartSpan("ffi.session_start");
+            EngineTrace.RecordRequest(EngineTrace.Transports.Ffi);
             var request = new InferenceRequest(promptText, maxTokens, temperature);
             var session = InferenceSession.Start(EngineHost.Orchestrator, request);
             var id = SessionRegistry.Add(session);
@@ -109,6 +110,7 @@ internal static class ExportsFfi
             var queryText = NativeText.Read((nint)query);
 
             using var span = EngineTrace.StartSpan("ffi.rag_session_start");
+            EngineTrace.RecordRequest(EngineTrace.Transports.Ffi);
             var request = new InferenceRequest(queryText, maxTokens, temperature);
             var session = InferenceSession.Start(EngineHost.RagOrchestrator, request);
             var id = SessionRegistry.Add(session);
@@ -162,6 +164,7 @@ internal static class ExportsFfi
             var queryText = NativeText.Read((nint)query);
 
             using var span = EngineTrace.StartSpan("ffi.agent_session_start");
+            EngineTrace.RecordRequest(EngineTrace.Transports.Ffi);
             var request = new InferenceRequest(queryText);
             var orchestrator = new InferenceOrchestrator(new ForemanLanguageModel(ForemanHost.Agent));
             var session = InferenceSession.Start(orchestrator, request);

@@ -36,6 +36,10 @@ public sealed record TraceStats(int Capacity, int Occupancy, long DroppedSinceDr
 ///
 /// AOT-safe: <see cref="ActivitySource"/>/<see cref="ActivityListener"/>/<see cref="Meter"/> live in the
 /// shared framework and use no reflection; JSON goes through the source-gen <see cref="TraceJsonContext"/>.
+///
+/// Alongside the spans: the same boundaries also record onto <see cref="Meter"/> (requests-per-transport,
+/// agent turns/tool calls, spans recorded/dropped, per-operation duration) — see <see cref="EngineMetrics"/>
+/// for the aggregator and the <c>metrics~snapshot</c> command it backs.
 /// </summary>
 public static class EngineTrace
 {
@@ -46,9 +50,11 @@ public static class EngineTrace
     public static readonly ActivitySource Source = new("Dni.Engine");
 
     /// <summary>
-    /// Companion metrics source. Instruments are recorded unconditionally but are no-ops until an external
-    /// <see cref="MeterListener"/> (or an OpenTelemetry exporter) subscribes — this wave ships the spans;
-    /// the meter is the forward-looking hook for a future metrics consumer (kept minimal on purpose).
+    /// Companion metrics source. Every instrument below is consumed in-process by
+    /// <see cref="EngineMetrics"/>'s <see cref="MeterListener"/> (started from this class's static
+    /// constructor) and exposed as the <c>metrics~snapshot</c> command — an external
+    /// <see cref="MeterListener"/>/OpenTelemetry exporter could still subscribe alongside it, but nothing
+    /// downstream depends on that; the in-process consumer is real.
     /// </summary>
     public static readonly Meter Meter = new("Dni.Engine");
 
@@ -56,6 +62,27 @@ public static class EngineTrace
     private static readonly Counter<long> SpansDropped = Meter.CreateCounter<long>("dni.spans.dropped");
     private static readonly Histogram<double> SpanDurationUs =
         Meter.CreateHistogram<double>("dni.span.duration", unit: "us");
+
+    // Wave B+1 (this wave): the small, honest instrument set beyond spans-recorded/dropped/duration
+    // above. Reuses the exact points that already open spans (see the transport files' StartSpan calls
+    // and ForemanAgent) so metrics and spans agree — see EngineMetrics for the consuming aggregator.
+    private static readonly Counter<long> Requests = Meter.CreateCounter<long>("dni.requests");
+    private static readonly Counter<long> AgentTurnsCounter = Meter.CreateCounter<long>("dni.agent.turns");
+    private static readonly Counter<long> AgentToolCallsCounter = Meter.CreateCounter<long>("dni.agent.tool_calls");
+
+    private const string TagTransport = "dni.transport";
+    private const string TagTool = "dni.tool";
+    private const string TagOperation = "dni.op";
+
+    /// <summary>Canonical <see cref="TagTransport"/> values for <see cref="RecordRequest"/> — kept as
+    /// constants so every call site (FFI/HTTP/SQLite/pb) uses the same literal.</summary>
+    public static class Transports
+    {
+        public const string Ffi = "ffi";
+        public const string Http = "http";
+        public const string Sqlite = "sqlite";
+        public const string Pb = "pb";
+    }
 
     // Boot reference for the µs clock. Stopwatch is monotonic + high-resolution (unlike DateTime.UtcNow,
     // which is ~15 ms coarse on Windows) so span start/duration are genuine microseconds.
@@ -80,6 +107,11 @@ public static class EngineTrace
             ActivityStopped = Record,
         };
         ActivitySource.AddActivityListener(listener);
+
+        // Forces EngineMetrics's static initializer (its MeterListener subscription) to run now, so the
+        // aggregator is guaranteed live before any instrument above can be touched by a caller — an
+        // Add/Record with no subscribed listener is a silent no-op, not a queued event.
+        EngineMetrics.EnsureStarted();
     }
 
     /// <summary>Microseconds elapsed since engine boot (the µs clock all spans share).</summary>
@@ -101,6 +133,22 @@ public static class EngineTrace
         return activity;
     }
 
+    /// <summary>
+    /// Records one request entering a built transport. Call this at the same call site that opens the
+    /// transport's top-level request span (e.g. alongside <c>StartSpan("http.request", ...)</c>) so the
+    /// <c>dni.requests</c> counter and the trace ring agree on what counts as "a request".
+    /// </summary>
+    /// <param name="transport">One of <see cref="Transports"/>.</param>
+    public static void RecordRequest(string transport) =>
+        Requests.Add(1, new KeyValuePair<string, object?>(TagTransport, transport));
+
+    /// <summary>Records one Foreman agent turn (call once per <c>ForemanAgent.RunTurnAsync</c>).</summary>
+    public static void RecordAgentTurn() => AgentTurnsCounter.Add(1);
+
+    /// <summary>Records one Foreman tool invocation, tagged by tool name.</summary>
+    public static void RecordAgentToolCall(string tool) =>
+        AgentToolCallsCounter.Add(1, new KeyValuePair<string, object?>(TagTool, tool));
+
     private static void Record(Activity activity)
     {
         // Duration is high-res; the span started durUs ago, and the stop is ~now, so startUs = now - dur.
@@ -111,7 +159,9 @@ public static class EngineTrace
         var span = new TraceSpan(activity.OperationName, Math.Round(startUs, 1), Math.Round(durUs, 1), requestId, status);
 
         SpansRecorded.Add(1);
-        SpanDurationUs.Record(durUs);
+        // Tagged by operation name so the aggregator can report duration count/sum/min/max PER operation
+        // (e.g. "pb.execute" vs "agent.turn") rather than one undifferentiated blob.
+        SpanDurationUs.Record(durUs, new KeyValuePair<string, object?>(TagOperation, activity.OperationName));
 
         lock (Gate)
         {
