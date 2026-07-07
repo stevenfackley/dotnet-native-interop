@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- Isolates this dev-time Aspire example from the repo-root Directory.Build.props, whose strict
+       defaults (TreatWarningsAsErrors, EnforceCodeStyleInBuild, InvariantGlobalization, etc.) are
+       tuned for the shipped AOT engine/bridge/native-UI code, not for scaffolded Aspire template
+       projects. MSBuild stops walking up at the first Directory.Build.props it finds, so this file
+       being present here means the root one is NOT also applied — a deliberate, standard MSBuild
+       isolation pattern (see docs/aspire-nativeaot-findings.md for why). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>

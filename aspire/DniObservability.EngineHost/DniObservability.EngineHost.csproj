@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- This is a DEV-TIME observability host: managed, JIT-compiled, run via `dotnet run`/AppHost
+         orchestration only. It is NOT the shipped mobile artifact — that is the NativeAOT
+         DotnetNativeInterop.NativeBridge library built for ios-arm64/linux-bionic-arm64. This
+         project intentionally does NOT set IsAotCompatible/PublishAot; it references the Engine
+         project purely as ordinary managed code so its OpenTelemetry ActivitySource/Meter can be
+         observed from the Aspire dashboard during local development. See ../README.md. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DniObservability.ServiceDefaults\DniObservability.ServiceDefaults.csproj" />
+    <!-- The engine's pure domain assembly (traces/metrics live here — see EngineTrace/EngineMetrics).
+         Ordinary managed ProjectReference: EngineHost is not itself an Aspire AppHost, so
+         IsAspireProjectResource (an Aspire.AppHost.Sdk-only concept) does not apply here. -->
+    <ProjectReference Include="..\..\core\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
+  </ItemGroup>
+
+</Project>
