@@ -441,6 +441,93 @@ Check("ForemanHost emitted agent.tool.run_feature span", hostSpans.Contains("age
     LanguageFeatureCatalog.Run("agent~reset"); // leave the process-wide conversation clean for anything after
 }
 
+// ============================================================================================
+// Task 21: agent.tool.<name> spans carry bounded dni.agent.tool_args/dni.agent.tool_result tags — the
+// actual deliverable of this task. Before this, the drained span proved only name+timing; now it must
+// prove what the tool call actually did (args in, result out), bounded+truncated, and honest on failure.
+// Each sub-case drains the ring first so it only sees the spans IT produces (dni_trace_drain is a
+// destructive read, same isolation pattern AgentSessionHarness uses around EngineTrace.Drain()).
+// ============================================================================================
+{
+    EngineTrace.Drain(); // clean slate — Tasks 1-20 above left plenty of agent.* spans in the ring
+
+    // 21a: a normal call well within both caps — tags carry the args/result VERBATIM, no truncation.
+    var smallTool = new ToolDefinition("engine_stats", "d", Array.Empty<ToolParam>(),
+        (_, _) => Task.FromResult("{\"heapMB\":12}"));
+    var smallBrain = new ScriptedBrain(ctx => ctx.Steps.Any(s => s.Kind == "tool_result")
+        ? AgentDecision.Answer : AgentDecision.Tool(new ToolCall("engine_stats", "{\"x\":1}")));
+    await new ForemanAgent(new[] { smallTool }, smallBrain).RunTurnAsync("q", _ => { }, default);
+
+    var drain21a = EngineTrace.Drain();
+    var toolSpan21a = drain21a.Spans.First(s => s.Name == "agent.tool.engine_stats");
+    Check("small tool call: tool_args tag carries the exact args", toolSpan21a.ToolArgs == "{\"x\":1}");
+    Check("small tool call: tool_result tag carries the exact result", toolSpan21a.ToolResult == "{\"heapMB\":12}");
+    Check("small tool call: no truncation marker present", !toolSpan21a.ToolResult!.Contains("truncated"));
+
+    // 21b: a result LARGER than MaxToolResultChars (models a big search_manuals snippet dump) must be
+    // truncated with the visible "…(truncated)" marker and bounded to exactly cap+markerLen — never the
+    // full untruncated size — proving the drain payload really is bounded, not just hoped to be.
+    var bigResult = new string('z', ForemanAgent.MaxToolResultChars + 200);
+    var bigTool = new ToolDefinition("search_manuals", "d", new[] { new ToolParam("query", "string", true) },
+        (_, _) => Task.FromResult(bigResult));
+    var bigBrain = new ScriptedBrain(ctx => ctx.Steps.Any(s => s.Kind == "tool_result")
+        ? AgentDecision.Answer : AgentDecision.Tool(new ToolCall("search_manuals", "{\"query\":\"E3\"}")));
+    await new ForemanAgent(new[] { bigTool }, bigBrain).RunTurnAsync("q", _ => { }, default);
+
+    var drain21b = EngineTrace.Drain();
+    var toolSpan21b = drain21b.Spans.First(s => s.Name == "agent.tool.search_manuals");
+    Check("oversized tool_result is truncated with the visible marker",
+        toolSpan21b.ToolResult!.EndsWith("…(truncated)", StringComparison.Ordinal));
+    Check("truncated tool_result is bounded to cap + marker length (never the full untruncated size)",
+        toolSpan21b.ToolResult!.Length == ForemanAgent.MaxToolResultChars + "…(truncated)".Length);
+    Check("truncated tool_result body is a genuine prefix of the real result (not garbage)",
+        toolSpan21b.ToolResult!.StartsWith(bigResult[..ForemanAgent.MaxToolResultChars], StringComparison.Ordinal));
+
+    // 21c: oversized ARGS are truncated the same way — an independent cap from the result's.
+    var bigArgs = "{\"query\":\"" + new string('a', ForemanAgent.MaxToolArgsChars + 100) + "\"}";
+    var argsTool = new ToolDefinition("search_manuals", "d", new[] { new ToolParam("query", "string", true) },
+        (_, _) => Task.FromResult("{\"snippets\":[]}"));
+    var argsBrain = new ScriptedBrain(ctx => ctx.Steps.Any(s => s.Kind == "tool_result")
+        ? AgentDecision.Answer : AgentDecision.Tool(new ToolCall("search_manuals", bigArgs)));
+    await new ForemanAgent(new[] { argsTool }, argsBrain).RunTurnAsync("q", _ => { }, default);
+
+    var drain21c = EngineTrace.Drain();
+    var toolSpan21c = drain21c.Spans.First(s => s.Name == "agent.tool.search_manuals");
+    Check("oversized tool_args is truncated with the visible marker",
+        toolSpan21c.ToolArgs!.EndsWith("…(truncated)", StringComparison.Ordinal));
+    Check("truncated tool_args is bounded to cap + marker length",
+        toolSpan21c.ToolArgs!.Length == ForemanAgent.MaxToolArgsChars + "…(truncated)".Length);
+
+    // 21d: honesty — an UNKNOWN tool call's tool_result tag carries the real JSON error, never blank.
+    var unknownBrain = new ScriptedBrain(_ => AgentDecision.Tool(new ToolCall("does_not_exist", "{}")));
+    await new ForemanAgent(Array.Empty<ToolDefinition>(), unknownBrain).RunTurnAsync("q", _ => { }, default);
+    var drain21d = EngineTrace.Drain();
+    var toolSpan21d = drain21d.Spans.First(s => s.Name == "agent.tool.does_not_exist");
+    Check("unknown tool: tool_args tag is still present (the attempted call, not blank)", toolSpan21d.ToolArgs == "{}");
+    Check("unknown tool: tool_result tag carries the honest JSON error, never blank",
+        toolSpan21d.ToolResult == "{\"error\":\"unknown tool\"}");
+
+    // 21e: honesty — a tool that THROWS still tags tool_result with the error, never blank/omitted — the
+    // strip must show a failing tool call as a failure, not silently drop its result.
+    var throwingTool = new ToolDefinition("boom", "d", Array.Empty<ToolParam>(),
+        (_, _) => throw new InvalidOperationException("kaboom"));
+    var throwingToolBrain = new ScriptedBrain(ctx => ctx.Steps.Any(s => s.Kind == "tool_result")
+        ? AgentDecision.Answer : AgentDecision.Tool(new ToolCall("boom", "{}")));
+    await new ForemanAgent(new[] { throwingTool }, throwingToolBrain).RunTurnAsync("q", _ => { }, default);
+    var drain21e = EngineTrace.Drain();
+    var toolSpan21e = drain21e.Spans.First(s => s.Name == "agent.tool.boom");
+    Check("throwing tool: tool_result tag carries the error type, never blank",
+        toolSpan21e.ToolResult == "{\"error\":\"InvalidOperationException\"}");
+
+    // 21f: a span for a DIFFERENT (non agent.tool.*) operation never carries these tags — proves the new
+    // fields are opt-in per-span, not accidentally populated engine-wide.
+    using (EngineTrace.StartSpan("some.other.op")) { }
+    var drain21f = EngineTrace.Drain();
+    var otherSpan = drain21f.Spans.First(s => s.Name == "some.other.op");
+    Check("a non-agent.tool span never carries tool_args/tool_result",
+        otherSpan.ToolArgs is null && otherSpan.ToolResult is null);
+}
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 

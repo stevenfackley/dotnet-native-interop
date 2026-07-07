@@ -94,9 +94,15 @@ Mirror of the merged Android Foreman UI. iOS consumes the same `dni_agent_sessio
 - **Honesty (hard):** Answered / StepCapReached / Error must be visibly distinct — never present a capped/errored
   turn as a clean answer. The **backend badge** must reflect the wire `backend` value (e.g. "scripted routing"
   on the router brain), not a hardcode.
-- **Tool-call strip** reuses the Trace waterfall; disclosed limitation: `dni_trace_drain` spans carry
-  name+timing only (not tool args/results) — the strip shows "tool · µs" and the UI STATES this rather than
-  faking args/results. (A future engine change could tag agent spans with args/results.)
+- **Tool-call strip** reuses the Trace waterfall, AND now renders the real tool call: `dni_trace_drain`
+  spans for `agent.tool.<name>` carry two additive tags — `dni.agent.tool_args` (the JSON args the call was
+  invoked with, bounded to <= 256 chars) and `dni.agent.tool_result` (the JSON result, bounded to <= 512
+  chars) — both truncated with a visible `"…(truncated)"` suffix past their cap, never silently. A
+  failed/unknown tool call still tags `tool_result` with its JSON error (never blank) — the strip must show
+  the failure honestly. Android renders `name(args) -> result` per tool span (see
+  `agent.AgentModels.formatToolCall` / `ForemanScreen`'s `ToolCallDetail` rows) — iOS should mirror the
+  same two tag keys, the same two caps, and the same `name(args) -> result` format. (Previously disclosed
+  as a limitation — "name+timing only" — that disclosure is now stale on Android and should not be ported.)
 - **Default landing tab stays Boundary** (the thesis centerpiece). Android added Foreman as a top-level tab
   but the default-tab change was REVERTED — iOS should add Foreman as a tab, default remains Boundary.
 - Token: `Instrument.agent = #F472B6`.

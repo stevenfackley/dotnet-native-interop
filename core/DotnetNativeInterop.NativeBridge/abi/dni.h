@@ -149,9 +149,16 @@ int64_t dni_ffi_stream_start(const char* prompt, int32_t max_tokens,
  *     "dropped": <int>,            // spans lost to ring overflow since last drain (disclosed)
  *     "capacity": 512,
  *     "spans": [ { "name": "pb.execute", "startUs": <double>, "durUs": <double>,
- *                  "requestId": <string|null>, "status": <string|null> }, ... ] }
+ *                  "requestId": <string|null>, "status": <string|null>,
+ *                  "toolArgs": <string|null>, "toolResult": <string|null> }, ... ] }
  * Engine spans carry µs offsets from engine boot; align to a client clock using
- * one offset per drain (nowUs) — cross-side accuracy is ±(drain round-trip). */
+ * one offset per drain (nowUs) — cross-side accuracy is ±(drain round-trip).
+ * toolArgs/toolResult (additive, no ABI change) are populated ONLY on Foreman's
+ * agent.tool.<name> spans (see ForemanAgent.cs) — every other span leaves them
+ * null. Both are bounded + truncated with a visible "…(truncated)" marker
+ * (args <= 256 chars, result <= 512 chars) so a large tool result (e.g.
+ * search_manuals snippets) can't blow the drain payload; a failed/unknown tool
+ * call still tags toolResult with its JSON error — never blank. */
 const char* dni_trace_drain(void);
 
 /* Framed-protobuf transport (the 4th transport): length-prefixed Google.Protobuf

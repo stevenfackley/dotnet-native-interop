@@ -110,4 +110,66 @@ public class AgentModelsTest {
     public fun turnSpansFromNullDrainReturnsEmpty() {
         assertEquals(emptyList<TraceSpan>(), turnSpansFrom(null, expectedToolSteps = 3))
     }
+
+    @Test
+    public fun turnSpansFromPreservesToolArgsAndToolResultTags() {
+        // Proves the tag-carrying fields survive turnSpansFrom's filter/sort — the strip reads them off
+        // the SAME spans this function slices, not a separately-fetched payload.
+        val drain = TraceDrain(
+            nowUs = 100.0,
+            dropped = 0,
+            capacity = 512,
+            spans = listOf(
+                TraceSpan("agent.turn", 1.0, 40.0, null, null),
+                TraceSpan(
+                    "agent.tool.search_manuals", 2.0, 10.0, null, null,
+                    toolArgs = "{\"query\":\"E3\"}", toolResult = "{\"snippets\":[\"a\",\"b\",\"c\"]}",
+                ),
+            ),
+        )
+        val spans = turnSpansFrom(drain, expectedToolSteps = 1)
+        val toolSpan = spans.first { it.name == "agent.tool.search_manuals" }
+        assertEquals("{\"query\":\"E3\"}", toolSpan.toolArgs)
+        assertEquals("{\"snippets\":[\"a\",\"b\",\"c\"]}", toolSpan.toolResult)
+    }
+
+    @Test
+    public fun isToolCallTrueForAgentToolSpansFalseForAgentTurn() {
+        assertTrue(TraceSpan("agent.tool.engine_stats", 0.0, 1.0, null, null).isToolCall())
+        assertTrue(!TraceSpan("agent.turn", 0.0, 1.0, null, null).isToolCall())
+        assertTrue(!TraceSpan("rag.retrieve", 0.0, 1.0, null, null).isToolCall())
+    }
+
+    @Test
+    public fun formatToolCallRendersRealArgsAndResult() {
+        val span = TraceSpan(
+            "agent.tool.run_feature", 0.0, 1.0, null, null,
+            toolArgs = "{\"id\":\"ping\"}", toolResult = "{\"ok\":true,\"result\":\"pong\"}",
+        )
+        assertEquals(
+            "run_feature({\"id\":\"ping\"}) -> {\"ok\":true,\"result\":\"pong\"}",
+            formatToolCall(span),
+        )
+    }
+
+    @Test
+    public fun formatToolCallShowsTheTruncationMarkerWhenTheEngineTruncated() {
+        // The engine (ForemanAgent.Bound) appends this exact suffix — the client just renders it, never
+        // hides that a result was clamped.
+        val span = TraceSpan(
+            "agent.tool.search_manuals", 0.0, 1.0, null, null,
+            toolArgs = "{\"query\":\"E3\"}", toolResult = "z".repeat(512) + "…(truncated)",
+        )
+        assertTrue(formatToolCall(span).contains("…(truncated)"))
+    }
+
+    @Test
+    public fun formatToolCallFallsBackHonestlyWhenTagsAreAbsent() {
+        // A span from an engine build that predates this feature carries null tags — the strip must
+        // never render a blank/misleading call, and must never throw.
+        val span = TraceSpan("agent.tool.engine_stats", 0.0, 1.0, null, null)
+        val formatted = formatToolCall(span)
+        assertTrue(formatted.contains("not captured"))
+        assertTrue(formatted.startsWith("engine_stats("))
+    }
 }

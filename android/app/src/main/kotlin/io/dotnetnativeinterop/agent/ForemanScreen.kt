@@ -140,10 +140,19 @@ private fun ForemanTurnCard(turn: ForemanTurn, modifier: Modifier = Modifier) {
             }
             if (expanded && turn.toolSpans.isNotEmpty()) {
                 SpanWaterfall(turn.toolSpans)
+                turn.toolSpans.filter { it.isToolCall() }.forEach { span ->
+                    Text(
+                        formatToolCall(span),
+                        color = Instrument.textPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 Text(
-                    "Tool name + timing only — args/result content isn't exposed over the current FFI " +
-                        "surface (dni_trace_drain carries span timing, not payloads); a follow-up engine " +
-                        "export would be needed to show them here.",
+                    "Tool args/result are bounded (args ≤ 256 chars, result ≤ 512 chars) and truncated " +
+                        "with \"…(truncated)\" past that — the same dni_trace_drain ring, now carrying " +
+                        "dni.agent.tool_args / dni.agent.tool_result span tags. A failed/unknown tool " +
+                        "call still shows its real error here, never a blank result.",
                     color = Instrument.textTertiary,
                     style = MaterialTheme.typography.labelSmall,
                 )
