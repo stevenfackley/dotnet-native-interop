@@ -8,6 +8,14 @@ options:
   groupSortPosition: top
   defaultConfig: Debug
 
+# First Swift Package Manager dependency in the project (Wave B Plan B gate): the SwiftProtobuf runtime
+# that the generated Shared/Pb/dni_frame.pb.swift links against. protoc-gen-swift generates the message
+# types; this pulls the matching runtime. Pinned to track the codegen plugin (1.38.x).
+packages:
+  SwiftProtobuf:
+    url: https://github.com/apple/swift-protobuf.git
+    from: "1.38.0"
+
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -44,6 +52,7 @@ targets:
       - framework: Frameworks/onnxruntime.xcframework
         embed: true
         codeSign: true
+      - package: SwiftProtobuf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dotnetnativeinterop.unified
@@ -82,6 +91,7 @@ targets:
       - path: Tests
     dependencies:
       - target: DotnetNativeInteropUnified
+      - package: SwiftProtobuf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dotnetnativeinterop.tests
