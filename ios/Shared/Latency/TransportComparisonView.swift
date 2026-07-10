@@ -69,6 +69,11 @@ struct TransportComparisonView: View {
                             }
                         }
                     }
+                    // Canonical transport colors, never an arbitrary palette (facelift spec §2/§5).
+                    .chartForegroundStyleScale(
+                        domain: TransportKind.allCases.map(\.displayName),
+                        range: TransportKind.allCases.map { Instrument.transport($0) }
+                    )
                     .chartXAxisLabel("round-trip (ms)")
                     .chartYAxisLabel("cumulative fraction")
                     .chartLegend(position: .bottom)
@@ -84,7 +89,7 @@ struct TransportComparisonView: View {
     private func stat(_ label: String, _ value: Double) -> some View {
         VStack(spacing: 1) {
             Text(label).font(.caption2).foregroundStyle(Instrument.textSecondary)
-            Text(String(format: "%.2f", value)).font(.caption.monospacedDigit())
+            Text(LatencyStats.formatLatencyMs(value)).font(.caption.monospacedDigit())
                 .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity)

@@ -42,16 +42,34 @@ struct JitterView: View {
             }
 
             if !samples.isEmpty {
+                // Annotate the tail (facelift spec §5); cap the markers so the chart doesn't drown in ticks.
+                let allOutliers = LatencyStats.outlierIndices(samples)
+                let outliers = Array(allOutliers.prefix(6))
                 Section("Latency over call index (ms)") {
                     Chart {
                         ForEach(Array(samples.enumerated()), id: \.offset) { index, ms in
                             LineMark(x: .value("call #", index), y: .value("ms", ms))
                                 .foregroundStyle(Instrument.transport(model.transport))
                         }
+                        ForEach(Array(outliers.enumerated()), id: \.element) { idx, i in
+                            PointMark(x: .value("call #", i), y: .value("ms", samples[i]))
+                                .foregroundStyle(Instrument.warn)
+                                .symbolSize(36)
+                                .annotation(position: .top) {
+                                    if idx == 0 {
+                                        Text("P99+").font(.system(size: 9)).foregroundStyle(Instrument.warn)
+                                    }
+                                }
+                        }
                     }
                     .chartXAxisLabel("call #")
                     .chartYAxisLabel("round-trip (ms)")
                     .frame(height: 240)
+                    if !allOutliers.isEmpty {
+                        let note = allOutliers.count > outliers.count ? " (first \(outliers.count) marked)" : ""
+                        Text("\(allOutliers.count) call(s) above p99\(note) — GC blips or cold-start spikes.")
+                            .font(.caption).foregroundStyle(Instrument.textSecondary)
+                    }
                 }
                 .instrumentRow()
             }

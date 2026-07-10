@@ -58,7 +58,7 @@ struct PayloadScalingView: View {
                 Section("Values") {
                     ForEach(Array(points.enumerated()), id: \.offset) { _, point in
                         LabeledContent(point.label) {
-                            Text(String(format: "%.2f ms", point.ms)).monospacedDigit()
+                            Text(LatencyStats.formatLatencyMs(point.ms)).monospacedDigit()
                         }
                     }
                 }

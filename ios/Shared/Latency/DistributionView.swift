@@ -48,22 +48,46 @@ struct DistributionView: View {
                 }
                 .listRowBackground(Color.clear)
             } else {
+                let sorted = samples.sorted()
+                let median = LatencyStats.percentile(sorted, 0.50)
+                let p95 = LatencyStats.percentile(sorted, 0.95)
                 Section(distributionTitle) {
-                    Chart(bins) { bin in
-                        BarMark(x: .value("round-trip (ms)", bin.midpoint), y: .value("calls", bin.count))
-                            .foregroundStyle(Instrument.transport(model.transport))
+                    Chart {
+                        ForEach(bins) { bin in
+                            BarMark(x: .value("round-trip (ms)", bin.midpoint), y: .value("calls", bin.count))
+                                .foregroundStyle(Instrument.transport(model.transport))
+                        }
+                        // Percentile overlays as evidence, not ornament (facelift spec §5): P50 dashed @
+                        // textSecondary, P95 dashed @ warn. (Known: warn == transportHttp #FBBF24, so P95
+                        // sits on same-colored bars on the HTTP histogram — a deliberate call, per Android.)
+                        RuleMark(x: .value("P50", median))
+                            .foregroundStyle(Instrument.textSecondary)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                            .annotation(position: .top, alignment: .leading) {
+                                Text("P50").font(.system(size: 9)).foregroundStyle(Instrument.textSecondary)
+                            }
+                        RuleMark(x: .value("P95", p95))
+                            .foregroundStyle(Instrument.warn)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text("P95").font(.system(size: 9)).foregroundStyle(Instrument.warn)
+                            }
                     }
                     .chartXAxisLabel("round-trip (ms)")
                     .chartYAxisLabel("calls")
-                    .frame(height: 220)
+                    .frame(height: 240)
                 }
                 .instrumentRow()
-                Section("Stats (ms)") {
-                    let sorted = samples.sorted()
-                    LabeledContent("min") { mono(sorted.first ?? 0) }
-                    LabeledContent("median") { mono(LatencyStats.percentile(sorted, 0.5)) }
-                    LabeledContent("p95") { mono(LatencyStats.percentile(sorted, 0.95)) }
-                    LabeledContent("max") { mono(sorted.last ?? 0) }
+                Section("Stats") {
+                    // The one dominant metric across the whole latency facelift (spec §3) — headline +
+                    // semibold, used ONCE. min/p95/max are supporting readouts.
+                    LabeledContent("median round-trip") {
+                        Text(LatencyStats.formatLatencyMs(median))
+                            .font(.title3.weight(.semibold)).monospacedDigit()
+                    }
+                    LabeledContent("min") { stat(sorted.first ?? 0, tint: Instrument.ok) }
+                    LabeledContent("p95") { stat(p95, tint: Instrument.warn) }
+                    LabeledContent("max") { stat(sorted.last ?? 0, tint: Instrument.warn) }
                 }
                 .instrumentRow()
             }
@@ -78,8 +102,8 @@ struct DistributionView: View {
             : "Distribution — \(samples.count) calls"
     }
 
-    private func mono(_ value: Double) -> some View {
-        Text(String(format: "%.3f", value)).monospacedDigit()
+    private func stat(_ value: Double, tint: Color) -> some View {
+        Text(LatencyStats.formatLatencyMs(value)).monospacedDigit().foregroundStyle(tint)
     }
 
     @MainActor

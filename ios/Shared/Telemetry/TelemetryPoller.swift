@@ -6,6 +6,7 @@ import Foundation
 final class TelemetryPoller: ObservableObject {
     @Published var stats: EngineStats?
     @Published var heapHistory: [Double] = []
+    @Published var committedHistory: [Double] = []
     @Published var errorMessage: String?
 
     private let service: TelemetryService
@@ -23,8 +24,11 @@ final class TelemetryPoller: ObservableObject {
                 let snapshot = try await service.stats()
                 stats = snapshot
                 heapHistory.append(Double(snapshot.heapBytes) / 1_048_576)
+                committedHistory.append(Double(snapshot.committedBytes) / 1_048_576)
                 if heapHistory.count > historyCap {
-                    heapHistory.removeFirst(heapHistory.count - historyCap)
+                    let excess = heapHistory.count - historyCap
+                    heapHistory.removeFirst(excess)
+                    committedHistory.removeFirst(excess)
                 }
                 errorMessage = nil
             } catch {
