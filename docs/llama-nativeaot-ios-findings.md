@@ -69,6 +69,14 @@ folder reference that carries `model.onnx`). `*.gguf` is Git-LFS-tracked; becaus
 file itself is fetched at build time rather than committed (a fresh checkout without it degrades to the
 extractive generator — the graceful fallback).
 
+**Provenance is pinned** to the exact upstream file Android downloads at first run
+(`huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF`, `Q4_K_M`, **807694464 bytes**) so both platforms
+generate byte-identically. Fetch it onto the build host with **`build/fetch-ios-gguf.sh`** (idempotent,
+size-verified) before the app build — the framework build does not bundle the model. That script's
+`GGUF_URL` is kept identical to `android/app/build.gradle.kts`'s `GGUF_URL`; the engine resolves the model
+by exact name (`EngineHost.BuildRagModel` → `Llama-3.2-1B-Instruct-Q4_K_M.gguf`), which is also the
+upstream file's name, so no rename is needed.
+
 ## Caveats / notes
 
 - **CPU only.** No Metal/ANE offload for generation (the EVS encoder still uses Core ML separately).
