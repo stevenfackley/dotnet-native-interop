@@ -26,31 +26,37 @@ struct SearchView: View {
     @State private var engine: Engine = .ffi
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: Instrument.Space.xs) {
-                Picker("Search engine", selection: $engine) {
-                    ForEach(Engine.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+        // Wrapped in a NavigationStack so the segmented control gets the same top-inset the single-screen
+        // tabs (Boundary/Catalog/Lab) get: on iPad the TabView tab bar is a floating top capsule that
+        // overlaps content lacking a nav bar, so a bare top-pinned Picker collided with it. The switched
+        // children keep their own NavigationStacks (nested is fine for this static content).
+        NavigationStack {
+            VStack(spacing: 0) {
+                VStack(spacing: Instrument.Space.xs) {
+                    Picker("Search engine", selection: $engine) {
+                        ForEach(Engine.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(engine.note)
+                        .font(.caption)
+                        .foregroundStyle(Instrument.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, Instrument.Space.l)
+                .padding(.top, Instrument.Space.s)
+                .padding(.bottom, Instrument.Space.xs)
+
+                Group {
+                    switch engine {
+                    case .ffi:      AiHubView(search: search, engineRagServices: engineRagServices)
+                    case .onDevice: EdgeSearchHubView()
                     }
                 }
-                .pickerStyle(.segmented)
-
-                Text(engine.note)
-                    .font(.caption)
-                    .foregroundStyle(Instrument.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, Instrument.Space.l)
-            .padding(.top, Instrument.Space.s)
-            .padding(.bottom, Instrument.Space.xs)
-
-            Group {
-                switch engine {
-                case .ffi:      AiHubView(search: search, engineRagServices: engineRagServices)
-                case .onDevice: EdgeSearchHubView()
-                }
-            }
+            .background(Instrument.bg0)
         }
-        .background(Instrument.bg0)
     }
 }
