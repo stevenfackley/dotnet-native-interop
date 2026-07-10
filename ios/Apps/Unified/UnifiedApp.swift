@@ -10,6 +10,7 @@ struct DotnetNativeInteropUnifiedApp: App {
     private let search = SemanticSearchService()
     private let engineRagServices = TransportMap<EngineRagService>(
         ffi: FFIRagService(),
+        binary: PbRagService(),
         http: HTTPRagService(),
         sqlite: SQLiteRagService()
     )
@@ -17,10 +18,11 @@ struct DotnetNativeInteropUnifiedApp: App {
     init() {
         let services = TransportMap<FeatureService>(
             ffi: FFIFeatureService(),
+            binary: PbFeatureService(),
             http: HTTPFeatureService(),
             sqlite: SQLiteFeatureService()
         )
-        let infos = TransportMap<TransportInfo>(ffi: .ffi, http: .http, sqlite: .sqlite)
+        let infos = TransportMap<TransportInfo>(ffi: .ffi, binary: .binary, http: .http, sqlite: .sqlite)
         _features = StateObject(wrappedValue: FeaturesViewModel(services: services, infos: infos))
         _comparison = StateObject(wrappedValue: ComparisonViewModel(services: services))
         _lab = StateObject(wrappedValue: LabViewModel(services: services))

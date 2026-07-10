@@ -73,6 +73,7 @@
 		AE9B1B60FFC9A8A45094EBDE /* RasterDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302375BD329DC28D7513E9BC /* RasterDemo.swift */; };
 		AF48D3C5E2FF13383ADA818C /* PbWireContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50AD514E49E8F1C1C62EF187 /* PbWireContractTests.swift */; };
 		B269C5EC2613668D194E8FE8 /* EdgeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3AA2986225C07A6418025D /* EdgeModels.swift */; };
+		B58B9EA76DABC9E5413F68DE /* PbRagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C9952DD19ABDBC802F05C3 /* PbRagService.swift */; };
 		B61EE128C634ECD47532E910 /* EngineStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525E137B6C99026B7E69979D /* EngineStats.swift */; };
 		B6F744DD748EBD271E452D28 /* FeaturesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9A065CD4FBC79F8AADB1A5 /* FeaturesView.swift */; };
 		BBEDABA60C247CE4870DA41D /* PbConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 625499EDB87030A538A4069B /* PbConnection.swift */; };
@@ -190,6 +191,7 @@
 		8CECC5996ECF5A7DE737703F /* TransportMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportMap.swift; sourceTree = "<group>"; };
 		8D171ACD2B6631DD7922AD6D /* FeatureDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureDetailView.swift; sourceTree = "<group>"; };
 		8F7D6169F28D0F9D50B48895 /* DotnetNativeInteropScreenshots.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DotnetNativeInteropScreenshots.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90C9952DD19ABDBC802F05C3 /* PbRagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbRagService.swift; sourceTree = "<group>"; };
 		924C7D3A4D30513D43E0B5F8 /* LatencyHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatencyHubView.swift; sourceTree = "<group>"; };
 		94FD614241BF9EED78D974FE /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../core/DotnetNativeInterop.Engine/Ai/assets; sourceTree = SOURCE_ROOT; };
 		95C9034A32E0B62F5385E1B3 /* edge-index.db */ = {isa = PBXFileReference; path = "edge-index.db"; sourceTree = "<group>"; };
@@ -338,6 +340,7 @@
 				9EA015C268A6250E829204FC /* EngineRagService.swift */,
 				74C86A172F204A6A2DDBD6B8 /* FFIRagService.swift */,
 				37970606261E00DB58B16838 /* HTTPRagService.swift */,
+				90C9952DD19ABDBC802F05C3 /* PbRagService.swift */,
 				1E226B00614D9BE8DCF6C682 /* RagError.swift */,
 				8BC2B8BBE2D198C78C2551B7 /* RagModels.swift */,
 				60EB1F53C3F8FB85F15642DB /* RagViewModel.swift */,
@@ -688,6 +691,7 @@
 				BBEDABA60C247CE4870DA41D /* PbConnection.swift in Sources */,
 				D9D3677776262E012FEF7B42 /* PbEnvelopes.swift in Sources */,
 				9032934C17CAB737F8FCA63E /* PbFeatureService.swift in Sources */,
+				B58B9EA76DABC9E5413F68DE /* PbRagService.swift in Sources */,
 				0A887469ADE154B2BD0EBC94 /* QueryInput.swift in Sources */,
 				C0FCE158F04195969471FDA0 /* RagError.swift in Sources */,
 				54B676C359971707E282BC9C /* RagModels.swift in Sources */,

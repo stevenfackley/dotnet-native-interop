@@ -24,9 +24,13 @@ enum Instrument {
     static let fail = Color(hex: 0xF87171)
     static let warn = Color(hex: 0xFBBF24)
 
+    /// Violet — the framed-protobuf ("Binary") transport (Wave B Plan B). Mirrored in the Android theme.
+    static let transportBinary = Color(hex: 0xA78BFA)
+
     static func transport(_ kind: TransportKind) -> Color {
         switch kind {
         case .ffi:    return Color(hex: 0x34D399)
+        case .binary: return transportBinary
         case .http:   return Color(hex: 0xFBBF24)
         case .sqlite: return Color(hex: 0xFB7185)
         }
