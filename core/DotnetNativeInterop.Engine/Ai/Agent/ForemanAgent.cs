@@ -5,11 +5,27 @@ namespace DotnetNativeInterop.Engine.Ai.Agent;
 
 /// <summary>
 /// The Foreman turn loop. Bounded, brain-agnostic. Emits an <c>agent.turn</c> span and an
-/// <c>agent.tool.&lt;name&gt;</c> span per tool call so every step shows in the Wave B trace waterfall.
+/// <c>agent.tool.&lt;name&gt;</c> span per tool call so every step shows in the Wave B trace waterfall —
+/// each tool span additionally carries the bounded <c>dni.agent.tool_args</c>/<c>dni.agent.tool_result</c>
+/// tags (see <see cref="MaxToolArgsChars"/>/<see cref="MaxToolResultChars"/>) so a client can render
+/// "search_manuals(...) -&gt; ..." instead of just a name and a duration.
 /// </summary>
 public sealed class ForemanAgent
 {
     public const int MaxToolSteps = 5;
+
+    /// <summary>Max chars of the <c>dni.agent.tool_args</c> span tag before truncation (see <see cref="Bound"/>).</summary>
+    public const int MaxToolArgsChars = 256;
+
+    /// <summary>
+    /// Max chars of the <c>dni.agent.tool_result</c> span tag before truncation — larger than
+    /// <see cref="MaxToolArgsChars"/> because tool results (e.g. search_manuals snippets, gclab JSON) are
+    /// typically bigger than the args that produced them.
+    /// </summary>
+    public const int MaxToolResultChars = 512;
+
+    private const string TruncatedSuffix = "…(truncated)";
+
     // Reuse the Wave B engine trace source (the SAME ActivitySource EngineTrace records from — not a
     // second one that merely shares the name) so agent spans land in the very ring/drain/waterfall the
     // native UI already reads.
@@ -93,8 +109,12 @@ public sealed class ForemanAgent
             using (var span = Trace.StartActivity($"agent.tool.{call.Tool}"))
             {
                 EngineTrace.RecordAgentToolCall(call.Tool);
+                span?.SetTag("dni.agent.tool_args", Bound(call.ArgsJson, MaxToolArgsChars));
                 if (tool is null) { result = "{\"error\":\"unknown tool\"}"; span?.SetTag("dni.agent.tool_known", false); }
                 else { try { result = await tool.Invoke(call.ArgsJson, ct); } catch (Exception ex) when (ex is not OperationCanceledException) { result = $"{{\"error\":\"{ex.GetType().Name}\"}}"; } }
+                // Tagged AFTER both branches above so a failed/unknown call's JSON error is what lands in
+                // the tag — the strip must show the failure honestly, never a blank result.
+                span?.SetTag("dni.agent.tool_result", Bound(result, MaxToolResultChars));
             }
             ctx.Steps.Add(new AgentStep(AgentStep.KindToolCall, call.Tool, call.ArgsJson));
             ctx.Steps.Add(new AgentStep(AgentStep.KindToolResult, call.Tool, result));
@@ -107,4 +127,13 @@ public sealed class ForemanAgent
         foreach (var t in _tools) if (t.Name == name) return t;
         return null;
     }
+
+    /// <summary>
+    /// Clamps a tool-span tag value to <paramref name="max"/> chars, appending <see cref="TruncatedSuffix"/>
+    /// when it was longer (same clamp-and-disclose shape as <see cref="ConversationSession"/>'s history
+    /// clamp) — a large search_manuals/gclab result must never blow the (already bounded, 512-span)
+    /// trace-drain payload, but the truncation itself is always visible, never silent.
+    /// </summary>
+    private static string Bound(string s, int max) =>
+        s.Length <= max ? s : string.Concat(s.AsSpan(0, max), TruncatedSuffix);
 }

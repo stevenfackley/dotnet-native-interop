@@ -48,4 +48,41 @@ public class TraceModelsTest {
         assertEquals(0, drain.spans.size)
         assertEquals(0L, drain.dropped)
     }
+
+    @Test
+    public fun parsesAgentToolSpanWithToolArgsAndToolResultTags() {
+        // The additive fields dni_trace_drain now carries for agent.tool.<name> spans (see EngineTrace.cs
+        // / ForemanAgent.cs) — a plain Kotlin property match on the C# source-gen camelCase names, no
+        // custom SerialName mapping needed.
+        val drainJson = """
+            {
+              "nowUs": 500.0,
+              "dropped": 0,
+              "capacity": 512,
+              "spans": [
+                {"name":"agent.tool.search_manuals","startUs":0.0,"durUs":5.0,"requestId":null,"status":null,
+                 "toolArgs":"{\"query\":\"E3\"}","toolResult":"{\"snippets\":[\"a\"]}"}
+              ]
+            }
+        """.trimIndent()
+
+        val drain = json.decodeFromString<TraceDrain>(drainJson)
+        val span = drain.spans[0]
+        assertEquals("{\"query\":\"E3\"}", span.toolArgs)
+        assertEquals("{\"snippets\":[\"a\"]}", span.toolResult)
+    }
+
+    @Test
+    public fun toolArgsAndToolResultDefaultToNullForOlderEngineBuildsMissingTheFields() {
+        // Backward compatibility: a drain payload from an engine build that predates this feature has no
+        // toolArgs/toolResult keys at all — must still parse, defaulting both to null, not throw.
+        val drainJson = """
+            {"nowUs":0.0,"dropped":0,"capacity":512,
+             "spans":[{"name":"pb.execute","startUs":0.0,"durUs":1.0,"requestId":null,"status":null}]}
+        """.trimIndent()
+
+        val drain = json.decodeFromString<TraceDrain>(drainJson)
+        assertNull(drain.spans[0].toolArgs)
+        assertNull(drain.spans[0].toolResult)
+    }
 }

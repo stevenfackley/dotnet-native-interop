@@ -87,3 +87,26 @@ public fun turnSpansFrom(drain: TraceDrain?, expectedToolSteps: Int): List<Trace
     val turnSpan = drain.spans.filter { it.name == "agent.turn" }.maxByOrNull { it.startUs }
     return (listOfNotNull(turnSpan) + toolSpans).sortedBy { it.startUs }
 }
+
+private const val TOOL_SPAN_PREFIX = "agent.tool."
+
+/** True for a tool-call span (as opposed to the one `agent.turn` span the strip also carries). */
+public fun TraceSpan.isToolCall(): Boolean = name.startsWith(TOOL_SPAN_PREFIX)
+
+/**
+ * Formats one `agent.tool.<name>` span as `name(args) -> result` for the Foreman tool-call strip — the
+ * REAL args/result the engine tagged on this span (`dni.agent.tool_args`/`dni.agent.tool_result`, see
+ * `EngineTrace`/`ForemanAgent.cs`), already bounded + truncated engine-side (args <= 256 chars, result
+ * <= 512 chars, a visible `"…(truncated)"` suffix when clamped) — not a per-tool hand-tuned summary, so
+ * it stays honest and generic across every current and future tool. A failed/unknown tool call still
+ * shows its JSON error here (the engine tags the error as the result, never leaves it blank).
+ *
+ * Falls back to an explicit "not captured" placeholder (never a blank string) for a span drained from an
+ * engine build that predates these tags, so an old/new build mismatch reads as missing data, not a bug.
+ */
+public fun formatToolCall(span: TraceSpan): String {
+    val name = span.name.removePrefix(TOOL_SPAN_PREFIX)
+    val args = span.toolArgs ?: "(args not captured)"
+    val result = span.toolResult ?: "(result not captured)"
+    return "$name($args) -> $result"
+}

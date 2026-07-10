@@ -11,7 +11,20 @@ namespace DotnetNativeInterop.Engine;
 /// <param name="DurUs">Span wall-clock duration in microseconds (high-res, from <see cref="Activity.Duration"/>).</param>
 /// <param name="RequestId">The client-supplied correlation id where one was passed; otherwise null.</param>
 /// <param name="Status">The activity status when it is not <see cref="ActivityStatusCode.Unset"/>; otherwise null.</param>
-public sealed record TraceSpan(string Name, double StartUs, double DurUs, string? RequestId, string? Status);
+/// <param name="ToolArgs">
+/// The bounded <c>dni.agent.tool_args</c> tag — the JSON args a Foreman tool call was invoked with,
+/// truncated with a visible <c>"…(truncated)"</c> marker past <see cref="Ai.Agent.ForemanAgent.MaxToolArgsChars"/>
+/// (see <see cref="Ai.Agent.ForemanAgent"/>). Null for every span that isn't an <c>agent.tool.&lt;name&gt;</c> span.
+/// </param>
+/// <param name="ToolResult">
+/// The bounded <c>dni.agent.tool_result</c> tag — the tool's JSON result (or a JSON error object if the
+/// tool threw/was unknown — a failure is tagged honestly, never left blank), truncated the same way past
+/// <see cref="Ai.Agent.ForemanAgent.MaxToolResultChars"/>. Null for every span that isn't an
+/// <c>agent.tool.&lt;name&gt;</c> span.
+/// </param>
+public sealed record TraceSpan(
+    string Name, double StartUs, double DurUs, string? RequestId, string? Status,
+    string? ToolArgs = null, string? ToolResult = null);
 
 /// <summary>
 /// The <c>dni_trace_drain</c> payload: every span recorded since the previous drain, plus the engine's
@@ -156,7 +169,13 @@ public static class EngineTrace
         var startUs = NowUs() - durUs;
         var requestId = activity.GetTagItem("dni.request_id") as string;
         var status = activity.Status == ActivityStatusCode.Unset ? null : activity.Status.ToString();
-        var span = new TraceSpan(activity.OperationName, Math.Round(startUs, 1), Math.Round(durUs, 1), requestId, status);
+        // Foreman's agent.tool.<name> spans (ForemanAgent.cs) tag these two — every other span leaves
+        // them null. Already bounded by ForemanAgent before SetTag, so no further clamping needed here;
+        // this is a straight passthrough, not a second truncation pass.
+        var toolArgs = activity.GetTagItem("dni.agent.tool_args") as string;
+        var toolResult = activity.GetTagItem("dni.agent.tool_result") as string;
+        var span = new TraceSpan(activity.OperationName, Math.Round(startUs, 1), Math.Round(durUs, 1), requestId, status,
+            toolArgs, toolResult);
 
         SpansRecorded.Add(1);
         // Tagged by operation name so the aggregator can report duration count/sum/min/max PER operation
