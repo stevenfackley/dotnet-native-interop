@@ -33,15 +33,41 @@ struct TelemetryView: View {
                 TelemetryStrip(stats: poller.stats)
             }
             .instrumentRow()
-            Section("Managed heap (MB)") {
+            Section("Managed heap / committed (MB)") {
+                // Heap is the story (primary = textPrimary); committed is supporting context (muted =
+                // textTertiary), NOT accent — the facelift reserves accent for interaction/in-flight,
+                // not decoration. Colors are name-mapped, so heap stays primary regardless of draw order.
+                let heapPoints = poller.heapHistory.enumerated().map { (x: Double($0.offset), y: $0.element) }
+                let gcEvents = Array(LatencyStats.collectionEventXs(heapPoints).prefix(10))
                 Chart {
                     ForEach(Array(poller.heapHistory.enumerated()), id: \.offset) { index, mb in
                         LineMark(x: .value("t", index), y: .value("MB", mb))
-                            .foregroundStyle(Instrument.accent)
+                            .foregroundStyle(by: .value("series", "heap"))
+                    }
+                    ForEach(Array(poller.committedHistory.enumerated()), id: \.offset) { index, mb in
+                        LineMark(x: .value("t", index), y: .value("MB", mb))
+                            .foregroundStyle(by: .value("series", "committed"))
+                    }
+                    // GC give-backs detected from the heap series (facelift spec §5): a point-to-point
+                    // heap drop > 10% of peak → dashed warn "GC" (only the first is labelled).
+                    ForEach(Array(gcEvents.enumerated()), id: \.offset) { idx, x in
+                        RuleMark(x: .value("t", x))
+                            .foregroundStyle(Instrument.warn)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                            .annotation(position: .top, alignment: .leading) {
+                                if idx == 0 {
+                                    Text("GC").font(.system(size: 9)).foregroundStyle(Instrument.warn)
+                                }
+                            }
                     }
                 }
-                .chartYAxisLabel("heap MB")
-                .frame(height: 200)
+                .chartForegroundStyleScale(
+                    domain: ["heap", "committed"],
+                    range: [Instrument.textPrimary, Instrument.textTertiary]
+                )
+                .chartYAxisLabel("MB")
+                .chartLegend(position: .bottom)
+                .frame(height: 240)
             }
             .instrumentRow()
         }
