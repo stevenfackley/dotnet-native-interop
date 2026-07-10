@@ -53,6 +53,30 @@ The repo lives on both Windows (edit) and the Mac (build). `clawagent` can read 
      "tar -xf - -C /Users/steve/dotnet-ios-android-poc-native-frontend"
    ```
 
+## Fresh-tree sync + reachability gotchas (learned 2026-07-10)
+
+- **`git archive` omits gitignored build-artifact deps.** A clean `git archive HEAD | tar -x` fresh tree is
+  missing anything gitignored-and-built. The NativeAOT iOS link needs
+  `native/llama-shim/build/{ios-arm64,iossimulator-arm64}/lib/*.a` (llama.cpp/ggml + the `dni_llama` shim),
+  which are gitignored → `build-ios-framework.sh` fails at link with `clang: no such file: libggml*.a`.
+  Recover them from a prior build tree (`~/dni-rag-build/native/llama-shim/build/*/lib/`): ABI-safe to reuse
+  when `dni_llama.cpp` / `dni_llama.h` / `CMakeLists.txt` **md5-match** (llama tag `b9542` is pinned, so the
+  ggml/llama libs are immutable). Otherwise rebuild:
+  `CMAKE=/opt/homebrew/bin/cmake bash native/llama-shim/build-llama.sh <ios-arm64|iossimulator-arm64>`
+  (needs a network clone of llama.cpp `b9542`).
+- **Verify LFS bytes shipped, not pointer stubs.** `git archive` from the Windows working tree DOES smudge
+  the real LFS bytes when git-lfs is configured there — confirm with `tar -tvf` sizes before shipping
+  (`model.onnx` ≈ 90 MB, `onnxruntime` slices 34 / 74 MB). The Mac has no `git-lfs`, so it can't `lfs pull`.
+- **Reach the Mac over the tailnet IP `100.80.151.78`, not mDNS `steve-mac-mini`.** `.local` resolution from
+  Windows flaps ("Could not resolve hostname"). And the Mac **sleeps when idle and drops off both LAN and
+  Tailscale at once** — a box reachable during active builds dies during any idle wait. Disable it up front:
+  `sudo pmset -a sleep 0 disksleep 0` (desktop Mac, safe) or keep a foreground `caffeinate -d` in a Terminal
+  tab. (A `caffeinate` fired over an already-dropping SSH does NOT hold it.)
+- **Simulator build needs an arm64-only destination.** The `dni.xcframework` sim slice is
+  `ios-arm64-simulator` (arm64 only), so `-destination 'generic/platform=iOS Simulator'` also builds x86_64
+  and fails to link. Use a concrete arm64 sim (`-destination 'platform=iOS Simulator,name=iPhone 17 Pro'`)
+  or force `ARCHS=arm64 ONLY_ACTIVE_ARCH=YES`.
+
 ## Code-signing over SSH (`errSecInternalComponent`) — THE key gotcha
 
 `xcodebuild` over SSH fails at `CodeSign` with `errSecInternalComponent` because **the login keychain is
