@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04CEB3C42A3ADCE39DA9E3C3 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 61D4C179763D3FD50B573658 /* SwiftProtobuf */; };
 		0779FBECFA671D269407C043 /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11E35B447C7709469724986 /* Badges.swift */; };
 		0A887469ADE154B2BD0EBC94 /* QueryInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = E604FFFA50EF3E36CB33B863 /* QueryInput.swift */; };
 		0F88EBB2F79AB455417C460F /* EdgeSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF69E5BA8F594CE3AA0045AE /* EdgeSearchView.swift */; };
@@ -45,6 +46,7 @@
 		6D2D0FD2811DD498AE4BD8DE /* BoundaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D572EDD2330D68BF3BD2B7 /* BoundaryService.swift */; };
 		717F0B669E9CFA6F5FD5E64A /* TelemetryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADC8880C8FDE7BF55ED760E /* TelemetryService.swift */; };
 		71AF908E272AD81A08999AC4 /* PayloadScalingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13825E0E9ACA9C1A1431AFC /* PayloadScalingView.swift */; };
+		758895446EEACDBB42D52097 /* dni_frame.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AD3E29CA4CBDA5822EFE3A /* dni_frame.pb.swift */; };
 		790D2D73A303C0F1A3C26BCB /* UnifiedApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B8CFA76EF317AB28C91EDA /* UnifiedApp.swift */; };
 		797E2516339D7D68EBE58226 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 94FD614241BF9EED78D974FE /* assets */; };
 		7DFE3486F2B6E704421AC45B /* TransportMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CECC5996ECF5A7DE737703F /* TransportMap.swift */; };
@@ -67,11 +69,13 @@
 		AD3066C36D4B39FB96E1793F /* onnxruntime.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 75DD168902EA8DB07E63F4B2 /* onnxruntime.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AE11EA180F027B843A0D7049 /* FFIFeatureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E18AAE7F99215809CCF30B5 /* FFIFeatureService.swift */; };
 		AE9B1B60FFC9A8A45094EBDE /* RasterDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302375BD329DC28D7513E9BC /* RasterDemo.swift */; };
+		AF48D3C5E2FF13383ADA818C /* PbWireContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50AD514E49E8F1C1C62EF187 /* PbWireContractTests.swift */; };
 		B269C5EC2613668D194E8FE8 /* EdgeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3AA2986225C07A6418025D /* EdgeModels.swift */; };
 		B61EE128C634ECD47532E910 /* EngineStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525E137B6C99026B7E69979D /* EngineStats.swift */; };
 		B6F744DD748EBD271E452D28 /* FeaturesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9A065CD4FBC79F8AADB1A5 /* FeaturesView.swift */; };
 		BF59757A461D04E5803EE779 /* FFIRagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C86A172F204A6A2DDBD6B8 /* FFIRagService.swift */; };
 		C0FCE158F04195969471FDA0 /* RagError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E226B00614D9BE8DCF6C682 /* RagError.swift */; };
+		C47BF60F660C5899BFA2203B /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 51B255DA88DBADE5DD066253 /* SwiftProtobuf */; };
 		C7916FC7ED4640836CBB3EF7 /* BoundaryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAE36AF74E1E7AB555982F87 /* BoundaryViewModelTests.swift */; };
 		CAE97307E01F6BF3800D123D /* VisualFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BEF4C2806C4FFA3EB0C6EE /* VisualFeature.swift */; };
 		CAEF9F5080C8D9617CC67277 /* AppleRagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA78359CA6D2259CDE8992A /* AppleRagService.swift */; };
@@ -154,12 +158,14 @@
 		4C9A065CD4FBC79F8AADB1A5 /* FeaturesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturesView.swift; sourceTree = "<group>"; };
 		4F804297EFE0D603A414D873 /* SQLiteRagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRagService.swift; sourceTree = "<group>"; };
 		4FA78359CA6D2259CDE8992A /* AppleRagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleRagService.swift; sourceTree = "<group>"; };
+		50AD514E49E8F1C1C62EF187 /* PbWireContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbWireContractTests.swift; sourceTree = "<group>"; };
 		5223992F1C8312632ED404F8 /* BoundaryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundaryModels.swift; sourceTree = "<group>"; };
 		525E137B6C99026B7E69979D /* EngineStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineStats.swift; sourceTree = "<group>"; };
 		52915C57CC07A8876517FF8B /* ShowcaseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowcaseModels.swift; sourceTree = "<group>"; };
 		60EB1F53C3F8FB85F15642DB /* RagViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RagViewModel.swift; sourceTree = "<group>"; };
 		624B3DC86CFD7B86DD9CDE56 /* EdgeSearchHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeSearchHubView.swift; sourceTree = "<group>"; };
 		62D25BEA9B1C32E2E7811DF2 /* EdgeSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeSearchEngine.swift; sourceTree = "<group>"; };
+		64AD3E29CA4CBDA5822EFE3A /* dni_frame.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = dni_frame.pb.swift; sourceTree = "<group>"; };
 		6AC92F8D82C3964808B11F30 /* BoundaryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundaryViewModel.swift; sourceTree = "<group>"; };
 		6E18AAE7F99215809CCF30B5 /* FFIFeatureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFIFeatureService.swift; sourceTree = "<group>"; };
 		6ECDAD7CBE8E8F7B35536E6B /* FeatureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureService.swift; sourceTree = "<group>"; };
@@ -220,12 +226,21 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		0570298B31A23E7CBE98BF74 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C47BF60F660C5899BFA2203B /* SwiftProtobuf in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5AA6A77AD24CBA5048893BD0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				2005691602753A6AD6EA58E7 /* dni.xcframework in Frameworks */,
 				D34323F48797D73316E3AA7D /* onnxruntime.xcframework in Frameworks */,
+				04CEB3C42A3ADCE39DA9E3C3 /* SwiftProtobuf in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -279,6 +294,7 @@
 				F7FBDE12C6272D38A0F48309 /* EdgeSearch */,
 				5DB9E3620F95C429D0F36638 /* Lab */,
 				013AFB19BBE5F25A5D2D39B2 /* Latency */,
+				E79F3C9D063A01973078A4DC /* Pb */,
 				A9A5F6E8E0432E242DB6552F /* Services */,
 				A5ABEB30F7F59056A516725D /* Telemetry */,
 				FA7BEEB1F8D7BDE89B979064 /* Theme */,
@@ -365,6 +381,7 @@
 				AAE36AF74E1E7AB555982F87 /* BoundaryViewModelTests.swift */,
 				875518F6B665FB3180CAE155 /* EdgeSearchAgreementTests.swift */,
 				3335EF5BEEFCFB67A614F6EB /* EdgeSearchSpikeTests.swift */,
+				50AD514E49E8F1C1C62EF187 /* PbWireContractTests.swift */,
 				A77AF8AB28E7659283EF4E30 /* TestsBridging.h */,
 			);
 			path = Tests;
@@ -434,6 +451,14 @@
 			);
 			sourceTree = "<group>";
 		};
+		E79F3C9D063A01973078A4DC /* Pb */ = {
+			isa = PBXGroup;
+			children = (
+				64AD3E29CA4CBDA5822EFE3A /* dni_frame.pb.swift */,
+			);
+			path = Pb;
+			sourceTree = "<group>";
+		};
 		F7FBDE12C6272D38A0F48309 /* EdgeSearch */ = {
 			isa = PBXGroup;
 			children = (
@@ -476,6 +501,7 @@
 			);
 			name = DotnetNativeInteropUnified;
 			packageProductDependencies = (
+				61D4C179763D3FD50B573658 /* SwiftProtobuf */,
 			);
 			productName = DotnetNativeInteropUnified;
 			productReference = F8AB90A99718227532F4169B /* DotnetNativeInteropUnified.app */;
@@ -486,6 +512,7 @@
 			buildConfigurationList = 4B74D99F5D786941CAD76E80 /* Build configuration list for PBXNativeTarget "DotnetNativeInteropTests" */;
 			buildPhases = (
 				440C474B4876C80778F2F4E5 /* Sources */,
+				0570298B31A23E7CBE98BF74 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -494,6 +521,7 @@
 			);
 			name = DotnetNativeInteropTests;
 			packageProductDependencies = (
+				51B255DA88DBADE5DD066253 /* SwiftProtobuf */,
 			);
 			productName = DotnetNativeInteropTests;
 			productReference = 42DA358A28FE2419D1CEBECD /* DotnetNativeInteropTests.xctest */;
@@ -545,6 +573,9 @@
 			);
 			mainGroup = B2E59CD10C21B9BC30239EEE;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9C96D8A73A2061C9A9F26664 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9E150EDF8429673ABF9B3C3A /* Products */;
 			projectDirPath = "";
@@ -579,6 +610,7 @@
 				C7916FC7ED4640836CBB3EF7 /* BoundaryViewModelTests.swift in Sources */,
 				656E50E265BBBA43091846D0 /* EdgeSearchAgreementTests.swift in Sources */,
 				5E1517B6F996B40FB4AE92DE /* EdgeSearchSpikeTests.swift in Sources */,
+				AF48D3C5E2FF13383ADA818C /* PbWireContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -667,6 +699,7 @@
 				790D2D73A303C0F1A3C26BCB /* UnifiedApp.swift in Sources */,
 				CAE97307E01F6BF3800D123D /* VisualFeature.swift in Sources */,
 				FCFE1359729EF72130FAA2A0 /* WordPieceTokenizer.swift in Sources */,
+				758895446EEACDBB42D52097 /* dni_frame.pb.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -981,6 +1014,30 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9C96D8A73A2061C9A9F26664 /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-protobuf.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.38.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		51B255DA88DBADE5DD066253 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9C96D8A73A2061C9A9F26664 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
+		61D4C179763D3FD50B573658 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9C96D8A73A2061C9A9F26664 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 56C47F875C2FEDA1BD2CF630 /* Project object */;
 }
