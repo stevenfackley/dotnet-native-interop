@@ -64,11 +64,23 @@ final class PbConnection {
 
     func close() { Darwin.close(fd) }
 
+    /// Writes one request Envelope as a frame. For a streaming call (rag), write once then call
+    /// `readEnvelope()` repeatedly until the terminal chunk.
+    func writeRequest(_ envelope: Dni_Frame_V1_Envelope) throws {
+        try writeFrame(try envelope.serializedData())
+    }
+
+    /// Reads the next response Envelope, or nil on a clean EOF at a frame boundary (peer closed politely).
+    func readEnvelope() throws -> Dni_Frame_V1_Envelope? {
+        guard let payload = try readFrame() else { return nil }
+        return try Dni_Frame_V1_Envelope(serializedBytes: payload)
+    }
+
     /// One request Envelope → one response Envelope.
     func request(_ envelope: Dni_Frame_V1_Envelope) throws -> Dni_Frame_V1_Envelope {
-        try writeFrame(try envelope.serializedData())
-        guard let payload = try readFrame() else { throw PbTransportError.closedEarly }
-        return try Dni_Frame_V1_Envelope(serializedBytes: payload)
+        try writeRequest(envelope)
+        guard let response = try readEnvelope() else { throw PbTransportError.closedEarly }
+        return response
     }
 
     // MARK: framing
