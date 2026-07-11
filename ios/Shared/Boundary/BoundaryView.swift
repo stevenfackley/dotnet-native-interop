@@ -37,6 +37,8 @@ struct BoundaryView: View {
 
                     inspectorPicker.revealCard(revealed, delay: 0.2)
                     BoundaryInspectorPanel(vm: viewModel).revealCard(revealed, delay: 0.25)
+
+                    trustLink.revealCard(revealed, delay: 0.3)
                 }
                 .padding(Instrument.Space.l)
             }
@@ -99,6 +101,28 @@ struct BoundaryView: View {
             ForEach(BoundaryInspector.allCases) { seg in Text(seg.label).tag(seg) }
         }
         .pickerStyle(.segmented)
+    }
+
+    /// Entry to the Trust inspector (per-transport security posture + the opt-in post-quantum channel).
+    private var trustLink: some View {
+        NavigationLink {
+            TrustView()
+        } label: {
+            HStack(spacing: Instrument.Space.m) {
+                Image(systemName: "lock.shield")
+                    .foregroundStyle(Instrument.transportBinary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Trust · security posture")
+                        .font(.subheadline).foregroundStyle(Instrument.textPrimary)
+                    Text("Per-transport posture + opt-in post-quantum channel")
+                        .font(.caption).foregroundStyle(Instrument.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(Instrument.textTertiary)
+            }
+            .instrumentCard()
+        }
+        .buttonStyle(.plain)
     }
 }
 

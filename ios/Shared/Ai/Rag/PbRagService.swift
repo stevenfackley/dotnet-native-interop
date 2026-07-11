@@ -10,9 +10,8 @@ final class PbRagService: EngineRagService, @unchecked Sendable {
             let task = Task.detached(priority: .userInitiated) {
                 var connection: PbConnection?
                 do {
-                    let port = dni_pb_start(0)
-                    guard port > 0 else { throw PbTransportError.serverUnavailable(port) }
-                    let conn = try PbConnection.open(port: port)
+                    // Opens in the transport's current mode (plaintext or PQ-secure — Trust owns the switch).
+                    let conn = try PbTransport.shared.open()
                     connection = conn
 
                     var envelope = Dni_Frame_V1_Envelope()
