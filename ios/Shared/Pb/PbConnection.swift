@@ -10,6 +10,7 @@ enum PbTransportError: LocalizedError {
     case frameTooLarge(UInt32)        // length prefix exceeds the 16 MiB cap
     case errorFrame(Int32, String)    // a typed ErrorFrame from the server
     case unexpectedBody(String)       // a well-formed response of the wrong oneof case
+    case pqUnavailable                // secure channel requested but CryptoKit PQ needs iOS 26+
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,7 @@ enum PbTransportError: LocalizedError {
         case .frameTooLarge(let n):     return "framed-protobuf: frame length \(n) exceeds the 16 MiB cap"
         case .errorFrame(let c, let m): return "framed-protobuf error \(c): \(m)"
         case .unexpectedBody(let b):    return "framed-protobuf: unexpected response body (\(b))"
+        case .pqUnavailable:            return "framed-protobuf PQ: the secure channel requires iOS 26+ (ML-KEM/ML-DSA)"
         }
     }
 }
@@ -33,10 +35,23 @@ final class PbConnection {
     private let fd: Int32
     private static let maxFrame: UInt32 = 16 * 1024 * 1024
 
+    /// Set together after a successful PQ handshake; nil = plaintext channel. Once set, every application
+    /// frame's payload is AES-256-GCM encrypted on write and decrypted on read. They stay nil DURING the
+    /// handshake so the offer/reply frames themselves are plaintext, exactly as the server expects. These
+    /// are plain closures (not the iOS-26-gated `AeadFrameCipher`) so `PbConnection` needs no availability
+    /// annotation — the gated cipher is captured inside the `if #available` block in `open`.
+    private var encryptFrame: ((Data) throws -> Data)?
+    private var decryptFrame: ((Data) throws -> Data)?
+
+    /// The live negotiated params after `open(port:secure:)` with secure=true — feeds the Trust inspector.
+    private(set) var pqParams: PqChannelParams?
+
     private init(fd: Int32) { self.fd = fd }
 
-    /// Connects to `port` on the loopback interface. Every failure path closes the fd so it can't leak.
-    static func open(port: Int32) throws -> PbConnection {
+    /// Connects to `port` on the loopback interface. When `secure`, runs the PQ handshake and attaches the
+    /// per-frame cipher before returning, so all subsequent frames are encrypted. Every failure path —
+    /// connect, handshake, or key derivation — closes the fd so it can't leak.
+    static func open(port: Int32, secure: Bool = false) throws -> PbConnection {
         let fd = socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { throw PbTransportError.connectFailed(errno) }
 
@@ -59,20 +74,46 @@ final class PbConnection {
             Darwin.close(fd)
             throw PbTransportError.connectFailed(e)
         }
-        return PbConnection(fd: fd)
+
+        let connection = PbConnection(fd: fd)
+        if secure {
+            // The PQ handshake needs CryptoKit's ML-KEM/ML-DSA (iOS 26+). On older OS the secure channel
+            // is simply unavailable — surfaced honestly rather than silently downgraded to plaintext.
+            guard #available(iOS 26.0, *) else {
+                connection.close()
+                throw PbTransportError.pqUnavailable
+            }
+            do {
+                let result = try PqHandshakeClient.handshake(connection) {
+                    DispatchTime.now().uptimeNanoseconds
+                }
+                let cipher = result.cipher                 // attach AFTER the plaintext handshake
+                connection.encryptFrame = { try cipher.encryptOutbound($0) }
+                connection.decryptFrame = { try cipher.decryptInbound($0) }
+                connection.pqParams = result.params
+            } catch {
+                connection.close()
+                throw error
+            }
+        }
+        return connection
     }
 
     func close() { Darwin.close(fd) }
 
     /// Writes one request Envelope as a frame. For a streaming call (rag), write once then call
-    /// `readEnvelope()` repeatedly until the terminal chunk.
+    /// `readEnvelope()` repeatedly until the terminal chunk. Encrypted when a cipher is attached.
     func writeRequest(_ envelope: Dni_Frame_V1_Envelope) throws {
-        try writeFrame(try envelope.serializedData())
+        var payload = try envelope.serializedData()
+        if let encryptFrame { payload = try encryptFrame(payload) }
+        try writeFrame(payload)
     }
 
     /// Reads the next response Envelope, or nil on a clean EOF at a frame boundary (peer closed politely).
+    /// Decrypted when a cipher is attached.
     func readEnvelope() throws -> Dni_Frame_V1_Envelope? {
-        guard let payload = try readFrame() else { return nil }
+        guard var payload = try readFrame() else { return nil }
+        if let decryptFrame { payload = try decryptFrame(payload) }
         return try Dni_Frame_V1_Envelope(serializedBytes: payload)
     }
 
