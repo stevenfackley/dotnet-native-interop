@@ -24,6 +24,7 @@
 		2D2E2F205F3EE1F47B408057 /* HTTPFeatureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9722F0521BF63B7B2EEC1F8 /* HTTPFeatureService.swift */; };
 		2F7221F6ABC0DDF7DEBDB496 /* BoundaryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5223992F1C8312632ED404F8 /* BoundaryModels.swift */; };
 		2FAC272EFFFFA23F90BDA443 /* BoundaryModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB93D44DE6BE3397675AC71F /* BoundaryModelsTests.swift */; };
+		314F2A06CB40724A0AE7F843 /* PbSecureChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC54DAE509AB2B20798F9F2 /* PbSecureChannelTests.swift */; };
 		315CCC8EE634E7276CAD3D6E /* LatencyStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFA185F1A7648783D0050CE /* LatencyStats.swift */; };
 		339E8F32BEA4ACB3EA00A9E9 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A3882A860F3F4A95B2843C /* DashboardView.swift */; };
 		3578256291E7A56F98BE3732 /* FeatureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ECDAD7CBE8E8F7B35536E6B /* FeatureService.swift */; };
@@ -43,14 +44,17 @@
 		619FCAC1156AF8AA589E402B /* SwimlaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE884FBE6070836900A82A31 /* SwimlaneView.swift */; };
 		654F56141F48F104F4122451 /* LatencyHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 924C7D3A4D30513D43E0B5F8 /* LatencyHubView.swift */; };
 		656E50E265BBBA43091846D0 /* EdgeSearchAgreementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875518F6B665FB3180CAE155 /* EdgeSearchAgreementTests.swift */; };
+		66BA7F9A6F688216153B7595 /* PbServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D3B069475EC9EDF4F1137A /* PbServer.swift */; };
 		6D2D0FD2811DD498AE4BD8DE /* BoundaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D572EDD2330D68BF3BD2B7 /* BoundaryService.swift */; };
 		717F0B669E9CFA6F5FD5E64A /* TelemetryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADC8880C8FDE7BF55ED760E /* TelemetryService.swift */; };
 		71AF908E272AD81A08999AC4 /* PayloadScalingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13825E0E9ACA9C1A1431AFC /* PayloadScalingView.swift */; };
+		71B5AA8E966CF29167610FF6 /* AeadFrameCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347EC1CD3062F240CA5506AA /* AeadFrameCipher.swift */; };
 		758895446EEACDBB42D52097 /* dni_frame.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AD3E29CA4CBDA5822EFE3A /* dni_frame.pb.swift */; };
 		790D2D73A303C0F1A3C26BCB /* UnifiedApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B8CFA76EF317AB28C91EDA /* UnifiedApp.swift */; };
 		797E2516339D7D68EBE58226 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 94FD614241BF9EED78D974FE /* assets */; };
 		7DFE3486F2B6E704421AC45B /* TransportMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CECC5996ECF5A7DE737703F /* TransportMap.swift */; };
 		7F819A38B9A5576157F7F1AE /* FractalExplorerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1E085D2E5C9D8E8E798474 /* FractalExplorerView.swift */; };
+		81B16B59A3FCC77246F82E94 /* PqHandshakeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A6A16B53DC3379D7FF57A7 /* PqHandshakeClient.swift */; };
 		8237168B179D836A1ED8E4AD /* ComparisonViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A0EF24BF4D1AA691724CF3 /* ComparisonViewModel.swift */; };
 		83F6AED77472ED9A15CD009A /* PbTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED613E180A8D3EF780493A63 /* PbTransportTests.swift */; };
 		84DE1441F33F6857F6345790 /* EngineRagService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EA015C268A6250E829204FC /* EngineRagService.swift */; };
@@ -151,14 +155,17 @@
 		29BEF4C2806C4FFA3EB0C6EE /* VisualFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualFeature.swift; sourceTree = "<group>"; };
 		2ADC8880C8FDE7BF55ED760E /* TelemetryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryService.swift; sourceTree = "<group>"; };
 		2BA73F23E417B49E8B0D45C8 /* BenchmarkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkView.swift; sourceTree = "<group>"; };
+		2FC54DAE509AB2B20798F9F2 /* PbSecureChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbSecureChannelTests.swift; sourceTree = "<group>"; };
 		302375BD329DC28D7513E9BC /* RasterDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RasterDemo.swift; sourceTree = "<group>"; };
 		3335EF5BEEFCFB67A614F6EB /* EdgeSearchSpikeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeSearchSpikeTests.swift; sourceTree = "<group>"; };
+		347EC1CD3062F240CA5506AA /* AeadFrameCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AeadFrameCipher.swift; sourceTree = "<group>"; };
 		3713AB4C895C42E1959B7BE1 /* WordPieceTokenizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordPieceTokenizer.swift; sourceTree = "<group>"; };
 		37970606261E00DB58B16838 /* HTTPRagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRagService.swift; sourceTree = "<group>"; };
 		3833D894082CFB78A30FB579 /* EvsOrt.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = EvsOrt.m; sourceTree = "<group>"; };
 		3F6B3D18925FE9D2BF05DA0D /* JSONDecode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONDecode.swift; sourceTree = "<group>"; };
 		42AD0106951BB3334BA14496 /* FeaturesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturesViewModel.swift; sourceTree = "<group>"; };
 		42DA358A28FE2419D1CEBECD /* DotnetNativeInteropTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DotnetNativeInteropTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		44D3B069475EC9EDF4F1137A /* PbServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbServer.swift; sourceTree = "<group>"; };
 		479E2AE90EB4B66A623A9B35 /* BridgingHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BridgingHeader.h; sourceTree = "<group>"; };
 		4C7762C9BAD754CA3BCF3547 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		4C9A065CD4FBC79F8AADB1A5 /* FeaturesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturesView.swift; sourceTree = "<group>"; };
@@ -182,6 +189,7 @@
 		74C86A172F204A6A2DDBD6B8 /* FFIRagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFIRagService.swift; sourceTree = "<group>"; };
 		75DD168902EA8DB07E63F4B2 /* onnxruntime.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = onnxruntime.xcframework; path = Frameworks/onnxruntime.xcframework; sourceTree = "<group>"; };
 		7737CFFE63994479155749A3 /* BoundaryInspectorPanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundaryInspectorPanels.swift; sourceTree = "<group>"; };
+		77A6A16B53DC3379D7FF57A7 /* PqHandshakeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PqHandshakeClient.swift; sourceTree = "<group>"; };
 		812694A7F8D7E6E6BA48D9BA /* PbEnvelopes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbEnvelopes.swift; sourceTree = "<group>"; };
 		840D9B99DDA565B102163FAA /* TelemetryStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryStrip.swift; sourceTree = "<group>"; };
 		875518F6B665FB3180CAE155 /* EdgeSearchAgreementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeSearchAgreementTests.swift; sourceTree = "<group>"; };
@@ -392,6 +400,7 @@
 				AAE36AF74E1E7AB555982F87 /* BoundaryViewModelTests.swift */,
 				875518F6B665FB3180CAE155 /* EdgeSearchAgreementTests.swift */,
 				3335EF5BEEFCFB67A614F6EB /* EdgeSearchSpikeTests.swift */,
+				2FC54DAE509AB2B20798F9F2 /* PbSecureChannelTests.swift */,
 				ED613E180A8D3EF780493A63 /* PbTransportTests.swift */,
 				50AD514E49E8F1C1C62EF187 /* PbWireContractTests.swift */,
 				A77AF8AB28E7659283EF4E30 /* TestsBridging.h */,
@@ -467,9 +476,12 @@
 		E79F3C9D063A01973078A4DC /* Pb */ = {
 			isa = PBXGroup;
 			children = (
+				347EC1CD3062F240CA5506AA /* AeadFrameCipher.swift */,
 				64AD3E29CA4CBDA5822EFE3A /* dni_frame.pb.swift */,
 				625499EDB87030A538A4069B /* PbConnection.swift */,
 				812694A7F8D7E6E6BA48D9BA /* PbEnvelopes.swift */,
+				44D3B069475EC9EDF4F1137A /* PbServer.swift */,
+				77A6A16B53DC3379D7FF57A7 /* PqHandshakeClient.swift */,
 			);
 			path = Pb;
 			sourceTree = "<group>";
@@ -625,6 +637,7 @@
 				C7916FC7ED4640836CBB3EF7 /* BoundaryViewModelTests.swift in Sources */,
 				656E50E265BBBA43091846D0 /* EdgeSearchAgreementTests.swift in Sources */,
 				5E1517B6F996B40FB4AE92DE /* EdgeSearchSpikeTests.swift in Sources */,
+				314F2A06CB40724A0AE7F843 /* PbSecureChannelTests.swift in Sources */,
 				83F6AED77472ED9A15CD009A /* PbTransportTests.swift in Sources */,
 				AF48D3C5E2FF13383ADA818C /* PbWireContractTests.swift in Sources */,
 			);
@@ -643,6 +656,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				136245C11062952D2D999265 /* AboutView.swift in Sources */,
+				71B5AA8E966CF29167610FF6 /* AeadFrameCipher.swift in Sources */,
 				8BD67846DDE1A09E43A37E4B /* AiHubView.swift in Sources */,
 				2144615136AC69E62147A6C3 /* AiViewModel.swift in Sources */,
 				E89EA368564218B8521F0C0C /* AnalysisView.swift in Sources */,
@@ -692,6 +706,8 @@
 				D9D3677776262E012FEF7B42 /* PbEnvelopes.swift in Sources */,
 				9032934C17CAB737F8FCA63E /* PbFeatureService.swift in Sources */,
 				B58B9EA76DABC9E5413F68DE /* PbRagService.swift in Sources */,
+				66BA7F9A6F688216153B7595 /* PbServer.swift in Sources */,
+				81B16B59A3FCC77246F82E94 /* PqHandshakeClient.swift in Sources */,
 				0A887469ADE154B2BD0EBC94 /* QueryInput.swift in Sources */,
 				C0FCE158F04195969471FDA0 /* RagError.swift in Sources */,
 				54B676C359971707E282BC9C /* RagModels.swift in Sources */,
