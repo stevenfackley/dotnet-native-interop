@@ -27,6 +27,9 @@ enum Instrument {
     /// Violet — the framed-protobuf ("Binary") transport (Wave B Plan B). Mirrored in the Android theme.
     static let transportBinary = Color(hex: 0xA78BFA)
 
+    /// Pink — agent.* trace spans + Foreman accents. Mirrored in the Android theme (work-order token).
+    static let agent = Color(hex: 0xF472B6)
+
     static func transport(_ kind: TransportKind) -> Color {
         switch kind {
         case .ffi:    return Color(hex: 0x34D399)
