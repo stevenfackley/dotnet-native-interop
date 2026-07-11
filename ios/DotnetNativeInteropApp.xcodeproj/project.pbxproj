@@ -7,9 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02128BF5B15736D3C09EDFBE /* PbTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A168FA1F217D27FC31DBE8E /* PbTransport.swift */; };
 		04CEB3C42A3ADCE39DA9E3C3 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 61D4C179763D3FD50B573658 /* SwiftProtobuf */; };
 		0779FBECFA671D269407C043 /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11E35B447C7709469724986 /* Badges.swift */; };
 		0A887469ADE154B2BD0EBC94 /* QueryInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = E604FFFA50EF3E36CB33B863 /* QueryInput.swift */; };
+		0C52B6D12F9DAF019E6A13AB /* TrustViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF459BE8F5BCB65196FDD1C /* TrustViewModel.swift */; };
 		0F88EBB2F79AB455417C460F /* EdgeSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF69E5BA8F594CE3AA0045AE /* EdgeSearchView.swift */; };
 		136245C11062952D2D999265 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7762C9BAD754CA3BCF3547 /* AboutView.swift */; };
 		18811DDFF6EA56EF155D93DF /* Instrument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E3654E45F9D9D312DE1DC8 /* Instrument.swift */; };
@@ -49,6 +51,7 @@
 		717F0B669E9CFA6F5FD5E64A /* TelemetryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADC8880C8FDE7BF55ED760E /* TelemetryService.swift */; };
 		71AF908E272AD81A08999AC4 /* PayloadScalingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13825E0E9ACA9C1A1431AFC /* PayloadScalingView.swift */; };
 		71B5AA8E966CF29167610FF6 /* AeadFrameCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347EC1CD3062F240CA5506AA /* AeadFrameCipher.swift */; };
+		73D353915C87806AA5E1988C /* TrustModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE34C8F324E514BDC940F8D0 /* TrustModels.swift */; };
 		758895446EEACDBB42D52097 /* dni_frame.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AD3E29CA4CBDA5822EFE3A /* dni_frame.pb.swift */; };
 		790D2D73A303C0F1A3C26BCB /* UnifiedApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B8CFA76EF317AB28C91EDA /* UnifiedApp.swift */; };
 		797E2516339D7D68EBE58226 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 94FD614241BF9EED78D974FE /* assets */; };
@@ -62,6 +65,7 @@
 		87F22D032F9450C1C885A90C /* RaymarcherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28550E230A4CC918E6E51480 /* RaymarcherView.swift */; };
 		8BD67846DDE1A09E43A37E4B /* AiHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE97383D5BB601F3A4AC179 /* AiHubView.swift */; };
 		8BD81D5217F68E1298DF6216 /* LabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7432E05F5C75908762C81346 /* LabViewModel.swift */; };
+		8D31C18323ED456F994E0695 /* TrustView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111B81B17F03D39AD26844F8 /* TrustView.swift */; };
 		9032934C17CAB737F8FCA63E /* PbFeatureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0692BE34371AACD8CFE7FA9C /* PbFeatureService.swift */; };
 		960AE75FBCFAA34715E29D81 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B051329D6A0450DCB19AAE25 /* SearchView.swift */; };
 		99F4812C51456DA058CB3642 /* InstrumentComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7F4900FCAC421E70263400 /* InstrumentComponents.swift */; };
@@ -92,6 +96,7 @@
 		D9D3677776262E012FEF7B42 /* PbEnvelopes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 812694A7F8D7E6E6BA48D9BA /* PbEnvelopes.swift */; };
 		DDFFFC8C0CFB217D270D8B63 /* TelemetryPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BE1D7D267E69B94AF37036 /* TelemetryPoller.swift */; };
 		DF096FDFC14EDB9C95A270BD /* TransportKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF5590EFF3323560DF481B5F /* TransportKind.swift */; };
+		DFD4F29C518C5D57FC751E29 /* TrustFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87C21AC8804C937FBA353CF3 /* TrustFlowTests.swift */; };
 		E4E9335DE62294945E6D2D51 /* SQLiteFeatureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17EC92632C8F1B70EEA603F /* SQLiteFeatureService.swift */; };
 		E625B6C9752A46EF0575A03E /* BoundaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19D9BF733CD00343B22521A /* BoundaryView.swift */; };
 		E7A7B42AB0A9EE60259822AA /* BoundaryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC92F8D82C3964808B11F30 /* BoundaryViewModel.swift */; };
@@ -143,6 +148,7 @@
 		0692BE34371AACD8CFE7FA9C /* PbFeatureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbFeatureService.swift; sourceTree = "<group>"; };
 		07E3BE4372815276B7CB34A1 /* DistributionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistributionView.swift; sourceTree = "<group>"; };
 		0E91540F935920DA691BEA15 /* JitterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JitterView.swift; sourceTree = "<group>"; };
+		111B81B17F03D39AD26844F8 /* TrustView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustView.swift; sourceTree = "<group>"; };
 		120E6801A4D3103707EF465D /* LabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabView.swift; sourceTree = "<group>"; };
 		18331F267271F869360A4B5F /* AnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalysisView.swift; sourceTree = "<group>"; };
 		1864CFCCD3B9DADD0365BDA0 /* TransportPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportPicker.swift; sourceTree = "<group>"; };
@@ -190,9 +196,11 @@
 		75DD168902EA8DB07E63F4B2 /* onnxruntime.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = onnxruntime.xcframework; path = Frameworks/onnxruntime.xcframework; sourceTree = "<group>"; };
 		7737CFFE63994479155749A3 /* BoundaryInspectorPanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundaryInspectorPanels.swift; sourceTree = "<group>"; };
 		77A6A16B53DC3379D7FF57A7 /* PqHandshakeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PqHandshakeClient.swift; sourceTree = "<group>"; };
+		7AF459BE8F5BCB65196FDD1C /* TrustViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustViewModel.swift; sourceTree = "<group>"; };
 		812694A7F8D7E6E6BA48D9BA /* PbEnvelopes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbEnvelopes.swift; sourceTree = "<group>"; };
 		840D9B99DDA565B102163FAA /* TelemetryStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryStrip.swift; sourceTree = "<group>"; };
 		875518F6B665FB3180CAE155 /* EdgeSearchAgreementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeSearchAgreementTests.swift; sourceTree = "<group>"; };
+		87C21AC8804C937FBA353CF3 /* TrustFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustFlowTests.swift; sourceTree = "<group>"; };
 		89EC05E41C2FFB30860CD33A /* SearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResult.swift; sourceTree = "<group>"; };
 		8A3AA2986225C07A6418025D /* EdgeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeModels.swift; sourceTree = "<group>"; };
 		8BC2B8BBE2D198C78C2551B7 /* RagModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RagModels.swift; sourceTree = "<group>"; };
@@ -203,10 +211,12 @@
 		924C7D3A4D30513D43E0B5F8 /* LatencyHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatencyHubView.swift; sourceTree = "<group>"; };
 		94FD614241BF9EED78D974FE /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../core/DotnetNativeInterop.Engine/Ai/assets; sourceTree = SOURCE_ROOT; };
 		95C9034A32E0B62F5385E1B3 /* edge-index.db */ = {isa = PBXFileReference; path = "edge-index.db"; sourceTree = "<group>"; };
+		9A168FA1F217D27FC31DBE8E /* PbTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PbTransport.swift; sourceTree = "<group>"; };
 		9EA015C268A6250E829204FC /* EngineRagService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineRagService.swift; sourceTree = "<group>"; };
 		A6A29D1A23CF679B1D962CC8 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A77AF8AB28E7659283EF4E30 /* TestsBridging.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestsBridging.h; sourceTree = "<group>"; };
 		AAE36AF74E1E7AB555982F87 /* BoundaryViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundaryViewModelTests.swift; sourceTree = "<group>"; };
+		AE34C8F324E514BDC940F8D0 /* TrustModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustModels.swift; sourceTree = "<group>"; };
 		B051329D6A0450DCB19AAE25 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		B11E35B447C7709469724986 /* Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Badges.swift; sourceTree = "<group>"; };
 		BA254DFDF8859380EB16D028 /* dni.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = dni.xcframework; path = Frameworks/dni.xcframework; sourceTree = "<group>"; };
@@ -280,6 +290,16 @@
 			path = Latency;
 			sourceTree = "<group>";
 		};
+		035B4E27A915BCD959CDD17E /* Trust */ = {
+			isa = PBXGroup;
+			children = (
+				AE34C8F324E514BDC940F8D0 /* TrustModels.swift */,
+				111B81B17F03D39AD26844F8 /* TrustView.swift */,
+				7AF459BE8F5BCB65196FDD1C /* TrustViewModel.swift */,
+			);
+			path = Trust;
+			sourceTree = "<group>";
+		};
 		28965C9B42EA4DB5A6D33535 /* Ai */ = {
 			isa = PBXGroup;
 			children = (
@@ -316,6 +336,7 @@
 				A9A5F6E8E0432E242DB6552F /* Services */,
 				A5ABEB30F7F59056A516725D /* Telemetry */,
 				FA7BEEB1F8D7BDE89B979064 /* Theme */,
+				035B4E27A915BCD959CDD17E /* Trust */,
 				4C7762C9BAD754CA3BCF3547 /* AboutView.swift */,
 				18331F267271F869360A4B5F /* AnalysisView.swift */,
 				B11E35B447C7709469724986 /* Badges.swift */,
@@ -404,6 +425,7 @@
 				ED613E180A8D3EF780493A63 /* PbTransportTests.swift */,
 				50AD514E49E8F1C1C62EF187 /* PbWireContractTests.swift */,
 				A77AF8AB28E7659283EF4E30 /* TestsBridging.h */,
+				87C21AC8804C937FBA353CF3 /* TrustFlowTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -481,6 +503,7 @@
 				625499EDB87030A538A4069B /* PbConnection.swift */,
 				812694A7F8D7E6E6BA48D9BA /* PbEnvelopes.swift */,
 				44D3B069475EC9EDF4F1137A /* PbServer.swift */,
+				9A168FA1F217D27FC31DBE8E /* PbTransport.swift */,
 				77A6A16B53DC3379D7FF57A7 /* PqHandshakeClient.swift */,
 			);
 			path = Pb;
@@ -640,6 +663,7 @@
 				314F2A06CB40724A0AE7F843 /* PbSecureChannelTests.swift in Sources */,
 				83F6AED77472ED9A15CD009A /* PbTransportTests.swift in Sources */,
 				AF48D3C5E2FF13383ADA818C /* PbWireContractTests.swift in Sources */,
+				DFD4F29C518C5D57FC751E29 /* TrustFlowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -707,6 +731,7 @@
 				9032934C17CAB737F8FCA63E /* PbFeatureService.swift in Sources */,
 				B58B9EA76DABC9E5413F68DE /* PbRagService.swift in Sources */,
 				66BA7F9A6F688216153B7595 /* PbServer.swift in Sources */,
+				02128BF5B15736D3C09EDFBE /* PbTransport.swift in Sources */,
 				81B16B59A3FCC77246F82E94 /* PqHandshakeClient.swift in Sources */,
 				0A887469ADE154B2BD0EBC94 /* QueryInput.swift in Sources */,
 				C0FCE158F04195969471FDA0 /* RagError.swift in Sources */,
@@ -732,6 +757,9 @@
 				DF096FDFC14EDB9C95A270BD /* TransportKind.swift in Sources */,
 				7DFE3486F2B6E704421AC45B /* TransportMap.swift in Sources */,
 				2C91ADC8B28D8AD1C897AEBB /* TransportPicker.swift in Sources */,
+				73D353915C87806AA5E1988C /* TrustModels.swift in Sources */,
+				8D31C18323ED456F994E0695 /* TrustView.swift in Sources */,
+				0C52B6D12F9DAF019E6A13AB /* TrustViewModel.swift in Sources */,
 				790D2D73A303C0F1A3C26BCB /* UnifiedApp.swift in Sources */,
 				CAE97307E01F6BF3800D123D /* VisualFeature.swift in Sources */,
 				FCFE1359729EF72130FAA2A0 /* WordPieceTokenizer.swift in Sources */,

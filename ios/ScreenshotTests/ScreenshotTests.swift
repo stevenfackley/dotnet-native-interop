@@ -80,6 +80,9 @@ final class ScreenshotTests: XCTestCase {
         drillAndRun("Jitter over time", run: "Sample 400 sequential pings", settle: 16, as: "19-jitter")
         drillAndRun("Payload scaling", run: "Sweep payload sizes", settle: 35, as: "20-payload-scaling")
         captureTelemetry(as: "21-telemetry")
+
+        // --- Trust inspector (from the Boundary hub): per-transport posture + the post-quantum toggle ---
+        captureTrust(as: "22-trust")
     }
 
     // MARK: - Capture
@@ -210,6 +213,27 @@ final class ScreenshotTests: XCTestCase {
         sleep(15)
         shot(name)
         // No goBack(): this is the final capture, so no navigation follows.
+    }
+
+    /// Trust inspector: from the Boundary hub, reveal + open the Trust link, screenshot the honest
+    /// plaintext posture, flip the post-quantum toggle (a real ML-KEM/ML-DSA handshake runs), then
+    /// screenshot the ENCRYPTED posture with the live negotiated params.
+    private func captureTrust(as base: String) {
+        tapTab("Boundary")
+        sleep(1)
+        // The Trust link sits at the bottom of the Boundary scroll — swipe to reveal it.
+        app.swipeUp(); app.swipeUp(); sleep(1)
+        guard tapRow("Trust · security posture") else { goBack(); return }
+        sleep(2)
+        shot("\(base)-plaintext")
+        let toggle = app.switches.firstMatch
+        if toggle.waitForExistence(timeout: 5) {
+            toggle.tap()
+            // Let the pb server restart in PQ mode + the ML-KEM/ML-DSA handshake complete + posture refresh.
+            sleep(5)
+            shot("\(base)-pq")
+        }
+        goBack()
     }
 
     /// Engine telemetry: enter, toggle the stress switch so GC/heap move, screenshot, stop, pop back.

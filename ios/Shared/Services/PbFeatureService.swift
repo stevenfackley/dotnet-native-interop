@@ -29,14 +29,13 @@ struct PbFeatureService: FeatureService {
         }
     }
 
-    /// Starts the pb server (idempotent), opens a connection on its port, runs `work`, and always closes.
+    /// Opens a connection in the transport's current mode (plaintext or PQ-secure — the Trust inspector
+    /// owns the switch via `PbTransport`), runs `work`, and always closes.
     private func roundTrip<T: Sendable>(
         _ work: @escaping @Sendable (PbConnection) throws -> T
     ) async throws -> T {
         try await Task.detached(priority: .userInitiated) {
-            let port = dni_pb_start(0)                       // flags 0 = plaintext (no PQ handshake)
-            guard port > 0 else { throw PbTransportError.serverUnavailable(port) }
-            let conn = try PbConnection.open(port: port)
+            let conn = try PbTransport.shared.open()
             defer { conn.close() }
             return try work(conn)
         }.value
