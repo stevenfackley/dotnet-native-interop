@@ -44,6 +44,28 @@ public class AgentModelsTest {
     }
 
     @Test
+    public fun doubledControlBytePrefixStillParses() {
+        // Ground-truth regression: the LIVE engine writes the marker with a REPEATED 0x01 prefix
+        // (0x01 0x01 dni.agent.status…), captured from a real iOS turn on the simulator. A fixed-length
+        // skip lands a byte short and yields invalid JSON; the tag-anchored parse must still decode it.
+        val doubled = "$CONTROL_BYTE$CONTROL_BYTE$STATUS_TAG" +
+            "{\"stopReason\":\"Answered\",\"toolSteps\":0,\"backend\":\"scripted routing — no on-device LLM present\"}"
+        val fragment = parseAgentFragment(doubled)
+        assertTrue(fragment is AgentFragment.Status)
+        val status = (fragment as AgentFragment.Status).status
+        assertEquals(AgentStopReason.Answered, status.stopReason)
+        assertEquals(0, status.toolSteps)
+        assertEquals("scripted routing — no on-device LLM present", status.backend)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    public fun controlByteWithoutTagThrows() {
+        // A leading 0x01 with no readable tag is a malformed marker → an honest throw (the service maps it
+        // to an Error status), never a mis-parse.
+        parseAgentFragment("$CONTROL_BYTE{\"stopReason\":\"Answered\"}")
+    }
+
+    @Test
     public fun controlByteFragmentParsesStepCapReachedStatus() {
         val fragment = parseAgentFragment(statusFragment("StepCapReached", 5, "scripted (harness)"))
         val status = (fragment as AgentFragment.Status).status
