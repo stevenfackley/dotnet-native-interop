@@ -18,9 +18,10 @@ final class ScreenshotTests: XCTestCase {
         sleep(3)
     }
 
-    /// 5 top-level sections per the 2026-06-21 IA collapse (was 9 tabs): Boundary, Catalog, Lab, Search
-    /// (segmented AI/Manuals), Analysis (segmented Dashboard/Compare/Latency). About is demoted to a
-    /// toolbar ⓘ, present on Boundary AND each Analysis child screen.
+    /// 6 top-level sections: Boundary, Foreman (the on-device tool-calling agent, added after the
+    /// 2026-06-21 IA collapse's 5), Catalog, Lab, Search (segmented AI/Manuals), Analysis (segmented
+    /// Dashboard/Compare/Latency). About is demoted to a toolbar ⓘ, present on Boundary AND each
+    /// Analysis child screen.
     func testCaptureEveryScreen() {
         // --- Boundary (hero/default landing tab; FFI lifecycle trace) ---
         tapTab("Boundary")
@@ -83,6 +84,9 @@ final class ScreenshotTests: XCTestCase {
 
         // --- Trust inspector (from the Boundary hub): per-transport posture + the post-quantum toggle ---
         captureTrust(as: "22-trust")
+
+        // --- Foreman (on-device tool-calling agent): one full turn with badges + tool-call strip ---
+        captureForeman(as: "23-foreman")
     }
 
     // MARK: - Capture
@@ -234,6 +238,21 @@ final class ScreenshotTests: XCTestCase {
             shot("\(base)-pq")
         }
         goBack()
+    }
+
+    /// Foreman agent: switch to the Foreman tab, type a maintenance question, submit (onSubmit runs a
+    /// full agent turn), wait for it to complete, screenshot the turn with its outcome/backend badges.
+    private func captureForeman(as name: String) {
+        tapTab("Foreman")
+        sleep(1)
+        let field = app.textFields.firstMatch
+        if field.waitForExistence(timeout: 6) {
+            field.tap()
+            field.typeText("how do I reset the compressor?\n")
+        }
+        // The router brain decides fast, but a search_manuals tool call loads the ONNX model cold (~10 s).
+        sleep(12)
+        shot(name)
     }
 
     /// Engine telemetry: enter, toggle the stress switch so GC/heap move, screenshot, stop, pop back.

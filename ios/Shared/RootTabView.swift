@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Root navigation: 5 top-level sections per the IA collapse spec (2026-06-21), collapsed from the prior
-/// 9 tabs. Boundary is the hero/default landing tab; About is demoted to a toolbar ⓘ on Boundary and on
-/// each Analysis child (see `AboutToolbarButton`). Search and Analysis are new container screens that
-/// reuse the absorbed tabs' existing view bodies unmodified, switched by a segmented control.
+/// Root navigation: 6 top-level sections — the 5 from the IA collapse spec (2026-06-21, collapsed from
+/// the prior 9 tabs) plus Foreman (the on-device tool-calling agent), added second. Boundary stays the
+/// hero/default landing tab (Android's default-tab change was reverted); About is demoted to a toolbar ⓘ
+/// on Boundary and on each Analysis child (see `AboutToolbarButton`). Search and Analysis are container
+/// screens that reuse the absorbed tabs' existing view bodies unmodified, switched by a segmented control.
 struct RootTabView: View {
     @ObservedObject var features: FeaturesViewModel
     @ObservedObject var comparison: ComparisonViewModel
@@ -18,6 +19,9 @@ struct RootTabView: View {
         TabView {
             BoundaryView(viewModel: boundary, infos: features.orderedInfos, telemetry: telemetry)
                 .tabItem { Label("Boundary", systemImage: "arrow.left.arrow.right") }
+
+            ForemanView()
+                .tabItem { Label("Foreman", systemImage: "wrench.and.screwdriver") }
 
             FeaturesView(viewModel: features)
                 .tabItem { Label("Catalog", systemImage: "checkmark.seal") }
