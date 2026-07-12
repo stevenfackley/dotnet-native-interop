@@ -26,6 +26,10 @@ import kotlinx.serialization.json.Json
 public class TrustViewModel(
     private val catalog: FeatureCatalogService = FfiFeatureService(),
     private val binaryCatalog: FeatureCatalogService = PbFeatureService(),
+    // The PQ on/off actuator — injected (not a hardcoded PbTransport.setSecure call) so the honesty-critical
+    // revert-on-failure invariant in setPqEnabled is unit-testable without the native pb server. Default is
+    // the real transport toggle (restarts the native pb server in require-PQ / plaintext mode).
+    private val pqToggle: suspend (Boolean) -> Unit = { PbTransport.setSecure(it) },
 ) : ViewModel() {
 
     public data class UiState(
@@ -42,18 +46,28 @@ public class TrustViewModel(
 
     init { refresh() }
 
-    /** Re-reads the current posture from the engine. */
+    /** Re-reads the current posture from the engine (clearing any stale error first — a manual refresh). */
     public fun refresh() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            runCatching {
-                val result = catalog.run("trust~posture")
-                json.decodeFromString<TrustPostureReport>(result.result)
-            }.onSuccess { report ->
-                _state.update { it.copy(report = report, loading = false) }
-            }.onFailure { e ->
-                _state.update { it.copy(loading = false, error = e.message ?: "trust~posture failed") }
-            }
+            applyPosture()
+        }
+    }
+
+    /**
+     * Re-reads `trust~posture` into state. On a successful read it updates the report but LEAVES an existing
+     * error untouched — so a "PQ negotiation failed" banner set by [setPqEnabled] survives the posture refresh
+     * that immediately follows it. (That trailing refresh used to call [refresh], whose up-front `error = null`
+     * silently wiped the banner, so the failure was reverted on the switch but never disclosed.)
+     */
+    private suspend fun applyPosture() {
+        runCatching {
+            val result = catalog.run("trust~posture")
+            json.decodeFromString<TrustPostureReport>(result.result)
+        }.onSuccess { report ->
+            _state.update { it.copy(report = report, loading = false) }
+        }.onFailure { e ->
+            _state.update { it.copy(loading = false, error = e.message ?: "trust~posture failed") }
         }
     }
 
@@ -67,7 +81,7 @@ public class TrustViewModel(
             val previous = _state.value.pqRequested
             _state.update { it.copy(negotiating = true, pqRequested = enabled, error = null) }
             runCatching {
-                PbTransport.setSecure(enabled)
+                pqToggle(enabled)
                 // Force a connection so the handshake runs (and publishes live params) or plaintext resumes.
                 binaryCatalog.run("ping")
             }.onFailure { e ->
@@ -76,7 +90,8 @@ public class TrustViewModel(
                 _state.update { it.copy(error = "PQ negotiation failed: ${e.message}", pqRequested = previous) }
             }
             _state.update { it.copy(negotiating = false) }
-            refresh()
+            // Re-read posture WITHOUT clearing the error above — a failed negotiation must stay disclosed.
+            applyPosture()
         }
     }
 }
