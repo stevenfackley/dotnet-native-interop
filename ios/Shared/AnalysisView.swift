@@ -9,6 +9,7 @@ struct AnalysisView: View {
         case overview = "Overview"
         case compare = "Compare"
         case latency = "Latency"
+        case log = "Log"
         var id: Self { self }
     }
 
@@ -18,6 +19,9 @@ struct AnalysisView: View {
     let telemetry: TelemetryService
 
     @State private var focus: Focus = .overview
+    // Owned here (not passed from RootTabView) — the log segment is self-contained: it drains the engine
+    // log ring on demand and needs no cross-tab state, so the container mints its own view-model.
+    @StateObject private var log = LogViewModel()
 
     var body: some View {
         // Wrapped in a NavigationStack so the segmented control gets the same top-inset the single-screen
@@ -43,6 +47,9 @@ struct AnalysisView: View {
                                                    infos: features.orderedInfos, telemetry: telemetry)
                     case .latency:  LatencyHubView(model: latency,
                                                    infos: features.orderedInfos, telemetry: telemetry)
+                    // The observability trio's logging leg (dni_log_drain), alongside metrics (in Latency's
+                    // Runtime section) — a plain list, no NavigationStack of its own needed.
+                    case .log:      LogView(model: log)
                     }
                 }
             }

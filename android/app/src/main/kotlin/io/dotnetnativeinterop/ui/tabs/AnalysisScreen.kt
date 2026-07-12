@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import io.dotnetnativeinterop.feature.ComparisonViewModel
 import io.dotnetnativeinterop.feature.FeaturesViewModel
 import io.dotnetnativeinterop.feature.LatencyViewModel
+import io.dotnetnativeinterop.log.LogScreen
 import io.dotnetnativeinterop.trace.TraceScreen
 import io.dotnetnativeinterop.ui.Spacing
 
@@ -35,7 +36,7 @@ internal fun AnalysisScreen(
     modifier: Modifier = Modifier,
 ) {
     var section by remember { mutableIntStateOf(0) }
-    val labels = listOf("Dashboard", "Compare", "Latency", "Trace")
+    val labels = listOf("Dashboard", "Compare", "Latency", "Trace", "Log")
 
     Column(modifier = modifier) {
         SingleChoiceSegmentedButtonRow(
@@ -55,7 +56,8 @@ internal fun AnalysisScreen(
             0 -> DashboardScreen(features, inner)
             1 -> CompareScreen(comparison, inner)
             2 -> LatencyScreen(latency, inner)
-            else -> TraceScreen(modifier = inner)
+            3 -> TraceScreen(modifier = inner)
+            else -> LogScreen(modifier = inner)
         }
     }
 }
