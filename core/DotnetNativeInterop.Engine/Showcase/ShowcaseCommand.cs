@@ -41,6 +41,7 @@ public static class ShowcaseCommand
                 "trust" => RunTrust(parts),
                 "trace" => RunTrace(parts),
                 "metrics" => RunMetrics(parts),
+                "log" => RunLog(parts),
                 "agent" => RunAgent(parts),
                 _ => $"Unknown showcase command: {name}",
             };
@@ -126,6 +127,17 @@ public static class ShowcaseCommand
         return sub == "snapshot"
             ? EngineMetrics.SnapshotJson()
             : $"Unknown showcase command: metrics (sub={sub})";
+    }
+
+    // log~stats -> the log ring's occupancy and drop/record counters (a non-draining snapshot, exactly
+    // like trace~stats). The DRAINING read is the dedicated dni_log_drain FFI export (parity with
+    // dni_trace_drain); this command is the pollable, transport-agnostic peek at ring health.
+    private static string RunLog(string[] parts)
+    {
+        var sub = parts.Length > 1 ? parts[1] : string.Empty;
+        return sub == "stats"
+            ? EngineLog.StatsJson()
+            : $"Unknown showcase command: log (sub={sub})";
     }
 
     // agent~reset -> clears the process-wide Foreman conversation (ForemanHost.ResetConversation); the

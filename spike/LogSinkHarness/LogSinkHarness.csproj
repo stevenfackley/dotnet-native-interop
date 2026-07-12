@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>LogSinkHarness</AssemblyName>
+    <!-- AOT-publishable so it doubles as the win-x64 NativeAOT gate for the logging leg plus the
+         Microsoft.Extensions.Logging.Abstractions + [LoggerMessage] source generator it pulls in — the
+         proof that M.E.Logging is AOT-clean (0 warnings), the way spike/MeaiGate proved M.E.AI. -->
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <!-- Exercises the engine's logging leg directly (EngineLog + EngineLogEvents) rather than going
+       through the NativeBridge transports; M.E.Logging.Abstractions flows transitively from the Engine's
+       own PackageReference. See docs/logging-nativeaot-findings.md. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\DotnetNativeInterop.Engine\DotnetNativeInterop.Engine.csproj" />
+  </ItemGroup>
+
+</Project>

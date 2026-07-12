@@ -161,6 +161,23 @@ int64_t dni_ffi_stream_start(const char* prompt, int32_t max_tokens,
  * call still tags toolResult with its JSON error — never blank. */
 const char* dni_trace_drain(void);
 
+/* In-process logging (the observability trio's 3rd leg, alongside dni_trace_drain and
+ * the metrics~snapshot command). Drains the engine's bounded log ring (256 records,
+ * drop-oldest) as heap UTF-8 JSON, or NULL on failure; copy then release with
+ * dni_string_free. Shape:
+ *   { "nowUs": <double>,           // engine µs-since-boot at drain time (same clock as spans)
+ *     "dropped": <int>,            // records lost to ring overflow since last drain (disclosed)
+ *     "capacity": 256,
+ *     "records": [ { "level": "Warning", "category": "Dni.Engine", "message": <string>,
+ *                    "timestampUs": <double>, "requestId": <string?>,
+ *                    "exception": <string?> }, ... ] }
+ * Level is Information and above (lower levels are dropped at the logger); requestId and
+ * exception are omitted when null. This is where errors the FFI boundary would otherwise
+ * swallow silently surface — e.g. a background token drain that ends abnormally (a cancel
+ * or a faulted channel) logs a Warning here (its only prior signal was the absence of an
+ * is_final=1 marker). */
+const char* dni_log_drain(void);
+
 /* Framed-protobuf transport (the 4th transport): length-prefixed Google.Protobuf
  * frames over a 127.0.0.1 loopback socket ([u32 little-endian length][Envelope];
  * see proto/dni_frame.proto). start() returns the bound port (> 0) or a negative
@@ -181,6 +198,9 @@ void    dni_pb_stop(void);
  *                        (op, count, sumUs, minUs, maxUs) }. Process-lifetime cumulative,
  *                        never reset by a read (like trace~stats, not dni_trace_drain) —
  *                        no percentiles, only count/sum/min/max.
+ *   "log~stats"        -> log-ring snapshot { capacity, occupancy, droppedSinceDrain,
+ *                        recordedTotal, droppedTotal } (parity with trace~stats; the
+ *                        DRAINING read is the dni_log_drain export, like dni_trace_drain).
  *   "agent~reset"      -> clears the process-wide Foreman conversation history (see
  *                        dni_agent_session_start below); the NEXT agent turn starts fresh with no
  *                        prior-turn context. Returns {"reset":true}. Idempotent (resetting an
