@@ -60,6 +60,25 @@ async Task<List<(int Index, string Text, bool IsFinal)>> DrainAsync(InferenceSes
     Check("the status fragment carries the StatusMarker prefix",
         tokens[^2].Text.StartsWith(ForemanLanguageModel.StatusMarker, StringComparison.Ordinal));
 
+    // Wire contract: after the REAL native marshalling step (NativeText.Allocate — the exact call
+    // ExportsFfi.Invoke makes before handing the byte* to dni_token_cb), the status fragment must carry
+    // EXACTLY ONE leading 0x01. This pins the byte the iOS/Android tag-anchored parsers key on, and
+    // directly refutes the "NativeAOT doubles the leading U+0001" hypothesis: the managed pipeline is
+    // verbatim (ForemanLanguageModel -> InferenceOrchestrator -> InferenceSession) and UTF-8 encodes
+    // U+0001 to a single byte in both JIT and AOT, so a doubled 0x01 could only be a client-side artifact.
+    var statusPtr = NativeText.Allocate(tokens[^2].Text);
+    try
+    {
+        var leadingSoh = 0;
+        while (System.Runtime.InteropServices.Marshal.ReadByte(statusPtr, leadingSoh) == 0x01) leadingSoh++;
+        Console.WriteLine($"   status fragment leading 0x01 bytes on the wire: {leadingSoh}");
+        Check("wire: status fragment carries EXACTLY ONE leading 0x01 after native marshalling", leadingSoh == 1);
+    }
+    finally
+    {
+        NativeText.Free(statusPtr);
+    }
+
     var answerFragments = tokens.Take(tokens.Count - 2).ToArray();
     Check("at least one real answer fragment streamed before the status", answerFragments.Length > 0);
     Check("no answer fragment is mistaken for a status fragment",

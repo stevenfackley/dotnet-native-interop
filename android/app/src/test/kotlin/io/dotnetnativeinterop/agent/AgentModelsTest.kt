@@ -45,9 +45,10 @@ public class AgentModelsTest {
 
     @Test
     public fun doubledControlBytePrefixStillParses() {
-        // Ground-truth regression: the LIVE engine writes the marker with a REPEATED 0x01 prefix
-        // (0x01 0x01 dni.agent.status…), captured from a real iOS turn on the simulator. A fixed-length
-        // skip lands a byte short and yields invalid JSON; the tag-anchored parse must still decode it.
+        // Robustness regression: an earlier engine bug emitted a DOUBLED 0x01 prefix (0x01 0x01
+        // dni.agent.status…, since root-caused + fixed so the wire is a single 0x01). A fixed-length skip
+        // landed a byte short on invalid JSON; the tag-anchored parse must decode any number of leading
+        // control bytes, so a wire regression can never break status detection.
         val doubled = "$CONTROL_BYTE$CONTROL_BYTE$STATUS_TAG" +
             "{\"stopReason\":\"Answered\",\"toolSteps\":0,\"backend\":\"scripted routing — no on-device LLM present\"}"
         val fragment = parseAgentFragment(doubled)

@@ -57,11 +57,11 @@ func parseAgentFragment(_ text: String) throws -> AgentFragment {
     guard text.first == agentStatusControlByte else { return .answer(text) }
     // Detection stays on the leading 0x01 (never the tag text — an on-device LLM could stream the literal
     // "dni.agent.status" while answering ABOUT the marker). But the JSON offset is found STRUCTURALLY by
-    // the tag rather than a fixed length: the live engine writes the marker with a REPEATED 0x01 prefix
-    // (observed 0x01 0x01 dni.agent.status…), so a fixed `1 + tag.count` skip lands one byte short and
-    // yields invalid JSON. Taking everything after the tag is robust to any number of leading control
-    // bytes. (The engine's StatusMarker is declared with a single 0x01 — the doubled prefix on the wire
-    // is worth an engine-side look; flagged, fixed defensively client-side here.) No tag ⇒ malformed.
+    // the tag rather than a fixed `1 + tag.count` length: an earlier engine bug emitted a DOUBLED 0x01
+    // prefix (a stray raw control byte in ForemanLanguageModel.StatusMarker, since ROOT-CAUSED + FIXED so
+    // the wire is a single 0x01 per abi/dni.h) which made a fixed skip land one byte short on invalid JSON.
+    // Taking everything after the tag stays robust to any number of leading control bytes regardless, so a
+    // wire regression can never resurface as a stuck/errored turn. No tag ⇒ malformed.
     guard let tagRange = text.range(of: agentStatusTag) else {
         throw AgentFragmentError.malformedStatusMarker
     }
