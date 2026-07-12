@@ -29,6 +29,7 @@ extern "C" void* dni_llama_load(const char* gguf_path) {
 }
 
 extern "C" int dni_llama_generate(void* handle, const char* prompt, int max_tokens, float temp,
+                                  const char* grammar,
                                   dni_llama_token_cb cb, void* user_data) {
     auto* h = static_cast<DniLlama*>(handle);
     if (!h || !prompt || !cb) return -1;
@@ -42,6 +43,15 @@ extern "C" int dni_llama_generate(void* handle, const char* prompt, int max_toke
                        toks.data(), (int)toks.size(), true, true) < 0) return -2;
 
     llama_sampler* smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    // Grammar-CONSTRAINED sampling (GBNF): added FIRST so it masks every grammar-violating token to -inf
+    // before top-k/temp ever see the logits — the model literally cannot emit malformed tool-call JSON.
+    // The chain auto-accepts each sampled token into the grammar (llama_sampler_sample on a chain calls
+    // accept on every stage), so the grammar state advances without any manual bookkeeping here.
+    if (grammar && grammar[0]) {
+        llama_sampler* gsmpl = llama_sampler_init_grammar(h->vocab, grammar, "root");
+        if (!gsmpl) { llama_sampler_free(smpl); return -5; } // malformed grammar
+        llama_sampler_chain_add(smpl, gsmpl);
+    }
     llama_sampler_chain_add(smpl, llama_sampler_init_top_k(40));
     llama_sampler_chain_add(smpl, llama_sampler_init_temp(temp));
     llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));

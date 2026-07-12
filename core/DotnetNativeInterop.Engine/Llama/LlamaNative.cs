@@ -15,6 +15,9 @@ internal static unsafe partial class LlamaNative
         [MarshalAs(UnmanagedType.LPUTF8Str)] string prompt,
         int maxTokens,
         float temp,
+        // Optional GBNF grammar; a null string marshals to a NULL pointer, which the shim treats as
+        // unconstrained sampling (plain RAG/answer streaming). Non-null = grammar-constrained decode.
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? grammar,
         delegate* unmanaged[Cdecl]<void*, byte*, void> callback,
         void* userData);
 

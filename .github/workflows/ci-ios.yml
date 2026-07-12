@@ -6,7 +6,8 @@ on:
       - main
       - develop
     paths:
-      - 'core/DotnetNativeInterop.NativeBridge/**'
+      - 'core/**'
+      - 'native/llama-shim/**'
       - 'ios/**'
       - 'build/build-ios-framework.sh'
       - '.github/workflows/ci-ios.yml'
@@ -15,7 +16,8 @@ on:
       - main
       - develop
     paths:
-      - 'core/DotnetNativeInterop.NativeBridge/**'
+      - 'core/**'
+      - 'native/llama-shim/**'
       - 'ios/**'
       - 'build/build-ios-framework.sh'
       - '.github/workflows/ci-ios.yml'

@@ -45,7 +45,7 @@ public sealed unsafe class LlamaLanguageModel : ILanguageModel, IDisposable
         {
             try
             {
-                GenerateUnsafe(_handle, request.Prompt, request.MaxTokens, request.Temperature, key);
+                GenerateUnsafe(_handle, request.Prompt, request.MaxTokens, request.Temperature, request.Grammar, key);
             }
             finally
             {
@@ -64,9 +64,10 @@ public sealed unsafe class LlamaLanguageModel : ILanguageModel, IDisposable
 
     // Unsafe trampoline: async iterators cannot contain unsafe code directly, so the
     // pointer-typed arguments are isolated here and called from the Task.Run lambda above.
-    private static unsafe void GenerateUnsafe(nint handle, string prompt, int maxTokens, float temp, nint key)
+    private static unsafe void GenerateUnsafe(
+        nint handle, string prompt, int maxTokens, float temp, string? grammar, nint key)
     {
-        LlamaNative.dni_llama_generate(handle, prompt, maxTokens, temp, &OnPiece, (void*)key);
+        LlamaNative.dni_llama_generate(handle, prompt, maxTokens, temp, grammar, &OnPiece, (void*)key);
     }
 
     // Non-capturing unmanaged callback: recover the writer from the key passed as user_data.

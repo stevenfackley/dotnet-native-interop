@@ -31,6 +31,15 @@ namespace DotnetNativeInterop.Engine.Meai;
 /// </summary>
 public sealed class DniChatClient(ILanguageModel model, string? modelId = null) : IChatClient
 {
+    /// <summary>
+    /// <see cref="ChatOptions.AdditionalProperties"/> key under which a caller may pass a llama.cpp GBNF
+    /// grammar string to hard-constrain decoding (see <see cref="InferenceRequest.Grammar"/>). This is the
+    /// M.E.AI-idiomatic channel for a backend-specific decode option the generic <see cref="ChatOptions"/>
+    /// surface has no first-class field for; only a grammar-capable backend honors it. Foreman's tool-call
+    /// turn sets it (<c>Ai.Agent.ForemanHost</c>); the free-form answer turn leaves it unset.
+    /// </summary>
+    public const string GrammarPropertyKey = "dni.grammar";
+
     /// <inheritdoc/>
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
@@ -101,9 +110,20 @@ public sealed class DniChatClient(ILanguageModel model, string? modelId = null) 
             prompt.Append(message.Role.Value).Append(": ").Append(message.Text);
         }
 
+        // A GBNF grammar, if the caller supplied one, rides through AdditionalProperties (see
+        // GrammarPropertyKey) — the value is a plain string; anything else is ignored, so a stray
+        // property can never crash the decode.
+        string? grammar = null;
+        if (options?.AdditionalProperties?.TryGetValue(GrammarPropertyKey, out var raw) == true
+            && raw is string s && s.Length > 0)
+        {
+            grammar = s;
+        }
+
         return new InferenceRequest(
             Prompt: prompt.ToString(),
             MaxTokens: options?.MaxOutputTokens ?? 256,
-            Temperature: options?.Temperature ?? 0.8f);
+            Temperature: options?.Temperature ?? 0.8f,
+            Grammar: grammar);
     }
 }

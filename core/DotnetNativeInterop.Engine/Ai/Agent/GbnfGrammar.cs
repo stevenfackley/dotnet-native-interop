@@ -4,10 +4,10 @@ namespace DotnetNativeInterop.Engine.Ai.Agent;
 
 /// <summary>
 /// Builds a llama.cpp GBNF grammar restricting a turn to a valid tool call or a final answer.
-/// The llama path samples under this grammar so the model cannot emit malformed tool syntax.
-/// (Older llama.cpp without grammar sampling: fall back to RouterBrain — see spec.)
-/// NOTE: as currently wired the grammar is *prompted*, not sampler-enforced — see
-/// <c>ForemanHost.BuildGrammarBrain</c> — until the dni_llama shim gains grammar sampling.
+/// The llama path samples UNDER this grammar (hard sampler constraint, not a prompt) so the model
+/// cannot emit malformed tool syntax — <c>ForemanHost.BuildGrammarBrain</c> passes this string through
+/// <c>DniChatClient.GrammarPropertyKey</c> -> <c>InferenceRequest.Grammar</c> -> the dni_llama shim's
+/// <c>llama_sampler_init_grammar</c>. (No on-device model / unloadable GGUF: fall back to RouterBrain.)
 /// </summary>
 public static class GbnfGrammar
 {
