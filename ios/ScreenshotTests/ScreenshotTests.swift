@@ -87,6 +87,9 @@ final class ScreenshotTests: XCTestCase {
 
         // --- Foreman (on-device tool-calling agent): one full turn with badges + tool-call strip ---
         captureForeman(as: "23-foreman")
+
+        // --- Analysis · Log: the logging leg of the observability trio (dni_log_drain) ---
+        captureLog(as: "24-log")
     }
 
     // MARK: - Capture
@@ -252,6 +255,19 @@ final class ScreenshotTests: XCTestCase {
         }
         // The router brain decides fast, but a search_manuals tool call loads the ONNX model cold (~10 s).
         sleep(12)
+        shot(name)
+    }
+
+    /// Analysis · Log: the logging leg of the observability trio (dni_log_drain). Switch to Analysis, open
+    /// the Log segment, drain the ring, and screenshot the captured records (at minimum the "Engine
+    /// initialized" marker; more if a turn/session logged a warning). Proves the view + drain + rendering.
+    private func captureLog(as name: String) {
+        tapTab("Analysis")
+        sleep(1)
+        tapIfExists(button: "Log")
+        sleep(1)
+        tapIfExists(button: "Drain ring")
+        sleep(2)
         shot(name)
     }
 
