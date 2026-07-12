@@ -146,8 +146,17 @@ public static class ForemanHost
         return new RouterBrain(router, ComposeProse);
     }
 
-    /// <summary>The shipped router cosine cut-off. See <see cref="BuildRouterBrain"/> for calibration.</summary>
-    public const float RouterThreshold = 0.3f;
+    /// <summary>
+    /// The shipped router cosine cut-off. See <see cref="BuildRouterBrain"/> for calibration.
+    /// RECALIBRATED 0.3 -> 0.25 for the INT8 model (2026-07-12, PR #75 shipped INT8 all-MiniLM): the
+    /// weakest genuine query in the ForemanHarness calibration set ("the compressor is overheating…") scores
+    /// cosine 0.29 against search_manuals under INT8 (it cleared >0.30 under FP32), so the old 0.3 cut-off
+    /// stopped routing it — a real regression the EVS retrieval-ranking verification didn't cover (the router
+    /// THRESHOLD is a separate, thinner-margin decision). 0.25 restores routing with margin while the
+    /// off-topic query ("weather in Tokyo…", 0.023) stays decisively rejected — the wider margin also hardens
+    /// the router against future embedding shifts (the 0.3 margin was fragile precisely because it was thin).
+    /// </summary>
+    public const float RouterThreshold = 0.25f;
 
     // Composes the router's fallback prose from the tool result(s) the turn produced. RouterBrain hands
     // this func "<query>\n<joined tool-result JSON>"; we answer from the RESULT, not a fresh manuals
