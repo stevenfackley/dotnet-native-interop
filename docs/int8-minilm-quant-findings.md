@@ -1,8 +1,19 @@
 # INT8 dynamic quantization of all-MiniLM-L6-v2 — size/accuracy tradeoff
 
 **Date:** 2026-07-06
-**Status:** ✅ **PASSED** — INT8 dynamic quantization is safe to ship. ~4x smaller, and it did not flip a
-single retrieval decision on the EVS corpus.
+**Status:** ✅ **PASSED + WIRED (2026-07-12).** INT8 dynamic quantization is safe to ship. ~4x smaller, and
+it did not flip a single retrieval decision on the EVS corpus.
+
+**WIRED INTO EVS + iOS Core ML VERIFIED (2026-07-12).** `model.onnx` (the shared all-MiniLM asset) was
+replaced with the INT8 model and `edge-index.db` + `edge-fixtures.json` rebuilt — an asset-only change
+(every loader references `"model.onnx"`, so no code changed). The publisher's fixture top chunk is
+`hvac-001#2`, **byte-identical to the FP32 fixture** (no CPU ranking change, as this doc predicted). The
+one previously-**unverified** risk — Core ML/ANE behaviour on INT8 weights — is now **RESOLVED**: on an
+iPad Pro 13-inch (M5) / iOS 26.5 sim, `EdgeSearchAgreementTests` passed with **max abs delta (Swift/Core ML
+INT8 vs .NET/CPU INT8) = 0.00165** (threshold 0.05), and the query ranked `hvac-001#2` first. Core ML on
+INT8 does NOT diverge. Size win: model.onnx **86.2 MB → 21.8 MB (−64 MB)**, shipped to every path that
+bundles it (EVS + the engine's AI-tab semantic search + RAG — all now INT8; visually re-verified via the
+`11-semantic-search` / `13-edge-search` screenshot captures).
 **Why this doc exists:** `model.onnx` ([all-MiniLM-L6-v2][minilm], FP32) is ~86 MB and ships via Git LFS **twice** in
 this repo's footprint — embedded in the NativeAOT engine's `dni.dylib` (Phase 3 AI tab,
 [`docs/onnx-nativeaot-ios-findings.md`](onnx-nativeaot-ios-findings.md)) and as the build-time embedding
