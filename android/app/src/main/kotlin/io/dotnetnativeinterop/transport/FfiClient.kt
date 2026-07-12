@@ -1,6 +1,7 @@
 package io.dotnetnativeinterop.transport
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.Flow
@@ -65,9 +66,13 @@ public class FfiClient : InferenceClient {
                 emit(token)
             }
         } finally {
-            // Cancellation path: cancel the session and release the registry slot.
-            // These are no-ops if the session already completed normally.
-            withContext(Dispatchers.Default) {
+            // Cancellation path: cancel the session and release the registry slot (no-ops if the session
+            // already completed normally). NonCancellable is REQUIRED: on the cancel path this finally runs
+            // while the coroutine is already cancelled, and a plain withContext calls ensureActive() on
+            // entry and throws immediately — so without it neither native call runs on the one path this
+            // block exists for, leaking the whole .NET InferenceSession (never freed) and letting the engine
+            // generate to max_tokens after the user left. NonCancellable lets the cleanup complete.
+            withContext(NonCancellable + Dispatchers.Default) {
                 NativeBridge.nativeSessionCancel(sessionId)
                 NativeBridge.nativeSessionFree(sessionId)
             }

@@ -3,6 +3,7 @@ package io.dotnetnativeinterop.ai
 import io.dotnetnativeinterop.transport.FfiTokenListener
 import io.dotnetnativeinterop.transport.NativeBridge
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -43,7 +44,11 @@ public class FfiRagService : RagService {
                 emit(fragment)
             }
         } finally {
-            withContext(Dispatchers.Default) {
+            // NonCancellable is REQUIRED: on the cancel path this finally runs while the coroutine is
+            // already cancelled, and a plain withContext throws at ensureActive() before running the block —
+            // so the cancel+free would be skipped exactly when it is needed, leaking the .NET session and
+            // leaving the engine generating after the user left. See transport/FfiClient for the full note.
+            withContext(NonCancellable + Dispatchers.Default) {
                 NativeBridge.nativeSessionCancel(sessionId)
                 NativeBridge.nativeSessionFree(sessionId)
             }

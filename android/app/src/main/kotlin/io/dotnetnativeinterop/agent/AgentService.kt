@@ -4,6 +4,7 @@ import io.dotnetnativeinterop.trace.TraceDrain
 import io.dotnetnativeinterop.transport.FfiTokenListener
 import io.dotnetnativeinterop.transport.NativeBridge
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -63,7 +64,10 @@ public class FfiAgentService : AgentService {
             }
         } finally {
             // Cancellation path: cancel + free the session (no-ops if it already completed normally).
-            withContext(Dispatchers.Default) {
+            // NonCancellable is REQUIRED: this finally runs while the coroutine is already cancelled on the
+            // cancel path, and a plain withContext throws at ensureActive() before running the block — so the
+            // cleanup would be skipped exactly when needed, leaking the .NET session. See FfiClient's note.
+            withContext(NonCancellable + Dispatchers.Default) {
                 NativeBridge.nativeSessionCancel(sessionId)
                 NativeBridge.nativeSessionFree(sessionId)
             }
