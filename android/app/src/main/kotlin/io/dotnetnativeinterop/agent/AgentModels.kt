@@ -47,19 +47,26 @@ public sealed interface AgentFragment {
 internal const val STATUS_TAG = "dni.agent.status"
 internal const val CONTROL_BYTE = '\u0001'
 
-/** Total fragment prefix length to skip before the JSON payload: the 0x01 byte + the readable tag. */
-private const val STATUS_PREFIX_LENGTH = 1 + STATUS_TAG.length
-
 private val agentJson = Json { ignoreUnknownKeys = true }
 
 /**
  * Classifies one raw `dni_token_cb` fragment per `dni_agent_session_start`'s completion contract
  * (abi/dni.h): the ONE fragment whose first character is the 0x01 control byte is the status fragment;
  * every other (non-empty) fragment is real streamed answer text. Detect on the control byte, not the tag.
+ *
+ * The JSON offset is found STRUCTURALLY by the tag rather than a fixed `1 + STATUS_TAG.length` skip: the
+ * live engine writes the marker with a REPEATED 0x01 prefix (observed on iOS: `0x01 0x01 dni.agent.status…`
+ * from a real turn), so a fixed skip lands one byte short and yields invalid JSON. Taking everything after
+ * the tag is robust to any number of leading control bytes; detection stays on the leading 0x01 (never the
+ * tag text — an LLM could stream "dni.agent.status" while answering ABOUT the marker). No tag ⇒ malformed
+ * ⇒ decode throws honestly. (The engine's StatusMarker is declared with a single 0x01 — the doubled prefix
+ * is worth an engine-side look; the client is defensive either way.)
  */
 public fun parseAgentFragment(text: String): AgentFragment {
     if (text.isNotEmpty() && text[0] == CONTROL_BYTE) {
-        val payload = text.substring(STATUS_PREFIX_LENGTH.coerceAtMost(text.length))
+        val tagStart = text.indexOf(STATUS_TAG)
+        require(tagStart >= 0) { "status fragment (leading 0x01) is missing the '$STATUS_TAG' tag" }
+        val payload = text.substring(tagStart + STATUS_TAG.length)
         val raw = agentJson.decodeFromString<RawAgentSessionStatus>(payload)
         return AgentFragment.Status(AgentTurnStatus(raw.stopReason, raw.toolSteps, raw.backend))
     }
