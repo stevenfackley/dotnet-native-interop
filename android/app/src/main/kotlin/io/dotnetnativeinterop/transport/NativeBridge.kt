@@ -40,6 +40,11 @@ public object NativeBridge {
     // Mirrors dni_trace_drain.
     public external fun nativeTraceDrain(): String?
 
+    // In-process logging (the observability trio's 3rd leg). Drains the engine's bounded log ring (256
+    // records, drop-oldest) as heap UTF-8 JSON (null on failure); overflow disclosed in "dropped". This is
+    // where errors the FFI boundary would otherwise swallow surface. Mirrors dni_log_drain.
+    public external fun nativeLogDrain(): String?
+
     // Pattern 4 — SQLite WAL broker
     public external fun nativeBrokerStart(dbPath: String): Int
     public external fun nativeBrokerStop(): Int

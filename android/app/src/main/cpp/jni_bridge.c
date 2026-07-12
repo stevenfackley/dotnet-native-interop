@@ -114,6 +114,7 @@ static jint    j_http_stop (JNIEnv* e, jobject o) { (void)e; (void)o; return dni
 static jint    j_pb_start(JNIEnv* e, jobject o, jint flags) { (void)e; (void)o; return dni_pb_start((int32_t)flags); }
 static void    j_pb_stop (JNIEnv* e, jobject o) { (void)e; (void)o; dni_pb_stop(); }
 static jstring j_trace_drain(JNIEnv* e, jobject o) { (void)o; return take_native_string(e, dni_trace_drain()); }
+static jstring j_log_drain  (JNIEnv* e, jobject o) { (void)o; return take_native_string(e, dni_log_drain()); }
 
 static jint    j_broker_start(JNIEnv* e, jobject o, jstring path) {
     (void)o;
@@ -279,6 +280,7 @@ static const JNINativeMethod kMethods[] = {
     {"nativePbStart",        "(I)I",                                                                     (void*)j_pb_start},
     {"nativePbStop",         "()V",                                                                      (void*)j_pb_stop},
     {"nativeTraceDrain",     "()Ljava/lang/String;",                                                     (void*)j_trace_drain},
+    {"nativeLogDrain",       "()Ljava/lang/String;",                                                     (void*)j_log_drain},
     {"nativeBrokerStart",    "(Ljava/lang/String;)I",                                                    (void*)j_broker_start},
     {"nativeBrokerStop",     "()I",                                                                      (void*)j_broker_stop},
     {"nativeFeaturesJson",   "()Ljava/lang/String;",                                                     (void*)j_features_json},
