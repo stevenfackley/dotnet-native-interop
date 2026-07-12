@@ -67,6 +67,7 @@ public class SqliteClient(
         }
 
         val tokenDao = database.responseTokenDao()
+        val requestDao = database.requestDao()
 
         // Bridge Room's reactive Flow → a regular Channel we can iterate.
         // Room re-emits ALL matching rows on each table change; we de-duplicate
@@ -74,37 +75,59 @@ public class SqliteClient(
         val channel = Channel<Token>(capacity = 64)
         var lastSeenIdx = -1
 
-        // Launch the Room observer in a sibling coroutine within this flow's scope.
+        // Launch the Room observers in sibling coroutines within this flow's scope.
         // 'this' here is the FlowCollector scope — we need the coroutineScope from flow{}.
         // Use a coroutineScope block to keep things structured.
         kotlinx.coroutines.coroutineScope {
             val observerJob = launch(Dispatchers.IO) {
-                tokenDao.observeTokensAfter(requestId, afterIdx = -1)
-                    .collect { rows ->
-                        var sawFinal = false
-                        for (row in rows) {
-                            if (row.idx > lastSeenIdx) {
-                                lastSeenIdx = row.idx
-                                val token = Token(row.idx, row.text, row.isFinal != 0)
-                                channel.send(token)
-                                if (row.isFinal != 0) {
-                                    sawFinal = true
-                                    break
+                try {
+                    tokenDao.observeTokensAfter(requestId, afterIdx = -1)
+                        .collect { rows ->
+                            var sawFinal = false
+                            for (row in rows) {
+                                if (row.idx > lastSeenIdx) {
+                                    lastSeenIdx = row.idx
+                                    val token = Token(row.idx, row.text, row.isFinal != 0)
+                                    channel.send(token)
+                                    if (row.isFinal != 0) {
+                                        sawFinal = true
+                                        break
+                                    }
                                 }
                             }
+                            if (sawFinal) channel.close()
                         }
-                        if (sawFinal) channel.close()
+                } catch (_: kotlinx.coroutines.channels.ClosedSendChannelException) {
+                    // The status observer closed the channel first (a broker fault) — stop forwarding.
+                }
+            }
+
+            // The token observer only ends the stream on an is_final row. A broker FAULT sets
+            // requests.status='error' and inserts NO final token (SqliteBroker.ProcessNextPendingAsync's
+            // catch) — so without also watching the status, the stream would hang forever on any engine
+            // fault, showing an endless spinner with no error. The broker sets that status precisely "so
+            // the host does not poll forever"; honor it by closing the stream with an error. ('done' needs
+            // no handling here: it always follows the is_final row the token observer already acted on.)
+            val statusJob = launch(Dispatchers.IO) {
+                requestDao.observeStatus(requestId).collect { status ->
+                    when (status) {
+                        "error" -> channel.close(IllegalStateException("SQLite broker reported an engine error"))
+                        "canceled" -> channel.close()
                     }
+                }
             }
 
-            // Drain the channel, emitting to the outer Flow collector.
-            // The channel is closed by the observer when the final token arrives,
-            // at which point the for-loop exits naturally.
-            for (token in channel) {
-                emit(token)
+            // Drain the channel, emitting to the outer Flow collector. Closed cleanly by the token
+            // observer on the final token (or by the status observer on a terminal broker state), at which
+            // point the for-loop drains any buffered tokens and then exits (or rethrows the close cause).
+            try {
+                for (token in channel) {
+                    emit(token)
+                }
+            } finally {
+                observerJob.cancel()
+                statusJob.cancel()
             }
-
-            observerJob.cancel()
         }
     }.flowOn(Dispatchers.IO)
 }
