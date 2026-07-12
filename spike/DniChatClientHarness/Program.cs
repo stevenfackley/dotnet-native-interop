@@ -2,6 +2,7 @@
 // (core/DotnetNativeInterop.Engine/Ai/Meai/DniChatClient.cs) directly against MockLanguageModel —
 // no NativeBridge, no transport. Every check prints PASS/FAIL; a non-zero exit code means at least
 // one failed. Also the win-x64 NativeAOT gate for this code path (see the .csproj comment).
+using System.Runtime.CompilerServices;
 using DotnetNativeInterop.Engine;
 using DotnetNativeInterop.Engine.Meai;
 using Microsoft.Extensions.AI;
@@ -20,6 +21,7 @@ internal static class Program
             await RunMultiTurnPromptFlatteningAsync().ConfigureAwait(false);
             await RunStreamingOrderAsync().ConfigureAwait(false);
             await RunChatOptionsMappingAsync().ConfigureAwait(false);
+            await RunGrammarThreadingAsync().ConfigureAwait(false);
             RunGetServiceAndDispose();
         }
         catch (Exception ex)
@@ -111,6 +113,41 @@ internal static class Program
             wordCount == 3);
     }
 
+    // Proves the grammar seam Foreman's constrained turn relies on: a GBNF string placed in
+    // ChatOptions.AdditionalProperties[DniChatClient.GrammarPropertyKey] must arrive verbatim on
+    // InferenceRequest.Grammar (which LlamaLanguageModel forwards to dni_llama_generate's grammar arg),
+    // an absent option must leave Grammar null (RAG/answer turns stay unconstrained), and a non-string
+    // value must be ignored rather than crash the decode. Uses a capturing backend so this runs with no
+    // GGUF — the native sampler enforcement itself is gated separately on the Mac build host.
+    private static async Task RunGrammarThreadingAsync()
+    {
+        const string grammar = "root ::= \"{\\\"answer\\\":\" string \"}\"\nstring ::= \"\\\"\" [a-z]+ \"\\\"\"";
+
+        var capture = new CapturingLanguageModel();
+        var options = new ChatOptions
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary { [DniChatClient.GrammarPropertyKey] = grammar },
+        };
+        _ = await new DniChatClient(capture).GetResponseAsync("decide the next step", options).ConfigureAwait(false);
+        Console.WriteLine($"grammar threaded: Grammar={(capture.Last?.Grammar is null ? "null" : "<set>")}");
+        Check("grammar: AdditionalProperties[dni.grammar] threads to InferenceRequest.Grammar verbatim",
+            capture.Last?.Grammar == grammar);
+
+        var capturePlain = new CapturingLanguageModel();
+        _ = await new DniChatClient(capturePlain).GetResponseAsync("a plain, unconstrained turn").ConfigureAwait(false);
+        Check("grammar: absent option leaves InferenceRequest.Grammar null (unconstrained decode)",
+            capturePlain.Last is { Grammar: null });
+
+        var captureBad = new CapturingLanguageModel();
+        var badOptions = new ChatOptions
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary { [DniChatClient.GrammarPropertyKey] = 42 },
+        };
+        _ = await new DniChatClient(captureBad).GetResponseAsync("weird value", badOptions).ConfigureAwait(false);
+        Check("grammar: a non-string grammar property is ignored (Grammar stays null, never throws)",
+            captureBad.Last is { Grammar: null });
+    }
+
     private static void RunGetServiceAndDispose()
     {
         var model = new MockLanguageModel(TimeSpan.Zero);
@@ -131,5 +168,22 @@ internal static class Program
     {
         Results.Add((name, ok));
         Console.WriteLine($"[{(ok ? "PASS" : "FAIL")}] {name}");
+    }
+
+    // Records the last InferenceRequest the adapter built, so a check can assert what DniChatClient
+    // actually handed the backend (here: whether the grammar was threaded through). Yields one trivial
+    // fragment so GetResponseAsync completes normally.
+    private sealed class CapturingLanguageModel : ILanguageModel
+    {
+        public InferenceRequest? Last { get; private set; }
+
+        public async IAsyncEnumerable<string> GenerateAsync(
+            InferenceRequest request,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            Last = request;
+            await Task.Yield();
+            yield return "{\"answer\":\"ok\"}";
+        }
     }
 }

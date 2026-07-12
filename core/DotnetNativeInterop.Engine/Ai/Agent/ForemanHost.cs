@@ -212,26 +212,32 @@ public static class ForemanHost
 
     // GrammarBrain seam: a real DniChatClient wrapping a real on-device LlamaLanguageModel.
     //
-    // VERSION-GATED FALLBACK (device-deferred): the dni_llama shim (native/llama-shim, see
-    // Llama/LlamaNative.cs — dni_llama_generate takes handle/prompt/maxTokens/temp/callback, no grammar
-    // parameter) has no grammar-sampling entry point yet. Per docs/superpowers/specs/
-    // 2026-07-06-foreman-ondevice-agent-design.md ("Native work required" / "Gates required"), adding
-    // real GBNF next-token constraining to the shim is its own device-gated spike, not part of this host
-    // wiring. So GbnfGrammar.Build's output rides along here as a *prompted* instruction (appended to the
-    // turn prompt) rather than a hard sampler constraint — this compiles and runs against the real model,
-    // it just isn't grammar-*enforced* yet. ToolCallParser's "malformed JSON -> answer, never throw"
-    // fallback (already exhaustively tested) is exactly what keeps an unconstrained 1B model's output
-    // safe in the meantime — a wrong/malformed emission degrades to a plain answer, never a crash or a
-    // hung turn. When the shim gate lands, only this method's `Complete` body needs to change (pass the
-    // grammar to the native call instead of the prompt); the brain/tool/turn contract does not.
+    // The decision turn is HARD grammar-constrained. GbnfGrammar.Build's output rides to the llama
+    // sampler through the M.E.AI seam — ChatOptions.AdditionalProperties[DniChatClient.GrammarPropertyKey]
+    // -> InferenceRequest.Grammar -> dni_llama_generate's grammar arg -> llama_sampler_init_grammar — so
+    // the model literally cannot emit a token that would make the tool-call/answer JSON malformed (the
+    // shim masks grammar-violating tokens before top-k/temp). The raw GBNF is therefore NOT put in the
+    // prompt anymore; the prompt just states the JSON shape in prose (BuildTurnPrompt) and the sampler
+    // enforces it. ToolCallParser's "malformed JSON -> answer, never throw" fallback stays as
+    // defense-in-depth (a truncated turn or a future unconstrained backend), but a grammar-constrained
+    // turn should never exercise it. Only the DECISION turn is constrained — the free-form answer turn
+    // (StreamAnswer) passes no grammar, so prose streams unconstrained.
     private static GrammarBrain BuildGrammarBrain(IReadOnlyList<ToolDefinition> tools, ILanguageModel model)
     {
         var chat = new DniChatClient(model, modelId: "Llama-3.2-1B-Instruct");
-        var grammar = GbnfGrammar.Build(tools);
+        // Built once (the tool set is fixed) and reused for every decision turn. Read-only after
+        // construction, so sharing it across turns is safe — DniChatClient only reads the grammar out.
+        var turnOptions = new ChatOptions
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                [DniChatClient.GrammarPropertyKey] = GbnfGrammar.Build(tools),
+            },
+        };
 
         async Task<string> Complete(AgentContext ctx, CancellationToken ct)
         {
-            var response = await chat.GetResponseAsync(BuildTurnPrompt(tools, grammar, ctx), cancellationToken: ct)
+            var response = await chat.GetResponseAsync(BuildTurnPrompt(tools, ctx), turnOptions, cancellationToken: ct)
                 .ConfigureAwait(false);
             return response.Text;
         }
@@ -249,10 +255,14 @@ public static class ForemanHost
         }
 
         return new GrammarBrain(Complete, StreamAnswer,
-            badge: "on-device LLM (Llama-3.2-1B) — grammar seam wired, native grammar sampling pending shim work");
+            badge: "on-device LLM (Llama-3.2-1B, grammar-constrained)");
     }
 
-    private static string BuildTurnPrompt(IReadOnlyList<ToolDefinition> tools, string grammar, AgentContext ctx)
+    // The reply's JSON shape is stated in prose here and HARD-enforced by the llama grammar sampler (see
+    // BuildGrammarBrain) — so the raw GBNF is deliberately NOT appended to the prompt (it would be noise a
+    // 1B model reads as content). The prose instruction keeps a non-grammar backend (router fallback)
+    // honest and gives the constrained model a reason for the shape it's being forced into.
+    private static string BuildTurnPrompt(IReadOnlyList<ToolDefinition> tools, AgentContext ctx)
     {
         var sb = new StringBuilder();
         sb.AppendLine("You are Foreman, an on-device maintenance assistant. Decide the single next step.");
@@ -282,8 +292,6 @@ public static class ForemanHost
         }
 
         sb.Append("Question: ").AppendLine(ctx.Query);
-        sb.AppendLine("Reference grammar for your reply (informational only — not yet enforced by the native sampler):");
-        sb.Append(grammar);
         return sb.ToString();
     }
 
