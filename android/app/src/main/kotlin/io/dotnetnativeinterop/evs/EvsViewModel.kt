@@ -7,6 +7,7 @@ import io.dotnetnativeinterop.AssetExtractor
 import io.dotnetnativeinterop.model.EdgeHit
 import io.dotnetnativeinterop.model.QueryInput
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,7 @@ public class EvsViewModel(app: Application) : AndroidViewModel(app) {
     private val engine = EdgeSearchEngine(AssetExtractor.ensure(app))
     private val _state = MutableStateFlow(EvsUiState())
     public val state: StateFlow<EvsUiState> = _state.asStateFlow()
+    private var searchJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -52,7 +54,11 @@ public class EvsViewModel(app: Application) : AndroidViewModel(app) {
     public fun search() {
         val s = _state.value
         val q = QueryInput.sanitize(s.query) ?: return
-        viewModelScope.launch {
+        // Cancel any in-flight search so a slower earlier query can't complete AFTER a newer one and
+        // overwrite its results (the engine serializes embeds on its gate, so completion order isn't
+        // guaranteed to match launch order).
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching { engine.search(q, errorCodes = s.activeErrorCodes, tools = s.activeTools) }
                 .onSuccess { r -> _state.update { it.copy(results = r, loading = false) } }

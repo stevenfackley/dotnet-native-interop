@@ -15,9 +15,13 @@ import java.io.File
 public class EdgeSearchEngine(private val assetsDir: File) {
 
     private val gate = Mutex()
-    private var tokenizer: WordPieceTokenizer? = null
-    private var encoder: EvsEncoder? = null
-    private var chunks: List<EdgeChunk> = emptyList()
+    // @Volatile: ensureLoaded()'s fast path and search() read these WITHOUT the gate. `encoder` is written
+    // LAST under the lock, so on a weak memory model (arm64) a reader that sees `encoder != null` via the
+    // volatile (acquire) read is guaranteed to also see the fully-initialized `tokenizer`/`chunks` — without
+    // it a reader could observe a non-null encoder but a stale null tokenizer / empty chunks.
+    @Volatile private var tokenizer: WordPieceTokenizer? = null
+    @Volatile private var encoder: EvsEncoder? = null
+    @Volatile private var chunks: List<EdgeChunk> = emptyList()
 
     private suspend fun ensureLoaded() {
         if (encoder != null) return
