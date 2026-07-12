@@ -1,8 +1,10 @@
 package io.dotnetnativeinterop.transport
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -17,7 +19,6 @@ import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.channels.Channel
 
 /**
  * Pattern 1 — HTTP Loopback (raw sockets + SSE).
@@ -52,7 +53,7 @@ public class HttpClient : InferenceClient {
         NativeBridge.nativeHttpStop()
     }
 
-    override fun stream(request: InferRequest): Flow<Token> = flow {
+    override fun stream(request: InferRequest): Flow<Token> = callbackFlow {
         if (port <= 0) throw IllegalStateException("HttpClient not started — call start() first")
 
         val body = json.encodeToString(
@@ -69,9 +70,6 @@ public class HttpClient : InferenceClient {
             .header("X-Dni-Request-Id", UUID.randomUUID().toString())
             .build()
 
-        // Channel bridges the OkHttp callback thread to the Flow collector.
-        val channel = Channel<Token>(capacity = 64)
-
         val listener = object : EventSourceListener() {
             override fun onEvent(
                 eventSource: EventSource,
@@ -82,30 +80,31 @@ public class HttpClient : InferenceClient {
                 runCatching {
                     val sseToken = json.decodeFromString(SseToken.serializer(), data)
                     val token = Token(sseToken.index, sseToken.text, sseToken.final)
-                    channel.trySend(token)
-                    if (sseToken.final) channel.close()
-                }.onFailure { channel.close(it) }
+                    // trySendBlocking applies backpressure — it blocks THIS OkHttp SSE reader thread until
+                    // the collector frees a buffer slot, so a fast loopback server can't outrun a slow UI
+                    // and silently drop tokens. (A non-blocking trySend into a bounded channel would drop
+                    // on overflow, and dropping the FINAL token would end the stream looking complete —
+                    // a truncated transcript with no error.) Returns a closed result, not a throw, once the
+                    // collector cancels; the trailing close()/onClosed then tears down cleanly.
+                    trySendBlocking(token)
+                    if (sseToken.final) close()
+                }.onFailure { close(it) }
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: okhttp3.Response?) {
-                channel.close(t ?: IllegalStateException("SSE connection failed: ${response?.code}"))
+                close(t ?: IllegalStateException("SSE connection failed: ${response?.code}"))
             }
 
             override fun onClosed(eventSource: EventSource) {
-                channel.close()
+                close()
             }
         }
 
         val eventSource = EventSources.createFactory(okhttp)
             .newEventSource(httpRequest, listener)
 
-        try {
-            for (token in channel) {
-                emit(token)
-            }
-        } finally {
-            eventSource.cancel()
-        }
+        // Cancel the SSE call when the collector completes or is cancelled (unblocks the reader thread).
+        awaitClose { eventSource.cancel() }
     }.flowOn(Dispatchers.IO)
 
     @Serializable

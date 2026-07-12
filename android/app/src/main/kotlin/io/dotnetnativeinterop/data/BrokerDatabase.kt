@@ -79,6 +79,15 @@ public data class ResponseTokenEntity(
 public interface RequestDao {
     @Insert
     public suspend fun insert(request: RequestEntity): Long
+
+    /**
+     * Observes one request's lifecycle status (pending → running → done | error | canceled). Room re-emits
+     * on every write to the row, so the SqliteClient can react to a terminal state the broker sets WITHOUT
+     * a final-token row — notably `error`, which the .NET broker writes on an engine fault precisely so the
+     * host does not poll forever. Nullable: emits null if the row is somehow absent.
+     */
+    @Query("SELECT status FROM requests WHERE id = :requestId")
+    public fun observeStatus(requestId: Long): Flow<String?>
 }
 
 @Dao
