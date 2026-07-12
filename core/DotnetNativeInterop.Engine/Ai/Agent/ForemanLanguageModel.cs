@@ -36,7 +36,7 @@ public sealed class ForemanLanguageModel(ForemanAgent agent) : ILanguageModel
     /// a native NUL-terminated <c>const char*</c> intact (unlike an embedded NUL, which such a reader
     /// would silently truncate at).
     /// </summary>
-    public const string StatusMarker = "\u0001dni.agent.status";
+    public const string StatusMarker = "\u0001dni.agent.status";
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<string> GenerateAsync(

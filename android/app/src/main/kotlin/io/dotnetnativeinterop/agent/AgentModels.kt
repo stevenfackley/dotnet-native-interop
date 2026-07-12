@@ -54,13 +54,13 @@ private val agentJson = Json { ignoreUnknownKeys = true }
  * (abi/dni.h): the ONE fragment whose first character is the 0x01 control byte is the status fragment;
  * every other (non-empty) fragment is real streamed answer text. Detect on the control byte, not the tag.
  *
- * The JSON offset is found STRUCTURALLY by the tag rather than a fixed `1 + STATUS_TAG.length` skip: the
- * live engine writes the marker with a REPEATED 0x01 prefix (observed on iOS: `0x01 0x01 dni.agent.status…`
- * from a real turn), so a fixed skip lands one byte short and yields invalid JSON. Taking everything after
- * the tag is robust to any number of leading control bytes; detection stays on the leading 0x01 (never the
- * tag text — an LLM could stream "dni.agent.status" while answering ABOUT the marker). No tag ⇒ malformed
- * ⇒ decode throws honestly. (The engine's StatusMarker is declared with a single 0x01 — the doubled prefix
- * is worth an engine-side look; the client is defensive either way.)
+ * The JSON offset is found STRUCTURALLY by the tag rather than a fixed `1 + STATUS_TAG.length` skip: an
+ * earlier engine bug emitted a DOUBLED 0x01 prefix (a stray raw control byte in
+ * ForemanLanguageModel.StatusMarker, since root-caused + fixed so the wire is a single 0x01 per abi/dni.h)
+ * which made a fixed skip land one byte short on invalid JSON. Taking everything after the tag stays robust
+ * to any number of leading control bytes regardless; detection stays on the leading 0x01 (never the tag
+ * text — an LLM could stream "dni.agent.status" while answering ABOUT the marker). No tag ⇒ malformed
+ * ⇒ decode throws honestly.
  */
 public fun parseAgentFragment(text: String): AgentFragment {
     if (text.isNotEmpty() && text[0] == CONTROL_BYTE) {
