@@ -10,7 +10,11 @@ import kotlin.math.sqrt
 public class EvsEncoder(modelPath: String) : AutoCloseable {
 
     private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
-    private val session: OrtSession = env.createSession(modelPath, OrtSession.SessionOptions())
+    // createSession READS the options but does not take ownership — SessionOptions owns a native handle
+    // (AutoCloseable), so an inline `SessionOptions()` would leak it. Close it once the session is built.
+    private val session: OrtSession = OrtSession.SessionOptions().use { opts ->
+        env.createSession(modelPath, opts)
+    }
     private val outputName: String = session.outputNames.first()
 
     public fun embed(ids: LongArray, mask: LongArray): FloatArray {
