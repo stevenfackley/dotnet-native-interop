@@ -205,6 +205,27 @@ internal sealed class SqliteBroker : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+
+        // Defensive lifecycle: STOP the poll loop before disposing the connection it uses — even when a
+        // caller Disposes without calling Stop() first. Both current callers do Stop() -> Dispose() (the FFI
+        // dni_broker_stop and the harness), so for them this is idempotent; but an IDisposable must be safe
+        // regardless of call order. Without this, a lone Dispose() would leave the live loop reading a
+        // disposed connection (ObjectDisposedException) and disposing a CTS whose token the loop still holds.
+        if (!_cts.IsCancellationRequested)
+        {
+            _cts.Cancel();
+        }
+
+        try
+        {
+            _loop?.GetAwaiter().GetResult();
+        }
+        catch (Exception)
+        {
+            // Expected OperationCanceledException on shutdown (or a contained loop fault); Dispose must
+            // never throw, so the loop's terminal state is swallowed here.
+        }
+
         _cts.Dispose();
         _conn?.Dispose();
     }

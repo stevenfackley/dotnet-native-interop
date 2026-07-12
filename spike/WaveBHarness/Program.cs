@@ -235,6 +235,19 @@ internal static class Program
             broker.Dispose();
             TryDelete(dbPath);
         }
+
+        // Hardening: a robust IDisposable must be safe regardless of call order. Start a fresh broker and
+        // Dispose it WITHOUT a preceding Stop() — the defensive Dispose stops the live poll loop before
+        // disposing the connection it uses, so no ObjectDisposedException escapes.
+        var noStopDb = Path.Combine(Path.GetTempPath(), $"dni-waveb-nostop-{Guid.NewGuid():N}.db");
+        var noStop = new SqliteBroker(noStopDb);
+        noStop.Start();
+        var disposedCleanly = true;
+        try { noStop.Dispose(); }
+        catch (Exception) { disposedCleanly = false; }
+        Check("broker: Dispose() without a preceding Stop() is safe (loop stopped before the connection is disposed)",
+            disposedCleanly);
+        TryDelete(noStopDb);
     }
 
     // ----- Foreman agent turn (internal path: ForemanHost.Agent directly, no FFI session wrapper) ---
