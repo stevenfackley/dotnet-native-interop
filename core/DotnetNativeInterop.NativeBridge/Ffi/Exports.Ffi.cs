@@ -61,7 +61,7 @@ internal static class ExportsFfi
             var callbackAsNint = (nint)callback;
             var userDataAsNint = (nint)userData;
 
-            _ = Task.Run(() => DrainAsync(session, callbackAsNint, userDataAsNint));
+            _ = Task.Run(() => DrainAsync(id, session, callbackAsNint, userDataAsNint));
 
             return id;
         }
@@ -119,7 +119,7 @@ internal static class ExportsFfi
             var callbackAsNint = (nint)callback;
             var userDataAsNint = (nint)userData;
 
-            _ = Task.Run(() => DrainAsync(session, callbackAsNint, userDataAsNint));
+            _ = Task.Run(() => DrainAsync(id, session, callbackAsNint, userDataAsNint));
 
             return id;
         }
@@ -174,12 +174,13 @@ internal static class ExportsFfi
             var callbackAsNint = (nint)callback;
             var userDataAsNint = (nint)userData;
 
-            _ = Task.Run(() => DrainAsync(session, callbackAsNint, userDataAsNint));
+            _ = Task.Run(() => DrainAsync(id, session, callbackAsNint, userDataAsNint));
 
             return id;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            EngineLogEvents.ExportFailed(EngineLog.Logger, "dni_agent_session_start", ex);
             return NativeStatus.Internal;
         }
     }
@@ -236,7 +237,7 @@ internal static class ExportsFfi
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private static async Task DrainAsync(InferenceSession session, nint callback, nint userData)
+    private static async Task DrainAsync(long sessionId, InferenceSession session, nint callback, nint userData)
     {
         try
         {
@@ -247,12 +248,14 @@ internal static class ExportsFfi
                 Invoke(callback, userData, token.Index, token.Text, token.IsFinal);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // The session may have been cancelled or the channel may have faulted.
-            // Either way: do not surface into unobserved Task land — swallow here.
-            // The native side will not receive further callbacks, which is the correct
-            // signal (no is_final=1) telling it something went wrong; it can free/cancel.
+            // The session may have been cancelled or the channel may have faulted. Either way, do not
+            // surface into unobserved-Task land — but no longer swallow it SILENTLY. Record it on the log
+            // ring (EngineLog, drained via dni_log_drain) so the failure is observable; the native side
+            // still receives no further callbacks (no is_final=1), which remains the in-band signal that
+            // the turn ended early and the client can free/cancel.
+            EngineLogEvents.FfiDrainAborted(EngineLog.Logger, sessionId, ex);
         }
     }
 

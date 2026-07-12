@@ -22,6 +22,15 @@
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.7.0" />
   </ItemGroup>
 
+  <!-- Observability's logging leg (EngineLog + [LoggerMessage] events): Abstractions ONLY — the
+       [LoggerMessage] source generator ships with it and emits reflection-free, zero-alloc logging code,
+       so no concrete Microsoft.Extensions.Logging (DI/Options) package is pulled in. A hand-written
+       ILogger (RingLogger) funnels records into the bounded ring the native UI drains. Proven AOT-clean
+       by spike/LogSinkHarness; see docs/logging-nativeaot-findings.md. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
   <!-- On-device AI: all-MiniLM sentence encoder via ONNX Runtime + bundled model/vocab/corpus. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />

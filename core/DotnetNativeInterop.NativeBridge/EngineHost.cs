@@ -48,6 +48,9 @@ public static class EngineHost
             // Payload is the C# 14 / .NET 10 language-feature showcase (no LLM).
             _orchestrator ??= new InferenceOrchestrator(new FeatureShowcaseModel());
             _ragOrchestrator ??= new InferenceOrchestrator(BuildRagModel());
+            // A happy-path marker on the log ring so a clean run's dni_log_drain is non-empty (not only
+            // errors). Inside the lock + after the ??= builds, so it records once per real initialization.
+            EngineLogEvents.EngineInitialized(EngineLog.Logger);
         }
     }
 
