@@ -46,4 +46,16 @@ public class RasterPayloadTest {
         assertNull("bad base64", RasterPayload.decode("2x2x3:@@@@"))
         assertTrue(true)
     }
+
+    @Test
+    public fun returnsNullOnOverflowingDimensions() {
+        // 65536*65536 wraps a 32-bit Int product to 0, so an EMPTY body would pass a naive
+        // `bytes.size != w*h*c` gate and yield a corrupt RasterImage (0 pixels, billions of pixels claimed)
+        // the UI then OOMs on. Must be rejected, honoring "returns null on a bad byte count. Never throws."
+        assertNull("w*h overflows Int to 0", RasterPayload.decode("65536x65536:"))
+        // 46341^2 > Int.MAX_VALUE (46340^2 fits) — the pixel count itself overflows even with C=1.
+        assertNull("w*h just over Int.MAX_VALUE", RasterPayload.decode("46341x46341:"))
+        // A body whose true W*H*C exceeds Int range can never match an Int-sized byte array → null.
+        assertNull("huge RGB dims", RasterPayload.decode("40000x40000x3:AAAA"))
+    }
 }

@@ -39,7 +39,13 @@ public object RasterPayload {
         } catch (_: IllegalArgumentException) {
             return null
         }
-        if (bytes.size != w * h * c) return null
+        // W*H*C computed in Long: an Int product silently wraps (e.g. "65536x65536" overflows w*h to 0),
+        // which would sneak a 0-byte body past this length gate and return a structurally-corrupt image
+        // (pixels.size = 0 while width*height claims billions) that the UI then OOMs building a bitmap
+        // from. Bound W*H to Int so IntArray(w*h) and the pixel loop below stay in range.
+        val pixelCount = w.toLong() * h.toLong()
+        if (pixelCount > Int.MAX_VALUE) return null
+        if (bytes.size.toLong() != pixelCount * c.toLong()) return null
 
         val pixels = IntArray(w * h)
         if (c == 1) {
