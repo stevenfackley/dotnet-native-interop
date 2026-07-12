@@ -77,10 +77,23 @@ public sealed class DniChatClient(ILanguageModel model, string? modelId = null) 
         var request = BuildRequest(messages, options);
         var id = modelId ?? model.GetType().Name;
 
+        var fragments = 0;
         await foreach (var fragment in model.GenerateAsync(request, cancellationToken).ConfigureAwait(false))
         {
+            fragments++;
             yield return new ChatResponseUpdate(ChatRole.Assistant, fragment) { ModelId = id };
         }
+
+        // Trailing update carrying the honest finish reason. M.E.AI aggregates the finish reason from the
+        // update stream (ToChatResponse()), so a streamed turn must terminate it the SAME way
+        // GetResponseAsync does — a turn cut off at MaxTokens is Length, a natural stop is Stop. Content is
+        // empty, so concatenating the stream stays byte-identical to the non-streaming text.
+        yield return new ChatResponseUpdate
+        {
+            Role = ChatRole.Assistant,
+            ModelId = id,
+            FinishReason = fragments >= request.MaxTokens ? ChatFinishReason.Length : ChatFinishReason.Stop,
+        };
     }
 
     /// <inheritdoc/>

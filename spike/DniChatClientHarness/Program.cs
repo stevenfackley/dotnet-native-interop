@@ -100,6 +100,22 @@ internal static class Program
         Check("streaming: concatenated updates, IN ORDER, exactly equal the non-streaming response " +
               "(the same GenerateAsync sequence surfaced through both paths)",
             streamedText == nonStreamed.Text);
+
+        // Honest finish reason on the streaming path too (a trailing empty update terminates it). The
+        // default prompt completes naturally, well under the 256-token cap -> Stop; the trailing update
+        // contributes no text, so the concat check above still holds.
+        Check("streaming: the final update carries the honest finish reason (natural stop -> Stop)",
+            updates[^1].FinishReason == ChatFinishReason.Stop);
+
+        // Truncated stream: a 3-token cap against the ~30-word reply -> the final update reports Length,
+        // matching the non-streaming GetResponseAsync (a caller that continues on Length must see it here too).
+        var truncated = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync(prompt, new ChatOptions { MaxOutputTokens = 3 }))
+        {
+            truncated.Add(update);
+        }
+        Check("streaming: a truncated stream (hit MaxTokens) ends with FinishReason.Length",
+            truncated[^1].FinishReason == ChatFinishReason.Length);
     }
 
     private static async Task RunChatOptionsMappingAsync()
