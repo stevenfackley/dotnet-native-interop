@@ -41,4 +41,38 @@ final class TrustFlowTests: XCTestCase {
         XCTAssertFalse(try binaryPosture(vm).encrypted, "binary is PLAINTEXT again after disabling PQ")
         XCTAssertNil(vm.report?.binaryPqChannel)
     }
+
+    /// A catalog that returns fixed JSON, or throws when `fail` is set — drives the failure path hermetically.
+    private struct FakeFeatureService: FeatureService {
+        var json: String = "{}"
+        var fail = false
+        func descriptors() async throws -> [FeatureDescriptor] { [] }
+        func run(_ id: String) async throws -> FeatureResult {
+            if fail { throw FeatureServiceError.nullResult }
+            return FeatureResult(id: id, result: json, elapsedMs: 0, ok: true)
+        }
+    }
+
+    /// Regression pin: a FAILED PQ negotiation must revert the switch AND keep its banner. The trailing
+    /// posture refresh used to call `refresh()`, whose up-front `errorMessage = nil` silently wiped the
+    /// "PQ negotiation failed" banner — the switch flicked back OFF with no explanation. Hermetic (fakes +
+    /// a no-op actuator), so it needs no simulator pb server. Parity with Android's TrustViewModelTest.
+    func testFailedPqNegotiationStaysDisclosed() async throws {
+        let plaintext = """
+        {"transports":[{"transport":"binary","inProcess":false,"encrypted":false,"wire":"loopback","detail":"framed protobuf"}],"binaryPqChannel":null}
+        """
+        // trust~posture (catalog) succeeds; the PQ handshake ping (binaryCatalog) FAILS.
+        let vm = TrustViewModel(
+            catalog: FakeFeatureService(json: plaintext),
+            binaryCatalog: FakeFeatureService(fail: true),
+            pqToggle: { _ in }  // no real transport side effect
+        )
+        await vm.refresh()
+        await vm.setPqEnabled(true)
+
+        XCTAssertFalse(vm.pqRequested, "the switch must NOT read ON when the handshake failed")
+        let msg = try XCTUnwrap(vm.errorMessage, "the failure must stay disclosed after the trailing refresh")
+        XCTAssertTrue(msg.contains("PQ negotiation failed"), "banner names the failure; got: \(msg)")
+        XCTAssertFalse(vm.negotiating)
+    }
 }

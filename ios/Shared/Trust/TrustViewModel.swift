@@ -18,17 +18,31 @@ final class TrustViewModel: ObservableObject {
 
     private let catalog: FeatureService         // FFI — answers the engine-global trust~posture, cheapest
     private let binaryCatalog: FeatureService   // pb — used to force a real handshake when enabling PQ
+    // The PQ on/off actuator — injected (not a hardcoded PbTransport call) so setPqEnabled's disclosure
+    // invariant is unit-testable without the native pb server. Default is the real transport toggle.
+    private let pqToggle: (Bool) -> Void
 
     init(catalog: FeatureService = FFIFeatureService(),
-         binaryCatalog: FeatureService = PbFeatureService()) {
+         binaryCatalog: FeatureService = PbFeatureService(),
+         pqToggle: @escaping (Bool) -> Void = { PbTransport.shared.setSecure($0) }) {
         self.catalog = catalog
         self.binaryCatalog = binaryCatalog
+        self.pqToggle = pqToggle
     }
 
-    /// Re-reads the current posture from the engine.
+    /// Re-reads the current posture from the engine (clearing any stale error first — a manual refresh).
     func refresh() async {
         loading = true
         errorMessage = nil
+        await applyPosture()
+    }
+
+    /// Re-reads `trust~posture` into `report`. On a successful read it updates the report but LEAVES
+    /// `errorMessage` untouched — so a "PQ negotiation failed" banner set by `setPqEnabled` survives the
+    /// posture refresh that immediately follows it. (That trailing refresh used to call `refresh()`, whose
+    /// up-front `errorMessage = nil` silently wiped the banner, so the failure was reverted on the switch but
+    /// never disclosed.)
+    private func applyPosture() async {
         do {
             let result = try await catalog.run("trust~posture")
             report = try JSONDecode.decode(TrustPostureReport.self, from: result.result)
@@ -48,7 +62,7 @@ final class TrustViewModel: ObservableObject {
         pqRequested = enabled
         errorMessage = nil
         do {
-            PbTransport.shared.setSecure(enabled)
+            pqToggle(enabled)
             // Force a connection so the handshake runs (publishing live params) or plaintext resumes.
             _ = try await binaryCatalog.run("ping")
         } catch {
@@ -56,6 +70,7 @@ final class TrustViewModel: ObservableObject {
             pqRequested = previous
         }
         negotiating = false
-        await refresh()
+        // Re-read posture WITHOUT clearing the error above — a failed negotiation must stay disclosed.
+        await applyPosture()
     }
 }
