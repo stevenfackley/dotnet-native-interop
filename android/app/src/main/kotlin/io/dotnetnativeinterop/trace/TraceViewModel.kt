@@ -3,6 +3,7 @@ package io.dotnetnativeinterop.trace
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.dotnetnativeinterop.transport.NativeBridge
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,11 +14,27 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 /**
+ * The source of raw `dni_trace_drain` JSON — injectable (a functional interface, like
+ * [io.dotnetnativeinterop.agent.AgentTraceReader] and [io.dotnetnativeinterop.log.LogDrainSource]) so tests
+ * can drive the view model without the native lib. Returns null on a NULL/failed drain.
+ */
+public fun interface TraceDrainSource {
+    public fun drain(): String?
+}
+
+/**
  * Drives the Analysis Trace segment. Drains the engine span ring (`dni_trace_drain`) on demand and holds
  * the most recent drain for the waterfall, plus a cumulative dropped-span count. Ring overflow is
  * disclosed (never silently swallowed) — the drain payload's `dropped` is accumulated and shown.
+ *
+ * `@JvmOverloads` keeps the no-arg constructor reflectable for Compose's `viewModel()`; [drainSource]/
+ * [ioDispatcher] are injected (not hardcoded) so the drain/filter/overflow logic is unit-testable with a
+ * fake source on an unconfined dispatcher — parity with LogViewModel / AgentViewModel.
  */
-public class TraceViewModel : ViewModel() {
+public class TraceViewModel @JvmOverloads constructor(
+    private val drainSource: TraceDrainSource = TraceDrainSource { NativeBridge.nativeTraceDrain() },
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : ViewModel() {
 
     public data class UiState(
         val spans: List<TraceSpan> = emptyList(),
@@ -48,7 +65,7 @@ public class TraceViewModel : ViewModel() {
     public fun drain() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            val raw = withContext(Dispatchers.IO) { NativeBridge.nativeTraceDrain() }
+            val raw = withContext(ioDispatcher) { drainSource.drain() }
             if (raw == null) {
                 _state.update { it.copy(loading = false, error = "dni_trace_drain returned null") }
                 return@launch
