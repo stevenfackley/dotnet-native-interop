@@ -39,6 +39,13 @@ final class EdgeSearchViewModel: ObservableObject {
     }
 
     func run() async {
+        // One in-flight search at a time. EdgeSearchEngine is @unchecked Sendable ONLY on the promise that
+        // its ORT session (which is NOT thread-safe) is never touched concurrently — this VM is that promise.
+        // run() is @MainActor but suspends at the detached search below, so without this guard a second
+        // submit could start a SECOND concurrent engine.search() on that session (a data race), and could
+        // also overwrite newer results with older ones. The search Button is .disabled(searching), but the
+        // TextField's onSubmit is not — so this guard, not the UI, is what actually holds the invariant.
+        guard !searching else { return }
         guard let engine else { return }
         guard let q = QueryInput.sanitize(query) else { hits = []; return }
         searching = true
