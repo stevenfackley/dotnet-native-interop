@@ -46,6 +46,23 @@ jobs:
         run: |
           brew install xcodegen
 
+      # macos-latest's DEFAULT xcode-select drifts (it was Xcode 26.5 through 2026-07-12 01:15 UTC, then
+      # rolled back to Xcode 16.4 / iPhoneOS 18.5 SDK). The pb PQ channel
+      # (ios/Shared/Pb/PqHandshakeClient.swift) uses CryptoKit MLKEM768/MLDSA65, which exist ONLY in the
+      # iOS 26 SDK — under 16.4 the app build fails with "cannot find 'MLKEM768' in scope". Pin the newest
+      # installed Xcode 26.x explicitly so the SDK is deterministic. Fails loudly if the runner has no
+      # Xcode 26 at all (which would instead require #available/canImport compile gating on the PQ code).
+      - name: Select Xcode with the iOS 26 SDK (post-quantum CryptoKit)
+        run: |
+          ls -d /Applications/Xcode_*.app || true
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then
+            echo "::error::no Xcode 26.x on this runner — iOS 26 SDK required for MLKEM768/MLDSA65"; exit 1
+          fi
+          echo "Selecting $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
       - name: Build llama.cpp static libs (device + simulator)
         run: |
           # The .csproj hand-links the iOS llama/ggml archives into the NativeAOT image, so they must
