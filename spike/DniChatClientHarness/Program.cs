@@ -50,7 +50,10 @@ internal static class Program
             response.Text.Contains("user: hello from dni", StringComparison.Ordinal));
         Check("non-streaming: MockLanguageModel actually ran",
             response.Text.StartsWith("You asked:", StringComparison.Ordinal));
-        Check("non-streaming: FinishReason is Stop", response.FinishReason == ChatFinishReason.Stop);
+        // Now a MEANINGFUL check (was hardcoded Stop before the honest-finish-reason fix): the mock's
+        // ~30-word reply is well under the default 256-token cap, so it completed naturally → Stop.
+        Check("non-streaming: a naturally-completed response (under MaxTokens) reports FinishReason.Stop",
+            response.FinishReason == ChatFinishReason.Stop);
         Check("non-streaming: ModelId defaults to the backend's type name",
             response.ModelId == nameof(MockLanguageModel));
     }
@@ -111,6 +114,10 @@ internal static class Program
         Console.WriteLine($"ChatOptions.MaxOutputTokens=3 -> \"{response.Text}\" ({wordCount} words)");
         Check("ChatOptions.MaxOutputTokens maps to InferenceRequest.MaxTokens (caps generated words)",
             wordCount == 3);
+        // The response was cut off at the 3-token cap (the mock's canned reply is ~30 words), so the finish
+        // reason must be Length, not a false Stop — the hardened honest-finish-reason behavior.
+        Check("truncated response (hit MaxTokens) reports FinishReason.Length, not a false Stop",
+            response.FinishReason == ChatFinishReason.Length);
     }
 
     // Proves the grammar seam Foreman's constrained turn relies on: a GBNF string placed in

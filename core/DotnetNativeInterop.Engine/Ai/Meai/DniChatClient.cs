@@ -47,16 +47,24 @@ public sealed class DniChatClient(ILanguageModel model, string? modelId = null) 
         var request = BuildRequest(messages, options);
 
         var text = new StringBuilder();
+        var fragments = 0;
         await foreach (var fragment in model.GenerateAsync(request, cancellationToken).ConfigureAwait(false))
         {
             text.Append(fragment);
+            fragments++;
         }
 
         var message = new ChatMessage(ChatRole.Assistant, text.ToString());
         return new ChatResponse(message)
         {
             ModelId = modelId ?? model.GetType().Name,
-            FinishReason = ChatFinishReason.Stop,
+            // Honest finish reason. Every engine backend yields ~one fragment per generated unit — a word
+            // for MockLanguageModel, a llama piece/token for LlamaLanguageModel — and stops at
+            // InferenceRequest.MaxTokens, so reaching the cap means the output was cut off (Length) while
+            // fewer fragments means the model stopped on its own (Stop). Previously hardcoded to Stop, which
+            // mis-reported every truncated turn as a clean completion (M.E.AI middleware and callers key off
+            // this — a caller retrying/continuing on Length must not see a truncated turn as Stop).
+            FinishReason = fragments >= request.MaxTokens ? ChatFinishReason.Length : ChatFinishReason.Stop,
         };
     }
 
