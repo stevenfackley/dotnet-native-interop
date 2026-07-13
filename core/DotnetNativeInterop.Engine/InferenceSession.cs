@@ -73,8 +73,23 @@ public sealed class InferenceSession : IAsyncDisposable
         }
     }
 
-    /// <summary>Requests cancellation of the underlying generation.</summary>
-    public void Cancel() => _cts.Cancel();
+    /// <summary>Requests cancellation of the underlying generation. Safe to race with <see cref="DisposeAsync"/>.</summary>
+    public void Cancel()
+    {
+        // Cancel can race Dispose/free: the FFI registry vends a session reference (SessionRegistry.TryGet)
+        // that a concurrent dni_session_free / dni_shutdown may dispose — and CancellationTokenSource.Cancel()
+        // throws ObjectDisposedException after Dispose(). A cancel that loses that race is a no-op (the
+        // session is already being torn down), not an error — swallow it so dni_session_cancel reports Ok
+        // instead of a misleading Internal, and a direct caller never sees the throw.
+        try
+        {
+            _cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed by a concurrent free/shutdown — cancellation is moot.
+        }
+    }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()

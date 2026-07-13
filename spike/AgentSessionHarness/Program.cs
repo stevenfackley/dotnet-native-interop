@@ -231,6 +231,25 @@ async Task<(ForemanStopReason StopReason, int ToolSteps)> RunHostTurnAsync(strin
         afterReset.ToolSteps == 0);
 }
 
+// ============================================================================================
+// Task: Cancel() is race-safe with Dispose/free. The FFI registry (SessionRegistry.TryGet) vends a
+// session reference that a concurrent dni_session_free / dni_shutdown can dispose, and
+// CancellationTokenSource.Cancel() throws ObjectDisposedException after Dispose() — so dni_session_cancel
+// (SessionCancel -> session.Cancel()) used to report a misleading Internal fault on a legitimate
+// cancel-racing-free. Cancel-after-dispose is the deterministic worst case of that race.
+// ============================================================================================
+{
+    var session = InferenceSession.Start(EngineHost.Orchestrator, new InferenceRequest("cancel-race"));
+    await session.DisposeAsync();
+
+    var threw = false;
+    try { session.Cancel(); } catch (Exception) { threw = true; }
+    Check("session: Cancel() after Dispose() does not throw (cancel racing free is a no-op, not a fault)", !threw);
+
+    try { session.Cancel(); } catch (Exception) { threw = true; }
+    Check("session: a second Cancel() after Dispose() is still safe (idempotent)", !threw);
+}
+
 Console.WriteLine($"== {passed}/{passed + failed} checks passed ==");
 return failed == 0 ? 0 : 1;
 
