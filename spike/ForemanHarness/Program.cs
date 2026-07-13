@@ -374,6 +374,29 @@ Check("ForemanHost emitted agent.tool.run_feature span", hostSpans.Contains("age
         withHistory?.Tool == "search_manuals");
 }
 
+// Task 18b: the off-topic-after-manuals guard. The router used to fold the ENTIRE prior turn (query +
+// answer, up to ~800 chars of manual prose) into the routing text UNCONDITIONALLY, so after any manuals
+// turn a decisively off-topic query was dragged above the threshold and false-routed to search_manuals
+// (verified: "who won the world cup in 1998" scored 0.425 combined). The relevance gate (cosine(query,
+// hint) >= 0.08) folds the hint in ONLY for a genuine continuation — the follow-up above (sim ~0.16 to the
+// hint) still routes; these off-topic pivots (sim ~0.01 / negative) must now route to NOTHING.
+{
+    var priorManualsHint = "search the manuals for fault E3 " +
+        "the manual says reset the panel breaker and re-energize the compressor contactor";
+    string[] offTopicFollowUps =
+    [
+        "what's the weather in Tokyo tomorrow afternoon",
+        "who won the world cup in 1998 and what was the final score",
+    ];
+    foreach (var offTopic in offTopicFollowUps)
+    {
+        var routed = calibrationRouter.Route(offTopic, priorManualsHint);
+        Console.WriteLine($"[history] off-topic WITH manuals hint: route={routed?.Tool ?? "(none)"}  <- \"{offTopic}\"");
+        Check("off-topic query does NOT route even with a prior manuals turn folded in (relevance-gated)",
+            routed is null);
+    }
+}
+
 // Task 19: full ForemanHost + agent~reset end-to-end — the REAL router brain (no GGUF on this box), the
 // REAL ConversationSession wired via ForemanHost.Build, and the REAL command-grammar reset path
 // (LanguageFeatureCatalog.Run("agent~reset"), the exact call dni_feature_run makes — see
@@ -401,6 +424,16 @@ Check("ForemanHost emitted agent.tool.run_feature span", hostSpans.Contains("age
     var afterResetRes = await hostAgent.RunTurnAsync(ambiguousFollowUp, _ => { }, default);
     Check("after agent~reset, the same follow-up again has no history and does not route",
         afterResetRes.ToolSteps == 0);
+
+    // Off-topic-after-manuals, end-to-end: a manuals turn then a decisively off-topic question must NOT
+    // route (the Task 18b relevance gate, through the full ForemanHost.Agent + ConversationSession path).
+    await hostAgent.RunTurnAsync(
+        "the compressor is overheating and keeps tripping the rooftop unit, what should I check?", _ => { }, default);
+    var offTopicRes = await hostAgent.RunTurnAsync(
+        "who won the world cup in 1998 and what was the final score", _ => { }, default);
+    Check("end-to-end: an off-topic question after a manuals turn does not route to a tool",
+        offTopicRes.ToolSteps == 0);
+    LanguageFeatureCatalog.Run("agent~reset"); // leave a clean slate for later tasks
 }
 
 // Task 20: the agent's run_feature tool is SCOPED to catalog demos — it must NOT be a back door into the

@@ -13,10 +13,19 @@ public sealed class DeterministicRouter
     private readonly (ToolDefinition Tool, float[] Vec)[] _tools;
     private readonly Func<string, float[]> _embed;
     private readonly float _threshold;
+    private readonly float _hintGate;
 
-    public DeterministicRouter(IReadOnlyList<ToolDefinition> tools, Func<string, float[]> embed, float threshold)
+    // hintRelevanceGate: minimum cosine(query, contextHint) required before the prior-turn hint is folded
+    // into the routing text. Guards against a long prior answer (up to ~800 chars of prose) dominating the
+    // mean-pooled embedding and dragging a decisively OFF-TOPIC current query above the threshold. Measured
+    // with the shipped INT8 encoder against a REAL manuals turn hint: a genuine anaphoric follow-up ("how do
+    // I clear THAT?") scores ~0.075, while off-topic pivots ("who won the world cup in 1998") score ~0.03 or
+    // negative — 0.05 sits between them (see spike/ForemanHarness Task 18/18b + the end-to-end off-topic
+    // check). Deliberately biased toward rejecting off-topic (a false HVAC answer to an unrelated question
+    // is worse than a follow-up losing its grounding). Ignored when no hint is passed.
+    public DeterministicRouter(IReadOnlyList<ToolDefinition> tools, Func<string, float[]> embed, float threshold, float hintRelevanceGate = 0.05f)
     {
-        _embed = embed; _threshold = threshold;
+        _embed = embed; _threshold = threshold; _hintGate = hintRelevanceGate;
         _tools = new (ToolDefinition, float[])[tools.Count];
         for (int i = 0; i < tools.Count; i++) _tools[i] = (tools[i], embed(tools[i].Description));
     }
@@ -32,8 +41,20 @@ public sealed class DeterministicRouter
     /// </param>
     public ToolCall? Route(string query, string? contextHint = null)
     {
-        var routedText = string.IsNullOrEmpty(contextHint) ? query : $"{contextHint}\n{query}";
-        var q = _embed(routedText);
+        // Fold the prior-turn hint into the routing text ONLY when the current query is a genuine
+        // continuation of it (cosine(query, hint) >= _hintGate). Otherwise a long prior answer dominates the
+        // embedding and a decisively off-topic current query ("who won the world cup in 1998" after a
+        // manuals turn) would clear the threshold and false-route to search_manuals. A real anaphoric
+        // follow-up ("how do I clear THAT?") stays close to the hint and is still folded in.
+        var routedText = query;
+        var q = _embed(query);
+        if (!string.IsNullOrEmpty(contextHint)
+            && TensorPrimitives.CosineSimilarity(q, _embed(contextHint)) >= _hintGate)
+        {
+            routedText = $"{contextHint}\n{query}";
+            q = _embed(routedText);
+        }
+
         float best = float.NegativeInfinity; ToolDefinition? pick = null;
         foreach (var (tool, vec) in _tools)
         {
