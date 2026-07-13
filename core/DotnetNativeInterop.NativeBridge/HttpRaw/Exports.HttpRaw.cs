@@ -59,17 +59,30 @@ internal static class RawHttpServer
 
     private static async Task AcceptLoopAsync(TcpListener listener, CancellationToken cancellationToken)
     {
-        try
+        // try/catch INSIDE the loop so a transient accept error (a backlog RST → SocketException) doesn't
+        // permanently kill the accept loop while Start() keeps reporting the server as live. Only a real
+        // Stop() (cancellation / disposed listener) ends the loop. Mirrors PbFrameServer.AcceptLoopAsync.
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            TcpClient client;
+            try
             {
-                var client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
-                _ = HandleClientAsync(client, cancellationToken);
+                client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
             }
-        }
-        catch (Exception)
-        {
-            // Listener stopped or cancelled.
+            catch (OperationCanceledException)
+            {
+                break; // Stop() cancelled the token.
+            }
+            catch (ObjectDisposedException)
+            {
+                break; // Stop() disposed the listener.
+            }
+            catch (SocketException)
+            {
+                continue; // Transient accept failure — keep serving.
+            }
+
+            _ = HandleClientAsync(client, cancellationToken);
         }
     }
 

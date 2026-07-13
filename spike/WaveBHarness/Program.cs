@@ -44,6 +44,9 @@ internal static class Program
             RunTraceDrain();
             RunTrustAndTraceCommands();
             RunMetricsSnapshot();
+            // Last: it starts/stops its own pb servers and drives only FAILING requests (no successful
+            // dispatch), so it stays clear of the calibrated trace/metrics assertions above.
+            await RunPbErrorHandlingAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -176,6 +179,65 @@ internal static class Program
         }
 
         Check("pb PQ: posture clears to plaintext after the server stops", TrustPosture.BinaryPqChannel is null);
+    }
+
+    // ----- pb server error handling & idempotency (regression pins for the server-resilience fixes) ---
+
+    private static async Task RunPbErrorHandlingAsync(CancellationToken ct)
+    {
+        // (a) The singleton server's PQ posture is fixed for its lifetime. A mismatched-flag second Start
+        // must be REJECTED (not silently ignored — that would desync every client into a handshake hang).
+        var port = PbFrameServer.Start(0);
+        try
+        {
+            Check("pb start: mismatched-flag restart rejected (Start(1) while plaintext-up => InvalidArgument)",
+                PbFrameServer.Start(1) == NativeStatus.InvalidArgument);
+            Check("pb start: matching-flag restart returns the live port",
+                PbFrameServer.Start(0) == port);
+
+            // (b) A frame that passes length-framing but is not a valid Envelope must get a typed
+            // ErrorInternal, not a silent close (0x0F = protobuf field 1 with invalid wire type 7).
+            var (client, stream, conn) = await ConnectAsync(port, ct).ConfigureAwait(false);
+            using (client)
+            using (conn)
+            {
+                await WriteRawFrameAsync(stream, [0x0F], ct).ConfigureAwait(false);
+                var bytes = await conn.ReadFrameAsync(ct).ConfigureAwait(false);
+                var ok = bytes is not null
+                    && Envelope.Parser.ParseFrom(bytes) is { BodyCase: Envelope.BodyOneofCase.Error } e
+                    && e.Error.Code == PbFrameServer.ErrorInternal;
+                Check("pb error: malformed frame gets a typed ErrorInternal (not a silent close)", ok);
+            }
+        }
+        finally
+        {
+            PbFrameServer.Stop();
+        }
+
+        // (c) A malformed PQ handshake reply (a wrong-length KEM ciphertext throws a BouncyCastle
+        // exception, NOT PqcHandshakeException) must still get a typed ErrorHandshakeFailed, not a silent
+        // close (the case the previous PqcHandshakeException-only catch let escape).
+        var pqPort = PbFrameServer.Start(1);
+        try
+        {
+            var (client, stream, conn) = await ConnectAsync(pqPort, ct).ConfigureAwait(false);
+            using (client)
+            using (conn)
+            {
+                _ = await conn.ReadFrameAsync(ct).ConfigureAwait(false); // consume the server's HandshakeOffer
+                var badReply = new Envelope { HandshakeReply = new HandshakeReply { Ciphertext = ByteString.CopyFrom(new byte[10]) } };
+                await WriteRawFrameAsync(stream, badReply.ToByteArray(), ct).ConfigureAwait(false);
+                var bytes = await conn.ReadFrameAsync(ct).ConfigureAwait(false);
+                var ok = bytes is not null
+                    && Envelope.Parser.ParseFrom(bytes) is { BodyCase: Envelope.BodyOneofCase.Error } e
+                    && e.Error.Code == PbFrameServer.ErrorHandshakeFailed;
+                Check("pb error: malformed handshake reply gets a typed ErrorHandshakeFailed (not a silent close)", ok);
+            }
+        }
+        finally
+        {
+            PbFrameServer.Stop();
+        }
     }
 
     // ----- Raw HTTP --------------------------------------------------------------------------------

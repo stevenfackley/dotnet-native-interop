@@ -53,6 +53,15 @@ internal static class PbFrameServer
         {
             if (_listener is not null)
             {
+                // The PQ posture is fixed for the singleton server's lifetime. A second Start with a
+                // DIFFERENT flag can't flip it silently — that would desync every client (a PQ client would
+                // hand-shake a plaintext server, or vice-versa, and both would block on read). Reject so the
+                // caller must Stop() first (which the mobile clients already do on a plaintext<->PQ switch).
+                if (((flags & 1) != 0) != _requirePq)
+                {
+                    return NativeStatus.InvalidArgument;
+                }
+
                 return ((IPEndPoint)_listener.LocalEndpoint).Port;
             }
 
@@ -100,17 +109,31 @@ internal static class PbFrameServer
 
     private static async Task AcceptLoopAsync(TcpListener listener, CancellationToken cancellationToken)
     {
-        try
+        // The try/catch is INSIDE the loop: a transient accept error (e.g. a client that RST-closes in the
+        // backlog surfaces as a SocketException from AcceptTcpClientAsync) must NOT kill the accept loop for
+        // good — otherwise the whole transport silently dies while Start() keeps handing back the cached
+        // port as if healthy. Only a real Stop() (cancellation / disposed listener) ends the loop.
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            TcpClient client;
+            try
             {
-                var client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
-                _ = HandleClientAsync(client, cancellationToken);
+                client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
             }
-        }
-        catch (Exception)
-        {
-            // Listener stopped or cancelled.
+            catch (OperationCanceledException)
+            {
+                break; // Stop() cancelled the token.
+            }
+            catch (ObjectDisposedException)
+            {
+                break; // Stop() disposed the listener.
+            }
+            catch (SocketException)
+            {
+                continue; // Transient accept failure — keep serving.
+            }
+
+            _ = HandleClientAsync(client, cancellationToken);
         }
     }
 
@@ -153,9 +176,21 @@ internal static class PbFrameServer
                     }
 
                     Envelope request;
-                    using (EngineTrace.StartSpan("pb.decode"))
+                    try
                     {
-                        request = Envelope.Parser.ParseFrom(frame);
+                        using (EngineTrace.StartSpan("pb.decode"))
+                        {
+                            request = Envelope.Parser.ParseFrom(frame);
+                        }
+                    }
+                    catch (InvalidProtocolBufferException)
+                    {
+                        // A frame that passed length-framing but isn't a valid Envelope. Surface the typed
+                        // ErrorInternal (previously dead code) instead of the outer silent close, honoring the
+                        // "never a silent close" contract, then tear down (the stream position is now unknown).
+                        await TrySendErrorAsync(connection, ErrorInternal, "malformed request frame", cancellationToken)
+                            .ConfigureAwait(false);
+                        break;
                     }
 
                     await DispatchAsync(connection, request, cancellationToken).ConfigureAwait(false);
@@ -194,10 +229,20 @@ internal static class PbFrameServer
 
             stopwatch.Stop();
             connection.UseCipher(result.Cipher);
-            TrustPosture.SetBinaryPqChannel(new PqChannelParams(
-                provider.KemAlgorithm, provider.SigAlgorithm, AeadFrameCipher.Algorithm,
-                result.KemPublicKeyBytes, result.CiphertextBytes, result.SharedSecretBytes,
-                Math.Round(stopwatch.Elapsed.TotalMicroseconds, 1)));
+            // Publish the live-channel posture under Gate, and only if this connection's server hasn't been
+            // stopped mid-handshake. Otherwise a handshake finishing just after Stop() (which nulls the
+            // posture under Gate) would resurrect a "secure channel up" readout for a server that is already
+            // down — the Trust inspector must stay honest. Stop() cancels this connection's token.
+            lock (Gate)
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    TrustPosture.SetBinaryPqChannel(new PqChannelParams(
+                        provider.KemAlgorithm, provider.SigAlgorithm, AeadFrameCipher.Algorithm,
+                        result.KemPublicKeyBytes, result.CiphertextBytes, result.SharedSecretBytes,
+                        Math.Round(stopwatch.Elapsed.TotalMicroseconds, 1)));
+                }
+            }
             return true;
         }
         catch (PqcHandshakeException ex)
@@ -205,6 +250,16 @@ internal static class PbFrameServer
             // Echoing ex.Message is a demo-only affordance (this is a loopback teaching artifact) — it is a
             // mild error oracle. A production server would return a single uniform "handshake failed" reason.
             await TrySendErrorAsync(connection, ErrorHandshakeFailed, ex.Message, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+        catch (Exception)
+        {
+            // A malformed handshake reply (wrong-length KEM ciphertext, non-protobuf bytes) throws a
+            // BouncyCastle/protobuf exception, NOT PqcHandshakeException — which would otherwise escape to
+            // HandleClientAsync's catch and close the socket SILENTLY, breaking the "a handshake failure is a
+            // typed ErrorFrame, never a silent close" contract. Still fail-closed; send a UNIFORM reason (no
+            // ex.Message — don't turn an unexpected exception into an error oracle).
+            await TrySendErrorAsync(connection, ErrorHandshakeFailed, "handshake failed", cancellationToken).ConfigureAwait(false);
             return false;
         }
     }
